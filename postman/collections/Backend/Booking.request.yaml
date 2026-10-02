@@ -1,0 +1,21 @@
+$kind: http-request
+url: http://192.168.0.101:8080/api/booking
+method: GET
+headers:
+  authorization: "{{bearer_token_0zgi}}"
+body:
+  type: json
+  content: "{\r
+
+    \    \"user\":\"6abf7e0c56de71a46608659b\",\r
+
+    \    \"customer\":\"6abf81390f83b7eebb3746cc\",\r
+
+    \    \"date\":\"01/05/2026\",\r
+
+    \    \"invoice\":\"TTrr4586\",\r
+
+    \    \"service\":\"name\"\r
+
+    }"
+order: 4501986463419138

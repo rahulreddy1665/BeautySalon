@@ -1,0 +1,65 @@
+$kind: http-request
+url: http://192.168.0.101:8080/api/role
+method: GET
+headers:
+  authorization: "{{bearer_token_0zgi}}"
+body:
+  type: json
+  content: "{\r
+
+    \  \"name\": \"test\",\r
+
+    \  \"permissions\": [\r
+
+    \    \"6abf7e0c56de71a46608654d\",\r
+
+    \    \"6abf7e0c56de71a466086553\",\r
+
+    \    \"6abf7e0c56de71a466086556\",\r
+
+    \    \"6abf7e0c56de71a466086559\",\r
+
+    \    \"6abf7e0c56de71a46608655c\",\r
+
+    \    \"6abf7e0c56de71a46608655f\",\r
+
+    \    \"6abf7e0c56de71a466086562\",\r
+
+    \    \"6abf7e0c56de71a466086565\",\r
+
+    \    \"6abf7e0c56de71a466086568\",\r
+
+    \    \"6abf7e0c56de71a46608656b\",\r
+
+    \    \"6abf7e0c56de71a46608656e\",\r
+
+    \    \"6abf7e0c56de71a466086571\",\r
+
+    \    \"6abf7e0c56de71a466086574\",\r
+
+    \    \"6abf7e0c56de71a466086577\",\r
+
+    \    \"6abf7e0c56de71a46608657a\",\r
+
+    \    \"6abf7e0c56de71a46608657d\",\r
+
+    \    \"6abf7e0c56de71a466086580\",\r
+
+    \    \"6abf7e0c56de71a466086583\",\r
+
+    \    \"6abf7e0c56de71a466086586\",\r
+
+    \    \"6abf7e0c56de71a466086589\",\r
+
+    \    \"6abf7e0c56de71a46608658c\",\r
+
+    \    \"6abf7e0c56de71a46608658f\",\r
+
+    \    \"6abf7e0c56de71a466086592\",\r
+
+    \    \"6abf7e0c56de71a466086595\"\r
+
+    \  ]\r
+
+    }"
+order: 4499840785546541

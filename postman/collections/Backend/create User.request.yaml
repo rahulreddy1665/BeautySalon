@@ -1,14 +1,17 @@
 $kind: http-request
-description: ""
-url: http://192.168.0.101:8080/api/auth/login
+url: http://192.168.0.100:8080/api/users
 method: POST
+headers:
+  authorization: "{{bearer_token_1941}}"
 body:
   type: json
   content: "{\r
+
+    \    \"name\":\"testUser\",\r
 
     \  \"email\": \"admin@example.com\",\r
 
     \  \"password\": \"Admin@123\"\r
 
     }"
-order: 3883577096678752
+order: 4264844484784808

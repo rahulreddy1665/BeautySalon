@@ -7,26 +7,11 @@ import { Permission } from "../models/permission.model";
 import { Role } from "../models/role.model";
 import { User } from "../models/user.model";
 
+import permissionData from "../extra/permissions.json";
+
 dotenv.config();
 
-const permissions = [
-  {
-    name: "user:create",
-    description: "Create users",
-  },
-  {
-    name: "user:read",
-    description: "View users",
-  },
-  {
-    name: "user:update",
-    description: "Update users",
-  },
-  {
-    name: "user:delete",
-    description: "Delete users",
-  },
-];
+const permissions = permissionData;
 
 const seed = async (): Promise<void> => {
   try {

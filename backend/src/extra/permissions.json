@@ -1,0 +1,103 @@
+[
+  {
+    "name": "user:create",
+    "description": "Create users"
+  },
+  {
+    "name": "user:read",
+    "description": "View users"
+  },
+  {
+    "name": "user:update",
+    "description": "Update users"
+  },
+  {
+    "name": "user:delete",
+    "description": "Delete users"
+  },
+
+  {
+    "name": "role:create",
+    "description": "Create roles"
+  },
+  {
+    "name": "role:read",
+    "description": "View roles"
+  },
+  {
+    "name": "role:update",
+    "description": "Update roles"
+  },
+  {
+    "name": "role:delete",
+    "description": "Delete roles"
+  },
+
+  {
+    "name": "permission:create",
+    "description": "Create permissions"
+  },
+  {
+    "name": "permission:read",
+    "description": "View permissions"
+  },
+  {
+    "name": "permission:update",
+    "description": "Update permissions"
+  },
+  {
+    "name": "permission:delete",
+    "description": "Delete permissions"
+  },
+
+  {
+    "name": "service:create",
+    "description": "Create services"
+  },
+  {
+    "name": "service:read",
+    "description": "View services"
+  },
+  {
+    "name": "service:update",
+    "description": "Update services"
+  },
+  {
+    "name": "service:delete",
+    "description": "Delete services"
+  },
+
+  {
+    "name": "customer:create",
+    "description": "Create customers"
+  },
+  {
+    "name": "customer:read",
+    "description": "View customers"
+  },
+  {
+    "name": "customer:update",
+    "description": "Update customers"
+  },
+  {
+    "name": "customer:delete",
+    "description": "Delete customers"
+  },
+
+  {
+    "name": "booking:create",
+    "description": "Create bookings"
+  },
+  {
+    "name": "booking:read",
+    "description": "View bookings"
+  },
+  {
+    "name": "booking:update",
+    "description": "Update bookings"
+  },
+  {
+    "name": "booking:delete",
+    "description": "Delete bookings"
+  }
+]

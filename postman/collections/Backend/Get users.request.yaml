@@ -1,4 +1,6 @@
 $kind: http-request
-url: ""
+url: http://192.168.0.100:8080/api/users
 method: GET
+headers:
+  authorization: "{{bearer_token_1941}}"
 order: 1790910258595

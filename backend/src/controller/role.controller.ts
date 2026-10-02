@@ -1,108 +1,108 @@
 import { Request, Response } from "express";
 
 import {
-  createUser,
-  deleteUser,
-  getUserById,
-  getUsers,
-  updateUser,
-} from "../services/user.service";
+  createRole,
+  deleteRole,
+  getRoleById,
+  getRoles,
+  updateRole,
+} from "../services/role.service";
 import { sendResponse } from "../middlewares/response.middleware";
 import { ApiResponseOptions } from "../dto/response.dto";
 
-export const createUserController = async (req: Request, res: Response) => {
+export const createRoleController = async (req: Request, res: Response) => {
   try {
-    const data: ApiResponseOptions = await createUser(req.body);
+    const data: ApiResponseOptions = await createRole(req.body);
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User created" : "User created failed",
+      message: data.statusCode == 200 ? "Role created" : "Role created failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "User created failed",
+      message: "Role created failed",
       errors: error,
     });
   }
 };
 
-export const getUsersController = async (_req: Request, res: Response) => {
+export const getRolesController = async (_req: Request, res: Response) => {
   try {
-    const data: ApiResponseOptions = await getUsers();
+    const data: ApiResponseOptions = await getRoles();
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User Get" : "User Get failed",
+      message: data.statusCode == 200 ? "Role Get" : "Role Get failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "User get failed",
+      message: "Role get failed",
       errors: error,
     });
   }
 };
 
-export const getUserByIdController = async (
+export const getRoleByIdController = async (
   req: Request<{ id: string }>,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await getUserById(req.params.id);
+    const data: ApiResponseOptions = await getRoleById(req.params.id);
 
     return sendResponse(res, {
       statusCode: data.statusCode,
       message:
-        data.statusCode == 200 ? "User Get By Id" : "User Get By Id failed",
+        data.statusCode == 200 ? "Role Get By Id" : "Role Get By Id failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "User get failed",
+      message: "Role get failed",
       errors: error,
     });
   }
 };
 
-export const updateUserController = async (
+export const updateRoleController = async (
   req: Request<{ id: string }>,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await updateUser(req.params.id, req.body);
+    const data: ApiResponseOptions = await updateRole(req.params.id, req.body);
 
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User Update" : "User Update failed",
+      message: data.statusCode == 200 ? "Role Update" : "Role Update failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "User update failed",
+      message: "Role update failed",
       errors: error,
     });
   }
 };
 
-export const deleteUserController = async (
+export const deleteRoleController = async (
   req: Request<{ id: string }>,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await deleteUser(req.params.id);
+    const data: ApiResponseOptions = await deleteRole(req.params.id);
 
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User Update" : "User Update failed",
+      message: data.statusCode == 200 ? "Role Update" : "Role Update failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "User delete failed",
+      message: "Role delete failed",
       errors: error,
     });
   }

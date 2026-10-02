@@ -1,10 +1,17 @@
 import { Router } from "express";
 import userRoutes from "./user.routes";
 import authRoutes from "./auth.routes";
-
+import serviceRoutes from "./service.routes";
+import roleRoutes from "./role.routes";
+import permissionRoutes from "./permission.routes";
+import customerRoutes from "./customer.routes";
+import bookingRoutes from "./booking.routes";
 const router = Router();
-
-router.use("/users", userRoutes);
 router.use("/auth", authRoutes);
-
+router.use("/user", userRoutes);
+router.use("/service", serviceRoutes);
+router.use("/role", roleRoutes);
+router.use("/permission", permissionRoutes);
+router.use("/customer", customerRoutes);
+router.use("/booking", bookingRoutes);
 export default router;

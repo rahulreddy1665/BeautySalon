@@ -1,0 +1,8 @@
+$kind: http-request
+description: ""
+url: http://192.168.0.101:8080/api/service
+method: GET
+body:
+  type: json
+  content: "{\r\n    \"name\":\"service23\"\r\n}"
+order: 4310649592474990

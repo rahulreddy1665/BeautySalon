@@ -1,0 +1,25 @@
+$kind: http-request
+url: http://192.168.0.101:8080/api/customer
+method: GET
+headers:
+  authorization: "{{bearer_token_0zgi}}"
+body:
+  type: json
+  content: "{\r
+
+    \    \"name\":\"test\",\r
+
+    \    \"lastName\":\"tt\",\r
+
+    \    \"email\":\"\",\r
+
+    \    \"phone\":9456165896,\r
+
+    \    \"address\":\"#78 uyasdsd adasd\",\r
+
+    \    \"address1\":\"\",\r
+
+    \    \"pincode\":789456\r
+
+    }"
+order: 4500232881087264

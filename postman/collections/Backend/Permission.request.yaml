@@ -1,0 +1,10 @@
+$kind: http-request
+description: ""
+url: http://192.168.0.101:8080/api/permission
+method: GET
+headers:
+  authorization: "{{bearer_token_0zgi}}"
+body:
+  type: json
+  content: ""
+order: 4407425335781061

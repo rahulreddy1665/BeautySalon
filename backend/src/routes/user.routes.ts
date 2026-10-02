@@ -2,6 +2,13 @@ import { Router } from "express";
 
 import { authenticate } from "../middlewares/auth.middleware";
 import { requirePermission } from "../middlewares/permission.middleware";
+import {
+  createUserController,
+  deleteUserController,
+  getUserByIdController,
+  getUsersController,
+  updateUserController,
+} from "../controller/user.controller";
 
 const router = Router();
 
@@ -9,37 +16,35 @@ router.get(
   "/",
   authenticate,
   requirePermission("user:read"),
-  (req, res) => {
-    res.json({
-      success: true,
-      message: "User list",
-      currentUser: req.user,
-    });
-  }
+  getUsersController,
+);
+
+router.get(
+  "/:id",
+  authenticate,
+  requirePermission("user:read"),
+  getUserByIdController,
 );
 
 router.post(
   "/",
   authenticate,
   requirePermission("user:create"),
-  (req, res) => {
-    res.json({
-      success: true,
-      message: "User created",
-    });
-  }
+  createUserController,
+);
+
+router.patch(
+  "/:id",
+  authenticate,
+  requirePermission("user:create"),
+  updateUserController,
 );
 
 router.delete(
   "/:id",
   authenticate,
   requirePermission("user:delete"),
-  (req, res) => {
-    res.json({
-      success: true,
-      message: "User deleted",
-    });
-  }
+  deleteUserController,
 );
 
 export default router;
