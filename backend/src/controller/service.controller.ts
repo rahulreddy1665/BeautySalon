@@ -28,6 +28,29 @@ export const createServiceController = async (req: Request, res: Response) => {
   }
 };
 
+export const createBulkServiceController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data: ApiResponseOptions = await createService(req.body);
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        data.statusCode == 200
+          ? "Service bulk created"
+          : "Service bulk created failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Service bulk created failed",
+      errors: error,
+    });
+  }
+};
+
 export const getServicesController = async (_req: Request, res: Response) => {
   try {
     const data: ApiResponseOptions = await getServices();

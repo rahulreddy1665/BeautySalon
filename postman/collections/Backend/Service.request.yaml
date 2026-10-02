@@ -1,8 +1,16 @@
 $kind: http-request
 description: ""
-url: http://192.168.0.101:8080/api/service
-method: GET
+url: http://192.168.0.103:8080/api/service/bulk
+method: POST
 body:
   type: json
-  content: "{\r\n    \"name\":\"service23\"\r\n}"
+  content: "[{\r
+
+    \    \"name\":\"service24\"\r
+
+    },{\r
+
+    \    \"name\":\"service25\"\r
+
+    }]"
 order: 4310649592474990

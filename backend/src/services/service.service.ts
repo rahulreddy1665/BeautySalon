@@ -9,6 +9,14 @@ export const createService = async (data: CreateServiceDto) => {
   }
 };
 
+export const createBulkService = async (data: CreateServiceDto) => {
+  try {
+    return { statusCode: 200, data: await Service.insertMany(data) };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
+};
+
 export const getServices = async () => {
   try {
     return { statusCode: 200, data: await Service.find() };

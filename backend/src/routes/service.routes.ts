@@ -3,6 +3,7 @@ import { Router } from "express";
 import { authenticate } from "../middlewares/auth.middleware";
 import { requirePermission } from "../middlewares/permission.middleware";
 import {
+  createBulkServiceController,
   createServiceController,
   deleteServiceController,
   getServiceByIdController,
@@ -22,6 +23,8 @@ router.get(
 router.get("/:id", getServiceByIdController);
 
 router.post("/", createServiceController);
+
+router.post("/bulk", createBulkServiceController);
 
 router.patch("/:id", updateServiceController);
 
