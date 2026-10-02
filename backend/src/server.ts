@@ -4,6 +4,7 @@ dotenv.config();
 
 import app from "./app";
 import { connectDatabase } from "./config/database";
+console.log(process.env.PORT, process.env.JWT_ACCESS_SECRET);
 
 const PORT = Number(process.env.PORT) || 8080;
 

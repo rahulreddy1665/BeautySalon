@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-
-import { JWT_SECRET } from "../config/auth";
+import { verifyAccessToken } from "./jwt";
 
 export interface AuthUser {
   id: string;
@@ -17,7 +16,7 @@ export interface AuthRequest extends Request {
 export const authenticate = (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   try {
     const authHeader = req.headers.authorization;
@@ -40,7 +39,7 @@ export const authenticate = (
 
     const token = authHeader.substring(7);
 
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const decoded = verifyAccessToken(token) as AuthUser;
 
     req.user = decoded;
 

@@ -1,8 +1,8 @@
 $kind: http-request
-url: http://192.168.0.101:8080/api/role
+url: http://192.168.0.103:8080/api/role
 method: GET
 headers:
-  authorization: "{{bearer_token_0zgi}}"
+  authorization: "{{bearer_token_0lrt}}"
 body:
   type: json
   content: "{\r

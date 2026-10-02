@@ -1,6 +1,6 @@
 $kind: http-request
 description: ""
-url: http://192.168.0.101:8080/api/auth/login
+url: http://192.168.0.103:8080/api/auth/login
 method: POST
 body:
   type: json

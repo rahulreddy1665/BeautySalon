@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { ApiResponseOptions } from "../dto/response.dto";
 
 export const sendResponse = (res: Response, options: ApiResponseOptions) => {
   return res.status(options.statusCode).json({

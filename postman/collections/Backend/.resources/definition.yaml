@@ -9,3 +9,9 @@ variables:
   - key: bearer_token_0zgi
     secret: true
     disabled: false
+  - key: bearer_token_0lrt
+    secret: true
+    disabled: false
+  - key: json_web_token_0wqx
+    secret: true
+    disabled: false

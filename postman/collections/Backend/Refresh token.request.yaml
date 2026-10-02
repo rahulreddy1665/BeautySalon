@@ -1,0 +1,11 @@
+$kind: http-request
+url: http://192.168.0.103:8080/api/auth/refreshToken
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"refreshToken\":\"{{json_web_token_0wqx}}\"\r
+
+    }"
+order: 4502090186734716
