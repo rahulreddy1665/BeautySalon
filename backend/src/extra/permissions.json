@@ -99,5 +99,95 @@
   {
     "name": "booking:delete",
     "description": "Delete bookings"
+  },
+
+  {
+    "name": "staff:create",
+    "description": "Create staff"
+  },
+  {
+    "name": "staff:read",
+    "description": "View staff"
+  },
+  {
+    "name": "staff:update",
+    "description": "Update staff"
+  },
+  {
+    "name": "staff:delete",
+    "description": "Delete staff"
+  },
+
+  {
+    "name": "appointment:create",
+    "description": "Create appointments"
+  },
+  {
+    "name": "appointment:read",
+    "description": "View appointments"
+  },
+  {
+    "name": "appointment:update",
+    "description": "Update appointments"
+  },
+  {
+    "name": "appointment:delete",
+    "description": "Delete appointments"
+  },
+
+  {
+    "name": "invoice:create",
+    "description": "Create invoices"
+  },
+  {
+    "name": "invoice:read",
+    "description": "View invoices"
+  },
+  {
+    "name": "invoice:update",
+    "description": "Update invoices"
+  },
+  {
+    "name": "invoice:delete",
+    "description": "Delete invoices"
+  },
+
+  {
+    "name": "product:create",
+    "description": "Create products"
+  },
+  {
+    "name": "product:read",
+    "description": "View products"
+  },
+  {
+    "name": "product:update",
+    "description": "Update products"
+  },
+  {
+    "name": "product:delete",
+    "description": "Delete products"
+  },
+
+  {
+    "name": "settings:read",
+    "description": "View salon settings"
+  },
+  {
+    "name": "settings:update",
+    "description": "Update salon settings"
+  },
+
+  {
+    "name": "loyalty:read",
+    "description": "View loyalty rules and balances"
+  },
+  {
+    "name": "loyalty:update",
+    "description": "Update loyalty rules"
+  },
+  {
+    "name": "loyalty:adjust",
+    "description": "Manually adjust loyalty points"
   }
 ]
