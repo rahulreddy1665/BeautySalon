@@ -1,0 +1,120 @@
+# ==============================
+# Dependencies
+# ==============================
+
+node_modules/
+**/node_modules/
+
+
+# ==============================
+# Environment variables
+# ==============================
+
+.env
+.env.*
+!.env.example
+
+# Backend / Frontend specific
+backend/.env
+frontend/.env
+
+
+# ==============================
+# Build output
+# ==============================
+
+dist/
+build/
+out/
+
+backend/dist/
+frontend/dist/
+frontend/build/
+
+
+# ==============================
+# Logs
+# ==============================
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# ==============================
+# TypeScript
+# ==============================
+
+*.tsbuildinfo
+
+
+# ==============================
+# Testing / Coverage
+# ==============================
+
+coverage/
+.nyc_output/
+
+
+# ==============================
+# IDE / Editors
+# ==============================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.idea/
+*.iml
+
+# VS Code local history
+.history/
+
+
+# ==============================
+# OS files
+# ==============================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ==============================
+# Temporary files
+# ==============================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+
+
+# ==============================
+# Frontend cache
+# ==============================
+
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+.vite/
+
+
+# ==============================
+# React Native / Expo
+# ==============================
+
+.expo/
+.expo-shared/
+
+
+# ==============================
+# Misc
+# ==============================
+
+*.pid
+*.seed
