@@ -1,9 +1,12 @@
-import { Document, Schema, model } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
+import "./role.model";
 
 export interface IUser extends Document {
   name: string;
   email: string;
-  age?: number;
+  password: string;
+  role: mongoose.Types.ObjectId;
+  isActive: boolean;
 }
 
 const userSchema = new Schema<IUser>(
@@ -11,7 +14,7 @@ const userSchema = new Schema<IUser>(
     name: {
       type: String,
       required: true,
-      trim: true
+      trim: true,
     },
 
     email: {
@@ -19,16 +22,29 @@ const userSchema = new Schema<IUser>(
       required: true,
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
     },
 
-    age: {
-      type: Number
-    }
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+
+    role: {
+      type: Schema.Types.ObjectId,
+      ref: "Role",
+      required: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
-export const User = model<IUser>("User", userSchema);
+export const User = mongoose.model<IUser>("User", userSchema);

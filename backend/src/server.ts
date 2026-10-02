@@ -4,7 +4,7 @@ dotenv.config();
 
 import app from "./app";
 import { connectDatabase } from "./config/database";
-console.log(process.env);
+console.log(process.env.PORT);
 
 const PORT = Number(process.env.PORT) || 8080;
 
