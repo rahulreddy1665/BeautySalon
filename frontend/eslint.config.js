@@ -57,6 +57,16 @@ export default defineConfig([
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+      // Prefer constants from @/app/constants — warn on raw JSX text in screens
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            "JSXElement[openingElement.name.name=/^(h1|h2|h3|p|label|Button|CardTitle)$/] > JSXText[value=/\\S/]",
+          message:
+            'User-facing copy should live in src/app/constants (see ARCHITECTURE.md).',
+        },
+      ],
     },
   },
   eslintConfigPrettier,

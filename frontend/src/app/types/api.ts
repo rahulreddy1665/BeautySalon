@@ -18,7 +18,6 @@ export interface ApiErrorResponse {
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse
 
-/** Normalized client-side error used across the app. */
 export interface AppError {
   message: string
   status?: number
@@ -30,20 +29,26 @@ export interface AppError {
 export interface AuthUser {
   id: string
   name: string
-  email: string
+  email?: string | null
+  username?: string | null
   role: string
   permissions: string[]
+  mustChangePassword?: boolean
+  staffId?: string | null
+  canViewRevenue?: boolean
+  canExport?: boolean
+  maxDiscountPercent?: number
 }
 
 export interface LoginPayload {
-  email: string
+  identifier: string
   password: string
 }
 
 export interface LoginResult {
   token: string
+  mustChangePassword?: boolean
   user: AuthUser
 }
 
-/** Product roles (placeholder). Backend currently seeds `admin`. */
 export type AppRole = 'owner' | 'manager' | 'staff' | 'admin'

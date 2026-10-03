@@ -4,6 +4,69 @@ import { Appointment } from "../models/appointment.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
+import { ErrorCodes, ErrorMessages } from "../constants/errors";
+import { getOrCreateSettings } from "./settings.service";
+import type { Weekday } from "../models/settings.model";
+
+const WEEKDAY_KEYS: Weekday[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+async function assertWithinBusinessHours(
+  date: string,
+  startMin: number,
+  endMin: number,
+) {
+  const settings = await getOrCreateSettings();
+  const open =
+    settings.business.openingTime ||
+    `${String(settings.appointments.startHour).padStart(2, "0")}:00`;
+  const close =
+    settings.business.closingTime ||
+    `${String(settings.appointments.endHour).padStart(2, "0")}:00`;
+  const openMin = parseTimeToMinutes(open);
+  const closeMin = parseTimeToMinutes(close);
+  if (openMin == null || closeMin == null) return;
+
+  const working =
+    settings.business.workingDays?.length
+      ? settings.business.workingDays
+      : (["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as Weekday[]);
+
+  const dow = new Date(`${date}T12:00:00`).getDay();
+  const dayKey = WEEKDAY_KEYS[dow];
+  if (!working.includes(dayKey)) {
+    throw Object.assign(new Error(ErrorMessages.NON_WORKING_DAY), {
+      statusCode: 400,
+      code: ErrorCodes.SALON_CLOSED,
+    });
+  }
+
+  if (startMin < openMin || endMin > closeMin) {
+    const openLabel = formatAmPm(openMin);
+    const closeLabel = formatAmPm(closeMin);
+    throw Object.assign(
+      new Error(ErrorMessages.OUTSIDE_HOURS(openLabel, closeLabel)),
+      { statusCode: 400, code: ErrorCodes.SALON_CLOSED },
+    );
+  }
+}
+
+function formatAmPm(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0
+    ? `${h12}:00 ${period}`
+    : `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
 
 export interface AppointmentServiceInput {
   serviceId: string;
@@ -214,6 +277,8 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
     const endTime = minutesToTime(endMin);
     const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
 
+    await assertWithinBusinessHours(data.date, startMin, endMin);
+
     await assertNoStaffConflict({
       date: data.date,
       startMin,
@@ -237,10 +302,12 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
     return { statusCode: 200, data: appointment };
   } catch (error) {
     const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
+    const code = (error as { code?: string }).code;
     return {
       statusCode,
       data: null,
       message: error instanceof Error ? error.message : "Create failed",
+      errors: code ? { code } : null,
     };
   }
 };
@@ -356,6 +423,8 @@ export const updateAppointment = async (
     const endTime = minutesToTime(endMin);
     const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
 
+    await assertWithinBusinessHours(date, startMin, endMin);
+
     await assertNoStaffConflict({
       date,
       startMin,
@@ -421,13 +490,6 @@ export const changeAppointmentStatus = async (
         statusCode: 400,
         data: null,
         message: "Completed appointments cannot change status",
-      };
-    }
-    if (status === "cancelled" && current.status === "completed") {
-      return {
-        statusCode: 400,
-        data: null,
-        message: "Completed appointments cannot be cancelled",
       };
     }
     current.status = status;

@@ -12,11 +12,12 @@ import {
 } from '@/app/service/settings/settingsApi'
 import { toErrorMessage } from '@/app/utils'
 
-export function useSalonSettingsQuery() {
+export function useSalonSettingsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.settings.all,
     queryFn: () => settingsApi.get(),
     staleTime: 60_000,
+    enabled: options?.enabled !== false,
   })
 }
 

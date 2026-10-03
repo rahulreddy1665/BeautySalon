@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/app/components/ui/dialog'
 import { Input } from '@/app/components/ui/input'
+import { INVENTORY } from '@/app/constants'
 import {
   useDeleteProductMutation,
   useProductsQuery,
@@ -103,7 +104,7 @@ export function InventoryScreen() {
   return (
     <div className="min-w-0 space-y-3">
       <PageHeader
-        description="Retail products · name and price only (no stock)."
+        description={INVENTORY.list.description}
         actions={
           <>
             <Button

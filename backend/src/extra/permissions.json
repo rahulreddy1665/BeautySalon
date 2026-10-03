@@ -1,5 +1,13 @@
 [
   {
+    "name": "dashboard:read",
+    "description": "View dashboard"
+  },
+  {
+    "name": "report:read",
+    "description": "View reports"
+  },
+  {
     "name": "user:create",
     "description": "Create users"
   },

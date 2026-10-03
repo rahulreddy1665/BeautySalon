@@ -1,12 +1,35 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export type RoundingRule = "none" | "nearest" | "up" | "down";
-export type InvoiceTemplateId = "classic" | "compact" | "thermal";
+export type InvoiceTemplateId =
+  | "creamGold"
+  | "blush"
+  | "compact"
+  | "thermal"
+  | "classic";
+
+export type InvoiceAccentPreset =
+  | "gold"
+  | "blush"
+  | "teal"
+  | "charcoal"
+  | "sage"
+  | "plum"
+  | "custom";
 
 export interface ITaxRatePair {
   cgstPercent: number;
   sgstPercent: number;
 }
+
+export type Weekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
 
 export interface IBusinessSettings {
   salonName: string;
@@ -20,6 +43,12 @@ export interface IBusinessSettings {
   email?: string;
   gstin?: string;
   invoiceFooterNote?: string;
+  /** HH:mm — salon opening (source of truth for hours) */
+  openingTime?: string;
+  /** HH:mm — salon closing (must be after opening) */
+  closingTime?: string;
+  /** Days the salon is open */
+  workingDays?: Weekday[];
 }
 
 export interface ITaxSettings {
@@ -35,12 +64,24 @@ export interface IInvoiceSettings {
   numberPadding: number;
   rounding: RoundingRule;
   templateId: InvoiceTemplateId;
+  accentPreset: InvoiceAccentPreset;
+  accentColor: string;
+  showStaffNames: boolean;
+  showLogo: boolean;
+  termsText: string;
+  thankYouText: string;
+  whatsappMessage: string;
+  shareLinkDays: number;
 }
 
 export interface IAppointmentSettings {
+  /** @deprecated Prefer business.openingTime — kept for backward compat */
   startHour: number;
+  /** @deprecated Prefer business.closingTime */
   endHour: number;
   slotMinutes: number;
+  minNoticeHours?: number;
+  bookingWindowDays?: number;
 }
 
 export interface ILoyaltySettings {
@@ -75,6 +116,16 @@ export const DEFAULT_SETTINGS = {
     email: "",
     gstin: "",
     invoiceFooterNote: "Thank you, visit again",
+    openingTime: "09:00",
+    closingTime: "21:00",
+    workingDays: [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ] as Weekday[],
   },
   tax: {
     gstEnabled: true,
@@ -87,12 +138,24 @@ export const DEFAULT_SETTINGS = {
     includeYear: true,
     numberPadding: 5,
     rounding: "none" as RoundingRule,
-    templateId: "classic" as InvoiceTemplateId,
+    templateId: "creamGold" as InvoiceTemplateId,
+    accentPreset: "gold" as InvoiceAccentPreset,
+    accentColor: "#FFD700",
+    showStaffNames: true,
+    showLogo: true,
+    termsText:
+      "Goods once sold will not be taken back. Please retain this invoice for your records.",
+    thankYouText: "Thank you for visiting. We look forward to seeing you again.",
+    whatsappMessage:
+      "Hi {customer}, here is your invoice from {salon} for {amount}. View: {link}",
+    shareLinkDays: 30,
   },
   appointments: {
     startHour: 9,
     endHour: 21,
     slotMinutes: 30,
+    minNoticeHours: 0,
+    bookingWindowDays: 60,
   },
   loyalty: {
     enabled: true,
@@ -126,6 +189,19 @@ const settingsSchema = new Schema<ISettings>(
       email: { type: String, trim: true, default: "" },
       gstin: { type: String, trim: true, default: "" },
       invoiceFooterNote: { type: String, trim: true, default: "Thank you, visit again" },
+      openingTime: { type: String, trim: true, default: "09:00" },
+      closingTime: { type: String, trim: true, default: "21:00" },
+      workingDays: {
+        type: [String],
+        default: () => [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+        ],
+      },
     },
     tax: {
       gstEnabled: { type: Boolean, default: true },
@@ -144,14 +220,43 @@ const settingsSchema = new Schema<ISettings>(
       },
       templateId: {
         type: String,
-        enum: ["classic", "compact", "thermal"],
-        default: "classic",
+        enum: ["creamGold", "blush", "compact", "thermal", "classic"],
+        default: "creamGold",
       },
+      accentPreset: {
+        type: String,
+        enum: ["gold", "blush", "teal", "charcoal", "sage", "plum", "custom"],
+        default: "gold",
+      },
+      accentColor: { type: String, default: "#FFD700" },
+      showStaffNames: { type: Boolean, default: true },
+      showLogo: { type: Boolean, default: true },
+      termsText: {
+        type: String,
+        default:
+          "Goods once sold will not be taken back. Please retain this invoice for your records.",
+        maxlength: 500,
+      },
+      thankYouText: {
+        type: String,
+        default:
+          "Thank you for visiting. We look forward to seeing you again.",
+        maxlength: 200,
+      },
+      whatsappMessage: {
+        type: String,
+        default:
+          "Hi {customer}, here is your invoice from {salon} for {amount}. View: {link}",
+        maxlength: 500,
+      },
+      shareLinkDays: { type: Number, default: 30, min: 1, max: 365 },
     },
     appointments: {
       startHour: { type: Number, default: 9, min: 0, max: 23 },
       endHour: { type: Number, default: 21, min: 1, max: 24 },
       slotMinutes: { type: Number, default: 30, min: 5, max: 120 },
+      minNoticeHours: { type: Number, default: 0, min: 0 },
+      bookingWindowDays: { type: Number, default: 60, min: 1 },
     },
     loyalty: {
       enabled: { type: Boolean, default: true },

@@ -4,9 +4,13 @@
 /*
   Theme tokens → CSS variables → Tailwind.
   Light (:root) and dark (.dark). Components use tokens only.
+  Gold gradient (--gold-gradient) is allowed ONLY on:
+  primary buttons, dashboard highlight stat, active sidebar pill accent.
 */
 @theme {
   --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-invoice-serif: 'Cormorant Garamond', 'Times New Roman', Georgia, serif;
+  --font-invoice-sans: 'DM Sans', 'Inter Variable', Inter, system-ui, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -16,6 +20,17 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-primary-disabled: var(--primary-disabled);
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-gold-pressed: var(--gold-pressed);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-deep: var(--gold-deep);
+  --color-on-gold: var(--on-gold);
+  --color-chart-cursor: var(--chart-cursor);
+  --color-chart-track: var(--chart-track);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -29,10 +44,16 @@
   --color-ring: var(--ring);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft: var(--danger-soft);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-chart-1: var(--chart-1);
@@ -40,99 +61,174 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-status-booked: var(--status-booked);
+  --color-status-booked-bg: var(--status-booked-bg);
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-confirmed-bg: var(--status-confirmed-bg);
+  --color-status-completed: var(--status-completed);
+  --color-status-completed-bg: var(--status-completed-bg);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
+  --color-status-no-show: var(--status-no-show);
+  --color-status-no-show-bg: var(--status-no-show-bg);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
 }
 
 :root {
-  --brand-accent: #d8bcab;
+  --brand-accent: #ffd700;
+  --gold: #ffd700;
+  --gold-hover: #e6c200;
+  --gold-pressed: #d4b000;
+  --gold-soft: #fff8cc;
+  --gold-deep: #8a6d00;
+  --on-gold: #1a1a1a;
+  --gold-gradient: linear-gradient(135deg, #ffe566 0%, #ffd700 45%, #e6c200 100%);
 
-  --background: #faf6f3;
-  --foreground: #2a2420;
+  --background: #f6f6f7;
+  --foreground: #1a1a1a;
   --card: #ffffff;
-  --card-foreground: #2a2420;
+  --card-foreground: #1a1a1a;
   --popover: #ffffff;
-  --popover-foreground: #2a2420;
-  --primary: #5c4638;
-  --primary-foreground: #faf6f3;
-  --secondary: #ede0d6;
-  --secondary-foreground: #2a2420;
-  --muted: #ede0d6;
-  --muted-foreground: #6b635c;
-  --accent: #d8bcab;
-  --accent-foreground: #2a2420;
-  --destructive: #b42318;
-  --destructive-foreground: #faf6f3;
-  --border: #e5d9cf;
-  --input: #e5d9cf;
-  --ring: #5c4638;
+  --popover-foreground: #1a1a1a;
+  --primary: #ffd700;
+  --primary-foreground: #1a1a1a;
+  --primary-hover: #e6c200;
+  --primary-pressed: #d4b000;
+  --primary-disabled: #f0e6a0;
+  --secondary: #f0f0f2;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f0f0f2;
+  --muted-foreground: #6b6b73;
+  --accent: #fff8cc;
+  --accent-foreground: #8a6d00;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --border: #e4e4e7;
+  --input: #92929c;
+  --ring: #ffd700;
 
-  --success: #1b7a3d;
-  --success-foreground: #faf6f3;
-  --warning: #9a6700;
-  --warning-foreground: #faf6f3;
-  --info: #175cd3;
-  --info-foreground: #faf6f3;
+  --success: #166534;
+  --success-foreground: #166534;
+  --success-soft: #dcfce7;
+  --warning: #854d0e;
+  --warning-foreground: #854d0e;
+  --warning-soft: #fef3c7;
+  --info: #1d4ed8;
+  --info-foreground: #1d4ed8;
+  --info-soft: #dbeafe;
+  --danger: #b91c1c;
+  --danger-foreground: #b91c1c;
+  --danger-soft: #fee2e2;
 
-  --sidebar: #e8d4c4;
-  --sidebar-foreground: #2a2420;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
 
-  --chart-1: #5c4638;
-  --chart-2: #9a6700;
-  --chart-3: #1b7a3d;
-  --chart-4: #175cd3;
-  --chart-5: #6b635c;
+  --chart-1: #ffd700;
+  --chart-2: #8a6d00;
+  --chart-3: #166534;
+  --chart-4: #1d4ed8;
+  --chart-5: #6b6b73;
+  --chart-cursor: #f0f0f2;
+  --chart-track: #ececee;
 
-  --radius: 8px;
-  --sidebar-width: 224px;
+  --status-booked: #1d4ed8;
+  --status-booked-bg: #dbeafe;
+  --status-confirmed: #854d0e;
+  --status-confirmed-bg: #fef3c7;
+  --status-completed: #166534;
+  --status-completed-bg: #dcfce7;
+  --status-cancelled: #b91c1c;
+  --status-cancelled-bg: #fee2e2;
+  --status-no-show: #52525b;
+  --status-no-show-bg: #f4f4f5;
+
+  --radius: 12px;
+  --radius-card: 16px;
+  --radius-shell: 24px;
+  --shadow-popover: 0 8px 30px rgb(0 0 0 / 0.12);
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
   --bottom-nav-height: 56px;
-  --header-height: 48px;
-  --theme-color: #5c4638;
+  --header-height: 56px;
+  --theme-color: #ffd700;
 }
 
 .dark {
-  --brand-accent: #d8bcab;
+  --brand-accent: #ffd700;
+  --gold: #ffd700;
+  --gold-hover: #e6c200;
+  --gold-pressed: #d4b000;
+  --gold-soft: #3f2e0a;
+  --gold-deep: #fde68a;
+  --on-gold: #1a1a1a;
+  --gold-gradient: linear-gradient(135deg, #ffe566 0%, #ffd700 45%, #e6c200 100%);
 
-  --background: #292929;
-  --foreground: #f0ebe6;
-  --card: #323232;
-  --card-foreground: #f0ebe6;
-  --popover: #323232;
-  --popover-foreground: #f0ebe6;
-  --primary: #d8bcab;
-  --primary-foreground: #2a2420;
-  --secondary: #3a3a3a;
-  --secondary-foreground: #f0ebe6;
-  --muted: #3a3a3a;
-  --muted-foreground: #a89f96;
-  --accent: #3f3a36;
-  --accent-foreground: #f0ebe6;
-  --destructive: #f97066;
-  --destructive-foreground: #2a2420;
-  --border: #404040;
-  --input: #404040;
-  --ring: #d8bcab;
+  --background: #0b0b0b;
+  --foreground: #f2f2f2;
+  --card: #141414;
+  --card-foreground: #f2f2f2;
+  --popover: #141414;
+  --popover-foreground: #f2f2f2;
+  --primary: #ffd700;
+  --primary-foreground: #1a1a1a;
+  --primary-hover: #e6c200;
+  --primary-pressed: #d4b000;
+  --primary-disabled: #3f3a20;
+  --secondary: #1c1c1c;
+  --secondary-foreground: #f2f2f2;
+  --muted: #1c1c1c;
+  --muted-foreground: #a0a0a8;
+  --accent: #3f2e0a;
+  --accent-foreground: #fde68a;
+  --destructive: #fca5a5;
+  --destructive-foreground: #1a1a1a;
+  --border: #262626;
+  --input: #3f3f46;
+  --ring: #ffd700;
 
-  --success: #3dd68c;
-  --success-foreground: #0a2e1a;
-  --warning: #f5b83d;
-  --warning-foreground: #2a2000;
-  --info: #84adff;
-  --info-foreground: #0b1f4a;
+  --success: #86efac;
+  --success-foreground: #86efac;
+  --success-soft: #14532d;
+  --warning: #fde68a;
+  --warning-foreground: #fde68a;
+  --warning-soft: #3f2e0a;
+  --info: #93c5fd;
+  --info-foreground: #93c5fd;
+  --info-soft: #1e3a5f;
+  --danger: #fca5a5;
+  --danger-foreground: #fca5a5;
+  --danger-soft: #450a0a;
 
-  --sidebar: #242424;
-  --sidebar-foreground: #f0ebe6;
+  --sidebar: #141414;
+  --sidebar-foreground: #f2f2f2;
 
-  --chart-1: #d8bcab;
-  --chart-2: #f5b83d;
-  --chart-3: #3dd68c;
-  --chart-4: #84adff;
-  --chart-5: #a89f96;
+  --chart-1: #ffd700;
+  --chart-2: #fde68a;
+  --chart-3: #86efac;
+  --chart-4: #93c5fd;
+  --chart-5: #a0a0a8;
+  --chart-cursor: #262626;
+  --chart-track: #262626;
 
-  --theme-color: #292929;
+  --status-booked: #93c5fd;
+  --status-booked-bg: #1e3a5f;
+  --status-confirmed: #fde68a;
+  --status-confirmed-bg: #3f2e0a;
+  --status-completed: #86efac;
+  --status-completed-bg: #14532d;
+  --status-cancelled: #fca5a5;
+  --status-cancelled-bg: #450a0a;
+  --status-no-show: #d4d4d8;
+  --status-no-show-bg: #27272a;
+
+  --shadow-popover: 0 8px 30px rgb(0 0 0 / 0.45);
+  --theme-color: #0b0b0b;
 }
 
 @layer base {
@@ -180,6 +276,87 @@
   }
 }
 
+@layer components {
+  /* Allowed gold gradient surfaces (Part 1 policy). */
+  .bg-gold-gradient {
+    background-image: var(--gold-gradient);
+    background-color: var(--gold);
+    color: var(--on-gold);
+  }
+
+  .btn-gold-gradient {
+    position: relative;
+    overflow: hidden;
+    background-image: var(--gold-gradient);
+    background-color: var(--gold);
+    color: var(--on-gold);
+  }
+
+  .btn-gold-gradient:hover {
+    background-color: var(--gold-hover);
+  }
+
+  .btn-gold-gradient:active {
+    background-color: var(--gold-pressed);
+  }
+
+  .btn-gold-gradient::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.35) 50%,
+      transparent 60%
+    );
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+
+  .btn-gold-gradient:hover::after,
+  .btn-gold-gradient:focus-visible::after {
+    animation: gold-shine 0.7s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-gold-gradient::after {
+      display: none;
+    }
+  }
+
+  .nav-active-pill {
+    background-color: var(--gold-soft);
+    color: var(--gold-deep);
+  }
+
+  .nav-active-pill::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 3px;
+    border-radius: 9999px;
+    background-image: var(--gold-gradient);
+  }
+
+  .stat-highlight {
+    background-image: var(--gold-gradient);
+    background-color: var(--gold);
+    color: var(--on-gold);
+  }
+}
+
+@keyframes gold-shine {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
 @layer utilities {
   .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -196,5 +373,24 @@
   .min-touch {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  .shadow-popover {
+    box-shadow: var(--shadow-popover);
+  }
+
+  .invoice-sheet {
+    font-family: var(--font-invoice-sans);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .invoice-sheet .inv-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .invoice-sheet thead {
+    display: table-header-group;
   }
 }

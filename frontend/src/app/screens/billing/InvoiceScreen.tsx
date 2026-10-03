@@ -1,260 +1,244 @@
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Printer } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  MessageCircle,
+  Printer,
+  Link2Off,
+} from 'lucide-react'
+import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { InvoiceDocument } from '@/app/components/invoice/InvoiceDocument'
+import { buildInvoiceViewModel } from '@/app/components/invoice/invoiceViewModel'
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
-import { PageHeader } from '@/app/components/PageHeader'
-import { Badge } from '@/app/components/ui/badge'
 import { Button } from '@/app/components/ui/button'
-import { Separator } from '@/app/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/dialog'
+import { Input } from '@/app/components/ui/input'
+import { BILLING, COMMON, ROUTES } from '@/app/constants'
 import { useBillQuery } from '@/app/hooks/queries/useBillingQuery'
-import { cn, formatINR } from '@/app/utils'
-
-function staffLabel(staff: string | { _id: string; name?: string }): string {
-  return typeof staff === 'string' ? staff : staff.name || 'Staff'
-}
+import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
+import {
+  clearCachedShareUrl,
+  sendInvoiceToCustomer,
+} from '@/app/service/billing/sendInvoiceToCustomer'
+import { invoicesApi } from '@/app/service/invoices/invoicesApi'
+import { formatINR } from '@/app/utils'
+import {
+  downloadBlob,
+  generateInvoicePdf,
+  printInvoice,
+} from '@/app/utils/invoicePdf'
 
 export function InvoiceScreen() {
   const { id } = useParams<{ id: string }>()
   const invoiceQuery = useBillQuery(id)
+  const settingsQuery = useSalonSettingsQuery()
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [phoneDraft, setPhoneDraft] = useState('')
+  const [sharing, setSharing] = useState(false)
 
   if (invoiceQuery.isLoading) return <LoadingSkeleton rows={6} />
   if (invoiceQuery.isError || !invoiceQuery.data) {
     return (
       <ErrorState
         error={invoiceQuery.error}
-        title="Invoice not found"
+        title={COMMON.errors.loadFailed}
         onRetry={() => void invoiceQuery.refetch()}
       />
     )
   }
 
   const inv = invoiceQuery.data
-  const biz = inv.businessSnapshot
-  const salonName = biz?.salonName || 'BeautySalon'
-  const template = inv.templateId || 'classic'
-  const customerName = inv.walkIn
-    ? inv.walkInName || 'Walk-in'
-    : [inv.customer?.name, inv.customer?.lastName].filter(Boolean).join(' ') ||
-      'Customer'
-  const lines = [
-    ...inv.serviceItems.map((line) => ({
-      name: line.name,
-      qty: line.qty,
-      unitPrice: line.price,
-      lineTotal: line.lineTotal,
-      staffName: staffLabel(line.staff),
-    })),
-    ...inv.productItems.map((line) => ({
-      name: line.name,
-      qty: line.qty,
-      unitPrice: line.price,
-      lineTotal: line.lineTotal,
-      staffName: staffLabel(line.staff),
-    })),
-  ]
-  const logoUrl =
-    biz?.logoBase64 && biz.logoMimeType
-      ? `data:${biz.logoMimeType};base64,${biz.logoBase64}`
-      : null
-  const payable = inv.amountPayable ?? inv.grandTotal
-  const tax = inv.tax
+  const dateLabel = format(parseISO(inv.createdAt), 'dd MMM yyyy')
+  const vm = buildInvoiceViewModel(inv, dateLabel)
+  const fileName = `${inv.invoiceNumber}.pdf`
+
+  const sheetEl = () =>
+    sheetRef.current?.querySelector('.invoice-sheet') as HTMLElement | null
+
+  const onDownloadPdf = async () => {
+    const el = sheetEl()
+    if (!el) {
+      printInvoice()
+      return
+    }
+    const result = await generateInvoicePdf(el, fileName)
+    if (result.ok) {
+      downloadBlob(result.blob, result.fileName)
+      return
+    }
+    toast.message(BILLING.invoice.pdfUnavailable)
+    printInvoice()
+  }
+
+  const runShare = async (phoneRaw: string) => {
+    setSharing(true)
+    try {
+      const outcome = await sendInvoiceToCustomer({
+        invoiceId: inv._id,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: vm.customerName,
+        phoneRaw,
+        salonName: vm.salonName,
+        amountLabel: formatINR(vm.total),
+        whatsappTemplate: settingsQuery.data?.invoice?.whatsappMessage,
+        sheetElement: sheetEl(),
+      })
+      if (outcome.mode === 'error') {
+        toast.error(outcome.message)
+        return
+      }
+      if (outcome.mode === 'wa-me') {
+        toast.message(outcome.instruction)
+      }
+      setPhoneOpen(false)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const onShareWhatsApp = () => {
+    const phone = vm.customerPhone?.trim()
+    if (!phone) {
+      setPhoneDraft('')
+      setPhoneOpen(true)
+      return
+    }
+    void runShare(phone)
+  }
+
+  const onRevokeLink = async () => {
+    if (!id) return
+    await invoicesApi.revokeShareLink(id)
+    clearCachedShareUrl(id)
+    toast.success(BILLING.invoice.linkRevoked)
+  }
+
+  const actions = (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        className="h-9 min-touch"
+        onClick={() => printInvoice()}
+      >
+        <Printer className="size-4" strokeWidth={1.75} />
+        {BILLING.invoice.print}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-9 min-touch"
+        onClick={() => void onDownloadPdf()}
+      >
+        <Download className="size-4" strokeWidth={1.75} />
+        {BILLING.invoice.downloadPdf}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-9 min-touch"
+        disabled={sharing}
+        onClick={onShareWhatsApp}
+      >
+        <MessageCircle className="size-4" strokeWidth={1.75} />
+        {BILLING.invoice.shareWhatsApp}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-9 min-touch"
+        onClick={() => void onRevokeLink()}
+      >
+        <Link2Off className="size-4" strokeWidth={1.75} />
+        {BILLING.invoice.revokeLink}
+      </Button>
+      <Button asChild size="sm" variant="outline" className="h-9 min-touch">
+        <Link to={ROUTES.billingNew}>{BILLING.invoice.newBill}</Link>
+      </Button>
+      <Button asChild size="sm" variant="outline" className="h-9 min-touch">
+        <Link to={ROUTES.billing}>
+          <ArrowLeft className="size-4" strokeWidth={1.75} />
+          {BILLING.invoice.backToBills}
+        </Link>
+      </Button>
+    </>
+  )
 
   return (
-    <div className="min-w-0 space-y-3">
-      <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <Button asChild size="sm" variant="outline" className="h-8">
-          <Link to="/billing">
-            <ArrowLeft className="size-4" strokeWidth={1.75} />
-            Bills
-          </Link>
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          className="h-8"
-          onClick={() => window.print()}
-        >
-          <Printer className="size-4" strokeWidth={1.75} />
-          Print
-        </Button>
+    <div className="min-w-0 space-y-3 pb-24 sm:pb-0">
+      <div className="hidden flex-wrap items-center gap-2 print:hidden sm:flex">
+        {actions}
       </div>
 
-      <PageHeader
-        description={`${inv.invoiceNumber} · ${format(parseISO(inv.createdAt), 'dd MMM yyyy, HH:mm')}`}
-        className="print:hidden"
-      />
-
-      <article
-        className={cn(
-          'invoice-sheet mx-auto border border-border bg-card p-4 text-sm text-foreground print:border-0',
-          template === 'classic' && 'max-w-3xl print:max-w-none',
-          template === 'compact' && 'max-w-xl text-xs',
-          template === 'thermal' &&
-            'max-w-[320px] font-mono text-[11px] leading-snug',
-        )}
-        data-template={template}
+      <div
+        ref={sheetRef}
+        className="overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
-        <header
-          className={cn(
-            'flex items-start justify-between gap-3',
-            template === 'thermal' && 'flex-col items-center text-center',
-          )}
-        >
-          <div className="flex min-w-0 items-start gap-2">
-            {logoUrl && template !== 'thermal' ? (
-              <img src={logoUrl} alt="" className="size-10 object-contain" />
-            ) : null}
-            {logoUrl && template === 'thermal' ? (
-              <img src={logoUrl} alt="" className="mb-1 size-8 object-contain" />
-            ) : null}
-            <div>
-              <h2 className="text-base font-semibold">{salonName}</h2>
-              {biz?.address ? (
-                <p className="text-[11px] text-muted-foreground">{biz.address}</p>
-              ) : null}
-              {biz?.phone || biz?.email ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {[biz.phone, biz.email].filter(Boolean).join(' · ')}
-                </p>
-              ) : null}
-              {tax?.gstEnabled && biz?.gstin ? (
-                <p className="text-[11px] tabular-nums">GSTIN: {biz.gstin}</p>
-              ) : null}
-            </div>
-          </div>
-          <Badge
-            variant="outline"
-            className="rounded-md capitalize print:border-foreground"
-          >
-            {inv.status}
-          </Badge>
-        </header>
+        <InvoiceDocument
+          vm={vm}
+          className="mx-auto w-full min-w-0 max-w-full origin-top scale-[0.88] shadow-sm sm:scale-100 print:scale-100 print:shadow-none"
+        />
+      </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <div>
-            <p className="text-[11px] text-muted-foreground">Bill to</p>
-            <p className="font-medium">{customerName}</p>
-            <p className="text-[11px] capitalize text-muted-foreground">
-              {inv.source}
-            </p>
-          </div>
-          <div className={template === 'thermal' ? 'text-left' : 'sm:text-right'}>
-            <p className="tabular-nums font-medium">{inv.invoiceNumber}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {format(parseISO(inv.createdAt), 'dd MMM yyyy, HH:mm')}
-            </p>
-            <p className="text-[11px] uppercase">{inv.paymentMode}</p>
-          </div>
-        </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-2 pb-safe print:hidden sm:hidden">
+        <div className="flex gap-2 overflow-x-auto">{actions}</div>
+      </div>
 
-        <Separator className="my-3" />
-
-        <div className="space-y-2">
-          {lines.map((line, index) => (
-            <div
-              key={`${line.name}-${index}`}
-              className="flex items-start justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <p className="font-medium">{line.name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {line.qty} × {formatINR(line.unitPrice)} · {line.staffName}
-                </p>
-              </div>
-              <p className="shrink-0 font-medium tabular-nums">
-                {formatINR(line.lineTotal)}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <Separator className="my-3" />
-
-        <div className="space-y-1 tabular-nums">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Services</span>
-            <span>{formatINR(inv.serviceSubtotal)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Products</span>
-            <span>{formatINR(inv.productSubtotal)}</span>
-          </div>
-          {(inv.serviceDiscountTotal > 0 || inv.productDiscountTotal > 0) && (
-            <>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Service discount</span>
-                <span>− {formatINR(inv.serviceDiscountTotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Product discount</span>
-                <span>− {formatINR(inv.productDiscountTotal)}</span>
-              </div>
-            </>
-          )}
-          {tax?.gstEnabled ? (
-            <>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  CGST
-                  {tax.pricesIncludeGst ? ' (incl.)' : ''}
-                </span>
-                <span>{formatINR(tax.cgstTotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  SGST
-                  {tax.pricesIncludeGst ? ' (incl.)' : ''}
-                </span>
-                <span>{formatINR(tax.sgstTotal)}</span>
-              </div>
-            </>
-          ) : null}
-          {(inv.loyaltyRedeemValue ?? 0) > 0 ? (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Loyalty ({inv.loyaltyRedeemPoints} pts)
-              </span>
-              <span>− {formatINR(inv.loyaltyRedeemValue ?? 0)}</span>
-            </div>
-          ) : null}
-          {inv.roundOff ? (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Round off</span>
-              <span>
-                {inv.roundOff > 0 ? '+' : ''}
-                {formatINR(inv.roundOff)}
-              </span>
-            </div>
-          ) : null}
-          {(inv.tip ?? 0) > 0 ? (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tip</span>
-              <span>{formatINR(inv.tip ?? 0)}</span>
-            </div>
-          ) : null}
-          <div className="flex justify-between text-base font-semibold">
-            <span>Amount payable</span>
-            <span>{formatINR(payable)}</span>
-          </div>
-        </div>
-
-        {biz?.invoiceFooterNote ? (
-          <p className="mt-4 text-center text-[11px] text-muted-foreground">
-            {biz.invoiceFooterNote}
+      <Dialog open={phoneOpen} onOpenChange={setPhoneOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{BILLING.invoice.walkInPhoneTitle}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {BILLING.invoice.walkInPhoneHint}
           </p>
-        ) : null}
-      </article>
+          <Input
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder={BILLING.invoice.walkInPhoneLabel}
+            value={phoneDraft}
+            onChange={(e) => setPhoneDraft(e.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              type="button"
+              disabled={sharing || !phoneDraft.trim()}
+              onClick={() => void runShare(phoneDraft)}
+            >
+              {BILLING.invoice.walkInPhoneContinue}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style>{`
         @media print {
           @page {
-            size: ${template === 'thermal' ? '80mm auto' : template === 'compact' ? 'A5' : 'A4'};
-            margin: ${template === 'thermal' ? '4mm' : '12mm'};
+            size: ${vm.templateId === 'thermal' ? '80mm auto' : vm.templateId === 'compact' ? 'A5' : 'A4'};
+            margin: ${vm.templateId === 'thermal' ? '4mm' : '10mm'};
           }
-          body { background: white !important; color: black !important; }
-          .invoice-sheet { box-shadow: none !important; }
+          body { background: white !important; }
+          .print\\:hidden { display: none !important; }
+          .invoice-sheet {
+            box-shadow: none !important;
+            border: none !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
       `}</style>
     </div>

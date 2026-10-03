@@ -1,3 +1,8 @@
+import {
+  ERROR_CODE_MESSAGES,
+  ERROR_STATUS_MESSAGES,
+  ERRORS,
+} from '@/app/constants/errors'
 import type { AppError } from '@/app/types/api'
 
 export function createAppError(
@@ -15,14 +20,32 @@ export function createAppError(
 
 export function toErrorMessage(
   error: unknown,
-  fallback = 'Something went wrong',
+  fallback: string = ERRORS.unexpected,
 ): string {
   if (!error) return fallback
   if (typeof error === 'string') return error
-  if (error instanceof Error) return error.message
-  if (typeof error === 'object' && 'message' in error) {
-    const message = (error as { message?: unknown }).message
-    if (typeof message === 'string') return message
+
+  if (typeof error === 'object' && error !== null) {
+    const maybe = error as {
+      code?: unknown
+      status?: unknown
+      message?: unknown
+    }
+    if (typeof maybe.code === 'string' && ERROR_CODE_MESSAGES[maybe.code]) {
+      return ERROR_CODE_MESSAGES[maybe.code] ?? fallback
+    }
+    if (typeof maybe.status === 'number' && ERROR_STATUS_MESSAGES[maybe.status]) {
+      // Prefer explicit server message when present and non-generic
+      if (typeof maybe.message === 'string' && maybe.message.trim()) {
+        return maybe.message
+      }
+      return ERROR_STATUS_MESSAGES[maybe.status] ?? fallback
+    }
+    if (typeof maybe.message === 'string' && maybe.message.trim()) {
+      return maybe.message
+    }
   }
+
+  if (error instanceof Error && error.message) return error.message
   return fallback
 }

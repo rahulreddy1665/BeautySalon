@@ -1,61 +1,113 @@
-import type { InvoiceTemplateId } from '@/app/service/settings/settingsApi'
+import { InvoiceDocument } from '@/app/components/invoice/InvoiceDocument'
+import type { InvoiceViewModel } from '@/app/components/invoice/invoiceViewModel'
+import { SETTINGS } from '@/app/constants'
+import {
+  buildPalette,
+  resolveTemplateId,
+  type InvoiceAccentPreset,
+  type InvoiceTemplateId,
+} from '@/app/theme/invoice-themes'
+import { formatINR } from '@/app/utils'
 import { cn } from '@/app/utils'
 
-const SAMPLE = {
-  salon: 'Glow Studio',
-  invoiceNo: 'INV-2026-00042',
-  customer: 'Ananya Rao',
-  lines: [
-    { name: 'Haircut', amount: '₹499' },
-    { name: 'Shampoo 250ml', amount: '₹450' },
-  ],
-  tax: 'CGST ₹85.41 · SGST ₹85.41',
-  total: '₹1,119.82',
+function sampleVm(
+  templateId: InvoiceTemplateId,
+  accentPreset: InvoiceAccentPreset,
+  accentColor: string,
+): InvoiceViewModel {
+  const resolved = resolveTemplateId(templateId)
+  return {
+    templateId: resolved,
+    palette: buildPalette(resolved, accentPreset, accentColor),
+    showStaffNames: true,
+    showLogo: false,
+    termsText: SETTINGS.invoice.termsDefault,
+    thankYouText: SETTINGS.invoice.thankYouDefault,
+    salonName: 'Glow Studio',
+    logoUrl: null,
+    address: '12 MG Road, Bengaluru',
+    phone: '+91 98765 43210',
+    email: 'hello@glow.studio',
+    gstin: '29ABCDE1234F1Z5',
+    invoiceNumber: 'INV-2026-00042',
+    dateLabel: '03 Oct 2026',
+    customerName: 'Ananya Rao',
+    customerPhone: '9876543210',
+    serviceLines: [
+      {
+        name: 'Haircut',
+        qty: 1,
+        rate: 499,
+        amount: 499,
+        staffName: 'Riya',
+        kind: 'service',
+      },
+    ],
+    productLines: [
+      {
+        name: 'Shampoo 250ml',
+        qty: 1,
+        rate: 450,
+        amount: 450,
+        staffName: 'Front desk',
+        kind: 'product',
+      },
+    ],
+    serviceSubtotal: 499,
+    productSubtotal: 450,
+    serviceDiscount: 0,
+    productDiscount: 0,
+    taxable: 949,
+    cgst: 85.41,
+    sgst: 85.41,
+    gstEnabled: true,
+    loyaltyRedeem: 0,
+    roundOff: 0.18,
+    tip: 20,
+    total: 1139.82,
+    paymentMode: 'upi',
+    formatMoney: formatINR,
+  }
 }
 
 interface Props {
   templateId: InvoiceTemplateId
+  accentPreset: InvoiceAccentPreset
+  accentColor: string
+  selected?: boolean
+  onSelect?: () => void
+  label: string
 }
 
-/** Live print-style preview with sample data (settings chooser). */
-export function InvoiceTemplatePreview({ templateId }: Props) {
+/** Selectable live preview card for settings. */
+export function InvoiceTemplatePreview({
+  templateId,
+  accentPreset,
+  accentColor,
+  selected,
+  onSelect,
+  label,
+}: Props) {
+  const vm = sampleVm(templateId, accentPreset, accentColor)
   return (
-    <div
+    <button
+      type="button"
+      onClick={onSelect}
       className={cn(
-        'rounded-md border border-border bg-card p-3 text-foreground',
-        templateId === 'thermal' && 'max-w-[280px] font-mono text-[11px]',
-        templateId === 'compact' && 'max-w-md text-xs',
-        templateId === 'classic' && 'text-sm',
+        'flex w-full flex-col overflow-hidden rounded-md border text-left transition-colors',
+        selected
+          ? 'border-primary ring-2 ring-primary'
+          : 'border-border hover:border-primary/40',
       )}
     >
-      <p
-        className={cn(
-          'font-semibold',
-          templateId === 'thermal' && 'text-center uppercase tracking-wide',
-        )}
-      >
-        {SAMPLE.salon}
-      </p>
-      <p className="text-muted-foreground tabular-nums">{SAMPLE.invoiceNo}</p>
-      <p className="mt-2">Bill to: {SAMPLE.customer}</p>
-      <div className="my-2 border-t border-border" />
-      {SAMPLE.lines.map((line) => (
-        <div key={line.name} className="flex justify-between gap-2 tabular-nums">
-          <span>{line.name}</span>
-          <span>{line.amount}</span>
+      <div className="border-b border-border bg-muted/40 px-2 py-1.5 text-xs font-medium">
+        {label}
+      </div>
+      <div className="max-h-56 overflow-hidden bg-muted/20 p-2">
+        <div className="origin-top scale-[0.42]">
+          <InvoiceDocument vm={vm} />
         </div>
-      ))}
-      <div className="my-2 border-t border-border" />
-      <p className="text-muted-foreground">{SAMPLE.tax}</p>
-      <p className="mt-1 flex justify-between font-semibold tabular-nums">
-        <span>Total</span>
-        <span>{SAMPLE.total}</span>
-      </p>
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        {templateId === 'classic' && 'Classic A4 · full detail'}
-        {templateId === 'compact' && 'Compact A5 · half page'}
-        {templateId === 'thermal' && 'Thermal 58/80 mm · narrow receipt'}
-      </p>
-    </div>
+      </div>
+    </button>
   )
 }

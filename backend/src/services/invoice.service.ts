@@ -46,6 +46,9 @@ export interface CreateInvoiceDto {
   appointmentId?: string | null;
   serviceItems?: ServiceLineInput[];
   productItems?: ProductLineInput[];
+  /** Section-level discount applied after per-line discounts (lines usually 0). */
+  serviceDiscount?: LineDiscountInput;
+  productDiscount?: LineDiscountInput;
   paymentMode: PaymentMode;
   tip?: number;
   loyaltyRedeemPoints?: number;
@@ -261,7 +264,24 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       });
     }
 
-    // Net after line (+ section = sum of line) discounts
+    // Section discounts (after line discounts; FE sends line discounts as 0)
+    const serviceAfterLines = round2(serviceSubtotal - serviceDiscountTotal);
+    const productAfterLines = round2(productSubtotal - productDiscountTotal);
+    const serviceSection = applyDiscount(
+      serviceAfterLines,
+      data.serviceDiscount,
+    );
+    const productSection = applyDiscount(
+      productAfterLines,
+      data.productDiscount,
+    );
+    serviceDiscountTotal = round2(
+      serviceDiscountTotal + serviceSection.discountAmount,
+    );
+    productDiscountTotal = round2(
+      productDiscountTotal + productSection.discountAmount,
+    );
+
     const serviceNet = round2(serviceSubtotal - serviceDiscountTotal);
     const productNet = round2(productSubtotal - productDiscountTotal);
     const netAfterDiscounts = round2(serviceNet + productNet);
@@ -413,7 +433,22 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       tip,
       amountPayable,
       grandTotal,
-      templateId: settings.invoice.templateId,
+      templateId:
+        settings.invoice.templateId === "classic"
+          ? "creamGold"
+          : settings.invoice.templateId,
+      templateSnapshot: {
+        templateId:
+          settings.invoice.templateId === "classic"
+            ? "creamGold"
+            : settings.invoice.templateId,
+        accentPreset: settings.invoice.accentPreset ?? "gold",
+        accentColor: settings.invoice.accentColor ?? "#FFD700",
+        showStaffNames: settings.invoice.showStaffNames !== false,
+        showLogo: settings.invoice.showLogo !== false,
+        termsText: settings.invoice.termsText ?? "",
+        thankYouText: settings.invoice.thankYouText ?? "",
+      },
       businessSnapshot: {
         salonName: b.salonName,
         gstin: b.gstin,

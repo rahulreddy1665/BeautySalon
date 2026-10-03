@@ -14,32 +14,22 @@ import {
   minutesToTime,
   type CalendarHours,
 } from '@/app/screens/appointments/calendarConfig'
+import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
 
 interface DayCalendarProps {
   staff: StaffMember[]
   appointments: Appointment[]
+  selectedId?: string | null
   hours?: CalendarHours
   onSlotClick: (staffId: string, startTime: string) => void
   onAppointmentClick: (appointment: Appointment) => void
 }
 
-function statusClasses(status: Appointment['status']): string {
-  switch (status) {
-    case 'completed':
-      return 'border-border bg-muted text-muted-foreground'
-    case 'cancelled':
-      return 'border-destructive/40 bg-destructive/10 text-destructive line-through opacity-70'
-    case 'no_show':
-      return 'border-border bg-muted/80 text-muted-foreground'
-    default:
-      return 'border-primary/30 bg-primary/10 text-foreground'
-  }
-}
-
 export function DayCalendar({
   staff,
   appointments,
+  selectedId,
   hours = DEFAULT_CALENDAR_HOURS,
   onSlotClick,
   onAppointmentClick,
@@ -56,7 +46,7 @@ export function DayCalendar({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border">
       <div
         className="grid min-w-[640px]"
         style={{
@@ -124,8 +114,11 @@ export function DayCalendar({
                     key={`${appt._id}-${member._id}`}
                     type="button"
                     className={cn(
-                      'absolute inset-x-1 z-10 overflow-hidden rounded-md border px-1.5 py-1 text-left shadow-sm',
-                      statusClasses(appt.status),
+                      'absolute inset-x-1 z-10 overflow-hidden rounded-lg px-1.5 py-1 text-left',
+                      appointmentStatusClasses(
+                        appt.status,
+                        selectedId === appt._id,
+                      ),
                     )}
                     style={{ top, height: Math.max(height - 2, 28) }}
                     onClick={(e) => {

@@ -135,7 +135,19 @@ class ApiClient {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
       const data = error.response?.data as
-        { message?: string; errors?: unknown; success?: boolean } | undefined
+        | {
+            message?: string
+            errors?: { code?: string } | unknown
+            success?: boolean
+          }
+        | undefined
+      const errorCode =
+        data?.errors &&
+        typeof data.errors === 'object' &&
+        data.errors !== null &&
+        'code' in data.errors
+          ? String((data.errors as { code?: string }).code ?? '')
+          : undefined
 
       return createAppError(
         status === 403 && data?.message === 'Permission denied'
@@ -145,7 +157,7 @@ class ApiClient {
           status,
           details: data?.errors ?? data,
           isUnauthorized: status === 401,
-          code: error.code,
+          code: errorCode || error.code,
         },
       )
     }

@@ -45,7 +45,12 @@ export type LoyaltyAdjustFormValues = z.infer<typeof loyaltyAdjustSchema>
 const gstinRegex =
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 
-export const businessSettingsSchema = z.object({
+const hm = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:mm')
+
+export const businessSettingsSchema = z
+  .object({
   salonName: z.string().trim().min(1, 'Salon name is required').max(120),
   address: z.string().trim().max(200).optional().or(z.literal('')),
   city: z.string().trim().max(80).optional().or(z.literal('')),
@@ -57,6 +62,21 @@ export const businessSettingsSchema = z.object({
     .optional()
     .or(z.literal('')),
   phone: z.string().trim().max(20).optional().or(z.literal('')),
+  openingTime: hm,
+  closingTime: hm,
+  workingDays: z
+    .array(
+      z.enum([
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ]),
+    )
+    .min(1, 'Select at least one working day'),
   email: z
     .string()
     .trim()
@@ -72,6 +92,14 @@ export const businessSettingsSchema = z.object({
     .or(z.literal('')),
   invoiceFooterNote: z.string().trim().max(200).optional().or(z.literal('')),
 })
+  .refine(
+    (v) => {
+      const [oh, om] = v.openingTime.split(':').map(Number)
+      const [ch, cm] = v.closingTime.split(':').map(Number)
+      return (ch ?? 0) * 60 + (cm ?? 0) > (oh ?? 0) * 60 + (om ?? 0)
+    },
+    { message: 'Closing time must be after opening time', path: ['closingTime'] },
+  )
 
 export type BusinessSettingsFormValues = z.infer<typeof businessSettingsSchema>
 
@@ -98,7 +126,23 @@ export const invoiceSettingsSchema = z.object({
   includeYear: z.boolean(),
   numberPadding: z.number().int().min(1).max(10),
   rounding: z.enum(['none', 'nearest', 'up', 'down']),
-  templateId: z.enum(['classic', 'compact', 'thermal']),
+  templateId: z.enum(['creamGold', 'blush', 'compact', 'thermal', 'classic']),
+  accentPreset: z.enum([
+    'gold',
+    'blush',
+    'teal',
+    'charcoal',
+    'sage',
+    'plum',
+    'custom',
+  ]),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use #RRGGBB'),
+  showStaffNames: z.boolean(),
+  showLogo: z.boolean(),
+  termsText: z.string().max(500),
+  thankYouText: z.string().max(200),
+  whatsappMessage: z.string().max(500),
+  shareLinkDays: z.number().int().min(1).max(365),
   nextNumber: z.number().int().min(1).optional(),
 })
 

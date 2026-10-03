@@ -16,9 +16,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { COMMON, STAFF } from '@/app/constants'
 import { useStaffListQuery } from '@/app/hooks/queries/useStaffQuery'
-import type { StaffMember } from '@/app/service/staff/staffApi'
+import type {
+  StaffLoginStatus,
+  StaffMember,
+} from '@/app/service/staff/staffApi'
 import { StaffFormSheet } from '@/app/screens/staff/StaffFormSheet'
+
+function loginLabel(status?: StaffLoginStatus): string {
+  switch (status) {
+    case 'login_enabled':
+      return STAFF.list.loginEnabled
+    case 'login_off':
+      return STAFF.list.loginOff
+    case 'must_change_password':
+      return STAFF.list.mustChangePassword
+    default:
+      return STAFF.list.noLogin
+  }
+}
 
 export function StaffScreen() {
   const [search, setSearch] = useState('')
@@ -42,7 +59,7 @@ export function StaffScreen() {
   const columns: ColumnDef<StaffMember>[] = [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: COMMON.labels.name,
       cell: ({ row }) => (
         <Link
           to={`/staff/${row.original._id}`}
@@ -54,18 +71,36 @@ export function StaffScreen() {
     },
     {
       accessorKey: 'age',
-      header: 'Age',
+      header: STAFF.form.age,
       cell: ({ getValue }) => (
         <span className="tabular-nums">{Number(getValue())}</span>
       ),
     },
-    { accessorKey: 'gender', header: 'Gender' },
+    {
+      accessorKey: 'gender',
+      header: COMMON.labels.gender,
+      cell: ({ getValue }) => {
+        const g = String(getValue()) as keyof typeof COMMON.gender
+        return COMMON.gender[g] ?? String(getValue())
+      },
+    },
+    {
+      id: 'login',
+      header: STAFF.detail.allowLogin,
+      cell: ({ row }) => (
+        <Badge variant="outline" className="rounded-md font-normal">
+          {loginLabel(row.original.loginStatus)}
+        </Badge>
+      ),
+    },
     {
       accessorKey: 'isActive',
-      header: 'Status',
+      header: COMMON.labels.status,
       cell: ({ getValue }) => (
         <Badge variant="outline" className="rounded-md font-normal">
-          {getValue() === false ? 'Inactive' : 'Active'}
+          {getValue() === false
+            ? COMMON.labels.inactive
+            : COMMON.labels.active}
         </Badge>
       ),
     },
@@ -83,7 +118,7 @@ export function StaffScreen() {
             setSheetOpen(true)
           }}
         >
-          Edit
+          {COMMON.actions.edit}
         </Button>
       ),
     },
@@ -92,7 +127,7 @@ export function StaffScreen() {
   return (
     <div className="min-w-0 space-y-3">
       <PageHeader
-        description="Salon staff for appointments and billing."
+        description={STAFF.list.description}
         actions={
           <Button
             type="button"
@@ -104,7 +139,7 @@ export function StaffScreen() {
             }}
           >
             <Plus className="size-4" strokeWidth={1.75} />
-            Add staff
+            {STAFF.list.add}
           </Button>
         }
       />
@@ -121,7 +156,7 @@ export function StaffScreen() {
               setSearch(e.target.value)
               setPage(1)
             }}
-            placeholder="Search name"
+            placeholder={STAFF.list.searchPlaceholder}
             className="pl-8"
           />
         </div>
@@ -136,9 +171,9 @@ export function StaffScreen() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="true">Active</SelectItem>
-            <SelectItem value="false">Inactive</SelectItem>
+            <SelectItem value="all">{COMMON.labels.status}</SelectItem>
+            <SelectItem value="true">{COMMON.labels.active}</SelectItem>
+            <SelectItem value="false">{COMMON.labels.inactive}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -147,7 +182,7 @@ export function StaffScreen() {
       {listQuery.isError ? (
         <ErrorState
           error={listQuery.error}
-          title="Could not load staff"
+          title={COMMON.errors.loadFailed}
           onRetry={() => void listQuery.refetch()}
         />
       ) : null}
@@ -158,13 +193,13 @@ export function StaffScreen() {
             data={items}
             columns={columns}
             mobileTitleKey="name"
-            emptyTitle="No staff yet"
-            emptyDescription="Add team members to assign on appointments and bills."
+            emptyTitle={STAFF.list.emptyTitle}
+            emptyDescription={STAFF.list.emptyHint}
           />
           {totalPages > 1 ? (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                {listQuery.data?.total ?? 0} · page {page}/{totalPages}
+                {listQuery.data?.total ?? 0} · {page}/{totalPages}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -174,7 +209,7 @@ export function StaffScreen() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {COMMON.actions.previous}
                 </Button>
                 <Button
                   type="button"
@@ -183,7 +218,7 @@ export function StaffScreen() {
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {COMMON.actions.next}
                 </Button>
               </div>
             </div>

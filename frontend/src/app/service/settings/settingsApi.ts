@@ -2,7 +2,30 @@ import { apiClient } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type RoundingRule = 'none' | 'nearest' | 'up' | 'down'
-export type InvoiceTemplateId = 'classic' | 'compact' | 'thermal'
+export type InvoiceTemplateId =
+  | 'creamGold'
+  | 'blush'
+  | 'compact'
+  | 'thermal'
+  | 'classic'
+
+export type InvoiceAccentPreset =
+  | 'gold'
+  | 'blush'
+  | 'teal'
+  | 'charcoal'
+  | 'sage'
+  | 'plum'
+  | 'custom'
+
+export type Weekday =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday'
 
 export interface BusinessSettings {
   salonName: string
@@ -16,6 +39,9 @@ export interface BusinessSettings {
   email?: string
   gstin?: string
   invoiceFooterNote?: string
+  openingTime?: string
+  closingTime?: string
+  workingDays?: Weekday[]
 }
 
 export interface TaxRatePair {
@@ -36,12 +62,22 @@ export interface InvoiceSettings {
   numberPadding: number
   rounding: RoundingRule
   templateId: InvoiceTemplateId
+  accentPreset?: InvoiceAccentPreset
+  accentColor?: string
+  showStaffNames?: boolean
+  showLogo?: boolean
+  termsText?: string
+  thankYouText?: string
+  whatsappMessage?: string
+  shareLinkDays?: number
 }
 
 export interface AppointmentSettings {
   startHour: number
   endHour: number
   slotMinutes: number
+  minNoticeHours?: number
+  bookingWindowDays?: number
 }
 
 export interface LoyaltySettings {

@@ -3,24 +3,31 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { FormField } from '@/app/components/FormField'
-import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
-import { Label } from '@/app/components/ui/label'
+import { SETTINGS } from '@/app/constants'
 import {
   loyaltyRulesSchema,
   type LoyaltyRulesFormValues,
 } from '@/app/helpers/loyaltyValidation'
 import { usePatchLoyaltySettingsMutation } from '@/app/hooks/queries/useSettingsQuery'
+import { SettingsSaveBar } from '@/app/screens/settings/SettingsSaveBar'
 import type { LoyaltySettings } from '@/app/service/settings/settingsApi'
 import { formatINR } from '@/app/utils'
 
 interface Props {
   initial: LoyaltySettings
   canUpdate: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  hideTitle?: boolean
 }
 
-export function LoyaltySettingsSection({ initial, canUpdate }: Props) {
+export function LoyaltySettingsSection({
+  initial,
+  canUpdate,
+  onDirtyChange,
+  hideTitle,
+}: Props) {
   const patch = usePatchLoyaltySettingsMutation()
   const form = useForm<LoyaltyRulesFormValues>({
     resolver: zodResolver(loyaltyRulesSchema),
@@ -39,6 +46,10 @@ export function LoyaltySettingsSection({ initial, canUpdate }: Props) {
   )
   const redeemExample = (values.redeemValuePerPoint || 0) * 100
 
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
   const onSubmit = form.handleSubmit(async (vals) => {
     await patch.mutateAsync(vals)
     form.reset(vals)
@@ -46,9 +57,11 @@ export function LoyaltySettingsSection({ initial, canUpdate }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Loyalty</CardTitle>
-      </CardHeader>
+      {hideTitle ? null : (
+        <CardHeader className="pb-2">
+          <CardTitle>{SETTINGS.sections.loyalty}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <label className="flex items-center gap-2 text-sm">
@@ -146,17 +159,11 @@ export function LoyaltySettingsSection({ initial, canUpdate }: Props) {
             and tip).
           </p>
 
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs font-normal text-muted-foreground">
-              {dirty ? 'Unsaved changes' : 'All changes saved'}
-            </Label>
-            <Button
-              type="submit"
-              disabled={!canUpdate || !dirty || patch.isPending}
-            >
-              {patch.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
+          <SettingsSaveBar
+            dirty={dirty}
+            canUpdate={canUpdate}
+            pending={patch.isPending}
+          />
         </form>
       </CardContent>
     </Card>

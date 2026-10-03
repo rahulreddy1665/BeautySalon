@@ -2,6 +2,11 @@ import { apiClient } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type StaffGender = 'Male' | 'Female' | 'Other'
+export type StaffLoginStatus =
+  | 'login_enabled'
+  | 'login_off'
+  | 'must_change_password'
+  | 'no_login'
 
 export interface StaffMember {
   _id: string
@@ -9,6 +14,9 @@ export interface StaffMember {
   age: number
   gender: StaffGender
   isActive: boolean
+  designation?: { _id: string; name: string; isActive?: boolean } | string | null
+  loginStatus?: StaffLoginStatus
+  username?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -18,6 +26,7 @@ export interface StaffInput {
   age: number
   gender: StaffGender
   isActive?: boolean
+  designationId?: string | null
 }
 
 export interface PaginatedStaff {
@@ -33,6 +42,13 @@ export interface StaffListParams {
   isActive?: string
   page?: number
   limit?: number
+}
+
+export interface StaffLoginResult {
+  staffId: string
+  username: string
+  temporaryPassword: string
+  loginStatus: StaffLoginStatus
 }
 
 export const staffApi = {
@@ -79,6 +95,35 @@ export const staffApi = {
     const { data } = await apiClient.delete<ApiSuccessResponse<StaffMember>>(
       `/staff/${id}`,
     )
+    return data.data
+  },
+
+  enableLogin: async (
+    id: string,
+    payload: { username: string; temporaryPassword?: string },
+  ): Promise<StaffLoginResult> => {
+    const { data } = await apiClient.post<ApiSuccessResponse<StaffLoginResult>>(
+      `/staff/${id}/login`,
+      payload,
+    )
+    return data.data
+  },
+
+  resetLoginPassword: async (
+    id: string,
+    temporaryPassword?: string,
+  ): Promise<StaffLoginResult> => {
+    const { data } = await apiClient.post<ApiSuccessResponse<StaffLoginResult>>(
+      `/staff/${id}/login/reset`,
+      { temporaryPassword },
+    )
+    return data.data
+  },
+
+  disableLogin: async (id: string): Promise<{ loginStatus: StaffLoginStatus }> => {
+    const { data } = await apiClient.delete<
+      ApiSuccessResponse<{ loginStatus: StaffLoginStatus }>
+    >(`/staff/${id}/login`)
     return data.data
   },
 }

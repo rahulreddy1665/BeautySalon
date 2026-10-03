@@ -3,23 +3,30 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { FormField } from '@/app/components/FormField'
-import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
-import { Label } from '@/app/components/ui/label'
+import { SETTINGS } from '@/app/constants'
 import {
   taxSettingsSchema,
   type TaxSettingsFormValues,
 } from '@/app/helpers/settingsValidation'
 import { usePatchTaxMutation } from '@/app/hooks/queries/useSettingsQuery'
+import { SettingsSaveBar } from '@/app/screens/settings/SettingsSaveBar'
 import type { TaxSettings } from '@/app/service/settings/settingsApi'
 
 interface Props {
   initial: TaxSettings
   canUpdate: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  hideTitle?: boolean
 }
 
-export function TaxSettingsSection({ initial, canUpdate }: Props) {
+export function TaxSettingsSection({
+  initial,
+  canUpdate,
+  onDirtyChange,
+  hideTitle,
+}: Props) {
   const patch = usePatchTaxMutation()
   const form = useForm<TaxSettingsFormValues>({
     resolver: zodResolver(taxSettingsSchema),
@@ -37,6 +44,10 @@ export function TaxSettingsSection({ initial, canUpdate }: Props) {
     (values.products?.cgstPercent ?? 0) + (values.products?.sgstPercent ?? 0)
   const dirty = form.formState.isDirty
 
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
   const onSubmit = form.handleSubmit(async (vals) => {
     await patch.mutateAsync(vals)
     form.reset(vals)
@@ -44,9 +55,11 @@ export function TaxSettingsSection({ initial, canUpdate }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Tax (CGST / SGST)</CardTitle>
-      </CardHeader>
+      {hideTitle ? null : (
+        <CardHeader className="pb-2">
+          <CardTitle>{SETTINGS.sections.tax}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <label className="flex items-center gap-2 text-sm">
@@ -154,17 +167,11 @@ export function TaxSettingsSection({ initial, canUpdate }: Props) {
             taxed. HSN/SAC, IGST and multi-state rules are not supported yet.
           </p>
 
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs font-normal text-muted-foreground">
-              {dirty ? 'Unsaved changes' : 'All changes saved'}
-            </Label>
-            <Button
-              type="submit"
-              disabled={!canUpdate || !dirty || patch.isPending}
-            >
-              {patch.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
+          <SettingsSaveBar
+            dirty={dirty}
+            canUpdate={canUpdate}
+            pending={patch.isPending}
+          />
         </form>
       </CardContent>
     </Card>

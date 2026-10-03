@@ -5,7 +5,31 @@ export type DiscountType = "percent" | "amount";
 export type InvoiceStatus = "paid" | "partial" | "unpaid";
 export type InvoiceSource = "walk-in" | "appointment";
 export type RoundingRule = "none" | "nearest" | "up" | "down";
-export type InvoiceTemplateId = "classic" | "compact" | "thermal";
+export type InvoiceTemplateId =
+  | "creamGold"
+  | "blush"
+  | "compact"
+  | "thermal"
+  | "classic";
+
+export type InvoiceAccentPreset =
+  | "gold"
+  | "blush"
+  | "teal"
+  | "charcoal"
+  | "sage"
+  | "plum"
+  | "custom";
+
+export interface IInvoiceTemplateSnapshot {
+  templateId: InvoiceTemplateId;
+  accentPreset: InvoiceAccentPreset;
+  accentColor: string;
+  showStaffNames: boolean;
+  showLogo: boolean;
+  termsText: string;
+  thankYouText: string;
+}
 
 export interface ILineDiscount {
   type: DiscountType;
@@ -74,6 +98,8 @@ export interface IInvoice extends Document {
   amountPayable: number;
   grandTotal: number;
   templateId: InvoiceTemplateId;
+  /** Full presentation snapshot so old invoices never change with settings. */
+  templateSnapshot?: IInvoiceTemplateSnapshot;
   businessSnapshot: {
     salonName: string;
     gstin?: string;
@@ -182,8 +208,23 @@ const invoiceSchema = new Schema<IInvoice>(
     grandTotal: { type: Number, required: true },
     templateId: {
       type: String,
-      enum: ["classic", "compact", "thermal"],
-      default: "classic",
+      enum: ["creamGold", "blush", "compact", "thermal", "classic"],
+      default: "creamGold",
+    },
+    templateSnapshot: {
+      templateId: {
+        type: String,
+        enum: ["creamGold", "blush", "compact", "thermal", "classic"],
+      },
+      accentPreset: {
+        type: String,
+        enum: ["gold", "blush", "teal", "charcoal", "sage", "plum", "custom"],
+      },
+      accentColor: { type: String },
+      showStaffNames: { type: Boolean, default: true },
+      showLogo: { type: Boolean, default: true },
+      termsText: { type: String, default: "" },
+      thankYouText: { type: String, default: "" },
     },
     businessSnapshot: {
       salonName: { type: String, default: "BeautySalon" },

@@ -18,6 +18,7 @@ export const requirePermission =
       res.status(403).json({
         success: false,
         message: "Permission denied",
+        errors: { code: "FORBIDDEN" },
       });
       return;
     }

@@ -7,6 +7,8 @@ export interface IStaff extends Document {
   age: number;
   gender: StaffGender;
   isActive: boolean;
+  designation?: mongoose.Types.ObjectId | null;
+  user?: mongoose.Types.ObjectId | null;
 }
 
 const staffSchema = new Schema<IStaff>(
@@ -30,6 +32,16 @@ const staffSchema = new Schema<IStaff>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    designation: {
+      type: Schema.Types.ObjectId,
+      ref: "Designation",
+      default: null,
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   {

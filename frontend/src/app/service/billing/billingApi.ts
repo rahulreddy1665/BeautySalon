@@ -1,6 +1,10 @@
 import { format } from 'date-fns'
 
-import { invoicesApi, type InvoiceRecord, type PaymentMode } from '@/app/service/invoices/invoicesApi'
+import {
+  invoicesApi,
+  type InvoiceRecord,
+  type PaymentMode,
+} from '@/app/service/invoices/invoicesApi'
 import { productsApi } from '@/app/service/products/productsApi'
 
 export type { PaymentMode }
@@ -22,6 +26,7 @@ export interface BillLineInput {
   qty: number
   staffId?: string
   staffName?: string
+  discount?: { type: 'percent' | 'amount'; value: number }
 }
 
 export interface PaymentSplit {
@@ -37,11 +42,10 @@ export interface CreateBillPayload {
   walkInPhone?: string
   appointmentId?: string | null
   lines: BillLineInput[]
-  discountAmount?: number
-  gstPercent?: number
-  loyaltyRedeemPoints?: number
-  loyaltyRedeemValue?: number
+  serviceDiscount?: { type: 'percent' | 'amount'; value: number }
+  productDiscount?: { type: 'percent' | 'amount'; value: number }
   tip?: number
+  loyaltyRedeemPoints?: number
   payment: PaymentSplit
   notes?: string
 }
@@ -94,9 +98,6 @@ export function mapInvoiceToBill(inv: InvoiceRecord): BillRecord {
   }
 }
 
-/**
- * Billing façade over `/api/invoice` + `/api/product`.
- */
 export const billingApi = {
   list: async (params: Record<string, unknown> = {}): Promise<BillRecord[]> => {
     const page = await invoicesApi.list({
@@ -125,6 +126,7 @@ export const billingApi = {
           serviceId: line.catalogId,
           staffId: line.staffId!,
           qty: line.qty,
+          discount: line.discount ?? { type: 'amount' as const, value: 0 },
         })),
       productItems: payload.lines
         .filter((line) => line.kind === 'product')
@@ -132,7 +134,10 @@ export const billingApi = {
           productId: line.catalogId,
           staffId: line.staffId!,
           qty: line.qty,
+          discount: line.discount ?? { type: 'amount' as const, value: 0 },
         })),
+      serviceDiscount: payload.serviceDiscount,
+      productDiscount: payload.productDiscount,
       paymentMode,
       tip: payload.tip,
       loyaltyRedeemPoints: payload.loyaltyRedeemPoints,
@@ -151,7 +156,6 @@ export const billingApi = {
   },
 }
 
-/** @deprecated invoices compute totals server-side */
 export function serviceUnitPrice(_id: string, apiPrice?: number): number {
   return apiPrice ?? 0
 }

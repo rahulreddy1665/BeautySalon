@@ -28,6 +28,7 @@ export const createAppointmentController = async (
           ? "Appointment created"
           : "Appointment created failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {

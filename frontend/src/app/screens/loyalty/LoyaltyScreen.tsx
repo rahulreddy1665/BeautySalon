@@ -10,7 +10,6 @@ import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { StatCard } from '@/app/components/StatCard'
-import { Badge } from '@/app/components/ui/badge'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
@@ -266,12 +265,6 @@ export function LoyaltyScreen() {
           </Button>
         }
       />
-
-      {import.meta.env.DEV ? (
-        <Badge variant="outline" className="rounded-md font-normal text-[11px]">
-          Live /api/loyalty · rules shared with Settings
-        </Badge>
-      ) : null}
 
       {loading ? <LoadingSkeleton variant="stats" /> : null}
       {error ? (

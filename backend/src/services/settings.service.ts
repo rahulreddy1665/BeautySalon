@@ -7,9 +7,31 @@ import {
   type ILoyaltySettings,
   type ITaxSettings,
   type RoundingRule,
+  type InvoiceAccentPreset,
   type InvoiceTemplateId,
+  type Weekday,
 } from "../models/settings.model";
 import { InvoiceSequence } from "../models/invoice-sequence.model";
+import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
+
+const WEEKDAYS: Weekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+function parseHm(time: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(time || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
 
 const GSTIN_RE =
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -49,6 +71,50 @@ export async function getOrCreateSettings() {
   let doc = await Settings.findOne();
   if (!doc) {
     doc = await Settings.create(DEFAULT_SETTINGS);
+  } else {
+    // Fill new invoice presentation fields on older settings docs
+    const inv = doc.invoice as IInvoiceSettings;
+    let dirty = false;
+    if (!inv.accentPreset) {
+      inv.accentPreset = DEFAULT_SETTINGS.invoice.accentPreset;
+      dirty = true;
+    }
+    if (!inv.accentColor) {
+      inv.accentColor = DEFAULT_SETTINGS.invoice.accentColor;
+      dirty = true;
+    }
+    if (inv.showStaffNames === undefined) {
+      inv.showStaffNames = true;
+      dirty = true;
+    }
+    if (inv.showLogo === undefined) {
+      inv.showLogo = true;
+      dirty = true;
+    }
+    if (inv.termsText === undefined) {
+      inv.termsText = DEFAULT_SETTINGS.invoice.termsText;
+      dirty = true;
+    }
+    if (inv.thankYouText === undefined) {
+      inv.thankYouText = DEFAULT_SETTINGS.invoice.thankYouText;
+      dirty = true;
+    }
+    if (inv.whatsappMessage === undefined) {
+      inv.whatsappMessage = DEFAULT_SETTINGS.invoice.whatsappMessage;
+      dirty = true;
+    }
+    if (!inv.shareLinkDays) {
+      inv.shareLinkDays = 30;
+      dirty = true;
+    }
+    if (inv.templateId === "classic") {
+      inv.templateId = "creamGold";
+      dirty = true;
+    }
+    if (dirty) {
+      doc.markModified("invoice");
+      await doc.save();
+    }
   }
   return doc;
 }
@@ -138,9 +204,35 @@ export const updateBusinessSettings = async (
     if (data.email !== undefined && data.email) {
       const email = String(data.email).trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return { statusCode: 400, data: null, message: "Invalid email" };
+        return fail(400, ErrorMessages.INVALID_EMAIL);
       }
       doc.business.email = email;
+    }
+    if (data.openingTime !== undefined || data.closingTime !== undefined) {
+      const open = data.openingTime ?? doc.business.openingTime ?? "09:00";
+      const close = data.closingTime ?? doc.business.closingTime ?? "21:00";
+      const openM = parseHm(open);
+      const closeM = parseHm(close);
+      if (openM == null || closeM == null) {
+        return fail(400, "Opening/closing time must be HH:mm", ErrorCodes.VALIDATION_ERROR);
+      }
+      if (closeM <= openM) {
+        return fail(400, ErrorMessages.END_AFTER_START);
+      }
+      doc.business.openingTime = open;
+      doc.business.closingTime = close;
+      // Keep legacy appointment hours in sync for older clients
+      doc.appointments.startHour = Math.floor(openM / 60);
+      doc.appointments.endHour = Math.ceil(closeM / 60);
+    }
+    if (data.workingDays !== undefined) {
+      const days = (Array.isArray(data.workingDays) ? data.workingDays : [])
+        .map((d) => String(d).toLowerCase() as Weekday)
+        .filter((d) => WEEKDAYS.includes(d));
+      if (days.length === 0) {
+        return fail(400, "Select at least one working day");
+      }
+      doc.business.workingDays = days;
     }
     await doc.save();
     return { statusCode: 200, data: publicSettings(doc).business };
@@ -229,11 +321,94 @@ export const updateInvoiceSettings = async (
       doc.invoice.rounding = data.rounding;
     }
     if (data.templateId !== undefined) {
-      const allowed: InvoiceTemplateId[] = ["classic", "compact", "thermal"];
+      const allowed: InvoiceTemplateId[] = [
+        "creamGold",
+        "blush",
+        "compact",
+        "thermal",
+        "classic",
+      ];
       if (!allowed.includes(data.templateId)) {
         return { statusCode: 400, data: null, message: "Invalid template" };
       }
-      doc.invoice.templateId = data.templateId;
+      doc.invoice.templateId =
+        data.templateId === "classic" ? "creamGold" : data.templateId;
+    }
+    if (data.accentPreset !== undefined) {
+      const allowed: InvoiceAccentPreset[] = [
+        "gold",
+        "blush",
+        "teal",
+        "charcoal",
+        "sage",
+        "plum",
+        "custom",
+      ];
+      if (!allowed.includes(data.accentPreset)) {
+        return { statusCode: 400, data: null, message: "Invalid accent preset" };
+      }
+      doc.invoice.accentPreset = data.accentPreset;
+    }
+    if (data.accentColor !== undefined) {
+      const hex = String(data.accentColor).trim().toUpperCase();
+      if (!/^#[0-9A-F]{6}$/.test(hex)) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Accent color must be a #RRGGBB hex value",
+        };
+      }
+      doc.invoice.accentColor = hex;
+    }
+    if (data.showStaffNames !== undefined) {
+      doc.invoice.showStaffNames = Boolean(data.showStaffNames);
+    }
+    if (data.showLogo !== undefined) {
+      doc.invoice.showLogo = Boolean(data.showLogo);
+    }
+    if (data.termsText !== undefined) {
+      const t = String(data.termsText).trim();
+      if (t.length > 500) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Terms text max 500 characters",
+        };
+      }
+      doc.invoice.termsText = t;
+    }
+    if (data.thankYouText !== undefined) {
+      const t = String(data.thankYouText).trim();
+      if (t.length > 200) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Thank-you text max 200 characters",
+        };
+      }
+      doc.invoice.thankYouText = t;
+    }
+    if (data.whatsappMessage !== undefined) {
+      const t = String(data.whatsappMessage).trim();
+      if (t.length > 500) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "WhatsApp message max 500 characters",
+        };
+      }
+      doc.invoice.whatsappMessage = t;
+    }
+    if (data.shareLinkDays !== undefined) {
+      const d = Math.floor(Number(data.shareLinkDays));
+      if (!Number.isFinite(d) || d < 1 || d > 365) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Share link days must be 1–365",
+        };
+      }
+      doc.invoice.shareLinkDays = d;
     }
 
     if (data.nextNumber !== undefined) {

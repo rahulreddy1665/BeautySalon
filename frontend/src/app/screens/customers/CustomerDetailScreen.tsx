@@ -7,13 +7,13 @@ import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { StatCard } from '@/app/components/StatCard'
-import { Badge } from '@/app/components/ui/badge'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import { CUSTOMERS, COMMON } from '@/app/constants'
 import { useCustomerBookingsQuery } from '@/app/hooks/queries/useCustomerBookingsQuery'
 import { useCustomerQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useLoyaltyBalanceQuery } from '@/app/hooks/queries/useLoyaltyQuery'
 import type { Booking } from '@/app/service/bookings/bookingsApi'
-import { getCustomerExtrasMock } from '@/app/service/mocks/customerExtrasMock'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
 
 type VisitRow = {
@@ -42,17 +42,14 @@ export function CustomerDetailScreen() {
   const { id } = useParams<{ id: string }>()
   const customerQuery = useCustomerQuery(id)
   const bookingsQuery = useCustomerBookingsQuery(id)
+  const loyaltyQuery = useLoyaltyBalanceQuery(id)
   const [editOpen, setEditOpen] = useState(false)
-
-  const extras = useMemo(
-    () => (id ? getCustomerExtrasMock(id) : { loyaltyPoints: 0, lifetimeSpend: 0 }),
-    [id],
-  )
 
   const visits = useMemo(
     () => toVisitRows(bookingsQuery.data ?? []),
     [bookingsQuery.data],
   )
+  const loyaltyPoints = loyaltyQuery.data?.points ?? 0
 
   if (customerQuery.isLoading) {
     return (
@@ -102,25 +99,20 @@ export function CustomerDetailScreen() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
-        <StatCard label="Visits" value={visits.length} />
-        <StatCard label="Loyalty points" value={extras.loyaltyPoints} />
-        <StatCard label="Lifetime spend" value={extras.lifetimeSpend} format="inr" />
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-3">
+        <StatCard label={CUSTOMERS.detail.visits} value={visits.length} />
+        <StatCard label={CUSTOMERS.detail.loyaltyPoints} value={loyaltyPoints} />
         <Card className="gap-0 rounded-md py-0 shadow-none">
           <CardContent className="px-3 py-3 sm:px-4">
-            <p className="text-xs text-muted-foreground">Status</p>
+            <p className="text-xs text-muted-foreground">{COMMON.labels.status}</p>
             <p className="mt-1 text-sm font-semibold">
-              {customer.isActive === false ? 'Inactive' : 'Active'}
+              {customer.isActive === false
+                ? COMMON.labels.inactive
+                : COMMON.labels.active}
             </p>
           </CardContent>
         </Card>
       </div>
-
-      {import.meta.env.DEV ? (
-        <Badge variant="outline" className="rounded-md font-normal text-[11px]">
-          Loyalty points from MOCK ledger · spend MOCK · visits from /api/booking
-        </Badge>
-      ) : null}
 
       <Card>
         <CardHeader className="pb-1">

@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu'
+import { COMMON } from '@/app/constants'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
 import {
   setThemeMode,
@@ -14,9 +15,9 @@ import {
 } from '@/app/state/redux/slices/settingsSlice'
 
 const options: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: COMMON.nav.themeLight, icon: Sun },
+  { value: 'dark', label: COMMON.nav.themeDark, icon: Moon },
+  { value: 'system', label: COMMON.nav.themeSystem, icon: Monitor },
 ]
 
 export function ThemeToggle() {
@@ -30,8 +31,8 @@ export function ThemeToggle() {
           type="button"
           variant="outline"
           size="icon-sm"
-          className="min-touch size-9"
-          aria-label="Theme"
+          aria-label={COMMON.nav.theme}
+          className="min-touch size-9 rounded-full"
         >
           <Sun className="size-4 dark:hidden" strokeWidth={1.75} />
           <Moon className="hidden size-4 dark:block" strokeWidth={1.75} />

@@ -9,6 +9,21 @@ export const staffFormSchema = z.object({
     .max(80, 'Maximum age is 80'),
   gender: z.enum(['Male', 'Female', 'Other']),
   isActive: z.boolean(),
+  designationId: z.string().optional().nullable(),
 })
 
 export type StaffFormValues = z.infer<typeof staffFormSchema>
+
+export const staffLoginSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(
+      /^[a-z0-9._]{4,20}$/,
+      '4–20 chars: letters, numbers, dot, or underscore',
+    ),
+  temporaryPassword: z.string().min(8, 'At least 8 characters'),
+})
+
+export type StaffLoginFormValues = z.infer<typeof staffLoginSchema>

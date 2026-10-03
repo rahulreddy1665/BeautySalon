@@ -100,4 +100,8 @@ export const queryKeys = {
   settings: {
     all: ['settings'] as const,
   },
+  designations: {
+    all: ['designations'] as const,
+    list: () => [...queryKeys.designations.all, 'list'] as const,
+  },
 } as const

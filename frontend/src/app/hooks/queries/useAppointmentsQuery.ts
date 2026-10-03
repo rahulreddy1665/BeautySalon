@@ -34,7 +34,6 @@ export function useCreateAppointmentMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
-      toast.success('Appointment booked')
     },
     onError: (error) => {
       toast.error(toErrorMessage(error, 'Could not book appointment'))
@@ -57,7 +56,6 @@ export function useUpdateAppointmentMutation() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.appointments.detail(appt._id),
       })
-      toast.success('Appointment updated')
     },
     onError: (error) => {
       toast.error(toErrorMessage(error, 'Could not update appointment'))
@@ -96,7 +94,6 @@ export function useCancelAppointmentMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
-      toast.success('Appointment cancelled')
     },
     onError: (error) => {
       toast.error(toErrorMessage(error, 'Could not cancel'))

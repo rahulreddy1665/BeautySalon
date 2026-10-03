@@ -7,6 +7,12 @@ import {
   getStaffList,
   updateStaff,
 } from "../services/staff.service";
+import {
+  disableStaffLogin,
+  enableStaffLogin,
+  resetStaffPassword,
+} from "../services/staff-login.service";
+import type { AuthRequest } from "../middlewares/auth.middleware";
 import { sendResponse } from "../middlewares/response.middleware";
 
 export const createStaffController = async (req: Request, res: Response) => {
@@ -112,6 +118,78 @@ export const deleteStaffController = async (
     return sendResponse(res, {
       statusCode: 500,
       message: "Staff delete failed",
+      errors: error,
+    });
+  }
+};
+
+function sendStaffLoginResult(
+  res: Response,
+  data: {
+    statusCode: number;
+    message?: string;
+    data?: unknown;
+    errors?: unknown;
+  },
+  okMessage: string,
+) {
+  return sendResponse(res, {
+    statusCode: data.statusCode,
+    message: data.message ?? (data.statusCode === 200 ? okMessage : "Failed"),
+    data: data.data,
+    errors: data.errors ?? null,
+  });
+}
+
+export const enableStaffLoginController = async (
+  req: Request<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const data = await enableStaffLogin(req.params.id, req.body);
+    return sendStaffLoginResult(res, data, "Login enabled");
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
+      errors: error,
+    });
+  }
+};
+
+export const resetStaffPasswordController = async (
+  req: Request<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const data = await resetStaffPassword(
+      req.params.id,
+      req.body?.temporaryPassword,
+    );
+    return sendStaffLoginResult(res, data, "Password reset");
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
+      errors: error,
+    });
+  }
+};
+
+export const disableStaffLoginController = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const data = await disableStaffLogin(
+      String(req.params.id),
+      req.user?.id,
+    );
+    return sendStaffLoginResult(res, data, "Login turned off");
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
       errors: error,
     });
   }

@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useMemo, useRef } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 
 import { FormField } from '@/app/components/FormField'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
+import { SETTINGS, WEEKDAYS } from '@/app/constants'
+import { SettingsSaveBar } from '@/app/screens/settings/SettingsSaveBar'
 import {
   businessSettingsSchema,
   type BusinessSettingsFormValues,
@@ -23,9 +25,16 @@ import {
 interface Props {
   initial: BusinessSettings
   canUpdate: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  hideTitle?: boolean
 }
 
-export function BusinessSettingsSection({ initial, canUpdate }: Props) {
+export function BusinessSettingsSection({
+  initial,
+  canUpdate,
+  onDirtyChange,
+  hideTitle,
+}: Props) {
   const patch = usePatchBusinessMutation()
   const uploadLogo = useUploadLogoMutation()
   const removeLogo = useRemoveLogoMutation()
@@ -43,6 +52,11 @@ export function BusinessSettingsSection({ initial, canUpdate }: Props) {
       email: initial.email ?? '',
       gstin: initial.gstin ?? '',
       invoiceFooterNote: initial.invoiceFooterNote ?? '',
+      openingTime: initial.openingTime ?? '09:00',
+      closingTime: initial.closingTime ?? '21:00',
+      workingDays: initial.workingDays?.length
+        ? initial.workingDays
+        : [...WEEKDAYS.filter((d) => d !== 'sunday')],
     },
   })
 
@@ -57,11 +71,20 @@ export function BusinessSettingsSection({ initial, canUpdate }: Props) {
       email: initial.email ?? '',
       gstin: initial.gstin ?? '',
       invoiceFooterNote: initial.invoiceFooterNote ?? '',
+      openingTime: initial.openingTime ?? '09:00',
+      closingTime: initial.closingTime ?? '21:00',
+      workingDays: initial.workingDays?.length
+        ? initial.workingDays
+        : [...WEEKDAYS.filter((d) => d !== 'sunday')],
     })
   }, [initial, form])
 
   const dirty = form.formState.isDirty
   const preview = useMemo(() => logoDataUrl(initial), [initial])
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   const onSubmit = form.handleSubmit(async (values) => {
     await patch.mutateAsync(values)
@@ -70,9 +93,11 @@ export function BusinessSettingsSection({ initial, canUpdate }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Business profile</CardTitle>
-      </CardHeader>
+      {hideTitle ? null : (
+        <CardHeader className="pb-2">
+          <CardTitle>{SETTINGS.sections.business}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <div className="flex flex-wrap items-center gap-4">
@@ -191,17 +216,74 @@ export function BusinessSettingsSection({ initial, canUpdate }: Props) {
             />
           </FormField>
 
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              {dirty ? 'Unsaved changes' : 'All changes saved'}
-            </p>
-            <Button
-              type="submit"
-              disabled={!canUpdate || !dirty || patch.isPending}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label={SETTINGS.business.openingTime}
+              htmlFor="openingTime"
+              error={form.formState.errors.openingTime?.message}
             >
-              {patch.isPending ? 'Saving…' : 'Save'}
-            </Button>
+              <Input
+                id="openingTime"
+                type="time"
+                disabled={!canUpdate}
+                {...form.register('openingTime')}
+              />
+            </FormField>
+            <FormField
+              label={SETTINGS.business.closingTime}
+              htmlFor="closingTime"
+              error={form.formState.errors.closingTime?.message}
+            >
+              <Input
+                id="closingTime"
+                type="time"
+                disabled={!canUpdate}
+                {...form.register('closingTime')}
+              />
+            </FormField>
           </div>
+
+          <FormField
+            label={SETTINGS.business.workingDays}
+            error={form.formState.errors.workingDays?.message}
+          >
+            <Controller
+              control={form.control}
+              name="workingDays"
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((day) => {
+                    const selected = field.value.includes(day)
+                    return (
+                      <Button
+                        key={day}
+                        type="button"
+                        size="sm"
+                        variant={selected ? 'default' : 'outline'}
+                        className="h-9"
+                        disabled={!canUpdate}
+                        onClick={() => {
+                          if (selected) {
+                            field.onChange(field.value.filter((d) => d !== day))
+                          } else {
+                            field.onChange([...field.value, day])
+                          }
+                        }}
+                      >
+                        {SETTINGS.weekday[day]}
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+            />
+          </FormField>
+
+          <SettingsSaveBar
+            dirty={dirty}
+            canUpdate={canUpdate}
+            pending={patch.isPending}
+          />
         </form>
       </CardContent>
     </Card>

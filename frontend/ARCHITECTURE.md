@@ -55,40 +55,59 @@ Entry: `src/main.tsx` → `AppProviders` → `AppRouter`.
 
 Persist whitelist: `['auth', 'settings']` only.
 
+## Constants (`src/app/constants/`)
+
+All user-facing copy lives here (no i18n library). Group by feature:
+
+| File | Contents |
+|------|----------|
+| `common.ts` | Shared actions, labels, nav, payment modes |
+| `billing.ts`, `staff.ts`, … | Feature strings |
+| `errors.ts` | User messages + backend code/status map |
+| `routes.ts` | Path helpers |
+| `enums.ts` | Payment modes, statuses, genders, weekdays |
+
+**How to add a string:** put it in the feature file → import `{ BILLING }` from `@/app/constants` → use in JSX. Do not hard-code UI sentences in screens.
+
+**How to add an error:** add a stable code in `backend/src/constants/errors.ts` + frontend `ERROR_CODE_MESSAGES` entry; return `errors: { code }` alongside `message` without changing the response envelope.
+
+ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens for leftover developer copy (`mock`, `/api/`, `backend`).
+
 ## UI rules (strict)
 
-- **No gradients** anywhere (backgrounds, buttons, charts, shadows). Flat solids only.
-- Brand beige accent + deep taupe primary for readable buttons; neutrals + semantic colors.
-- Radius **6–8px**, **1px** borders, shadows only on overlays (dialog, sheet, popover, dropdown).
+- Brand: **gold** `#FFD700` on white (light) / black (dark). Never white text on gold (use `--on-gold` `#1A1A1A`).
+- **Gradient policy:** `--gold-gradient` / `.btn-gold-gradient` ONLY on primary buttons, the dashboard highlight stat card, and the active sidebar pill accent. Everything else is flat.
+- Radius **8–12px** (`rounded-lg` / `rounded-xl`), **1px** borders, shadows only on overlays (dialog, sheet, popover, dropdown).
 - Icons: **lucide-react** only. No emojis.
 - Dense POS/admin layouts. Realistic salon copy (“Walk-in”, “Collect payment”, “Today's collection”).
 - Currency: always `formatINR()` from `utils/` (`en-IN` grouping). Use `tabular-nums` on money/numbers.
-- Font: self-hosted **Inter Variable** (`@fontsource-variable/inter`) — no Google Fonts CDN.
+- Font: self-hosted **Inter Variable** for UI; invoice fonts **Cormorant Garamond** + **DM Sans** — no Google Fonts CDN.
 - Empty / loading skeleton / error+retry on every data screen.
 - Page title lives in the **top bar once**; `PageHeader` is actions + optional muted description (avoid duplicate H1).
-- Mock/data-source badges only when `import.meta.env.DEV` and data is mocked.
+- Mock/data-source badges only when `import.meta.env.DEV` and data is mocked. Prefer empty states over fake numbers.
 
 ## Theme tokens
 
-1. Edit `src/app/theme/tokens.ts` (TS source of truth for light + dark).
+1. Edit `src/app/theme/tokens.ts` (TS source of truth for light + dark; includes contrast notes).
 2. Mirror values in `src/app/styles/global.css` `:root` / `.dark`.
 3. Tailwind maps via `@theme { --color-*: var(--*); }`.
-4. Components use Tailwind token classes (`bg-background`, `text-primary`) — no hard-coded hex outside `theme/` + `styles/`.
+4. Components use Tailwind token classes (`bg-background`, `text-primary`, `bg-gold-soft`) — no hard-coded hex outside `theme/` + `styles/` (+ `theme/invoice-themes.ts` for invoice accents).
 
-**Brand:** beige accent `#D8BCAB` (not full-page bg). Light page `#FAF6F3`, cards white, primary button deep taupe `#5C4638` for AA contrast. Dark base `#292929`.
+**Brand:** primary `#FFD700`, page `#F6F6F7`, cards white, dark base `#0B0B0B`. Charts: shared `ChartTooltip` (card bg, never black). Invoice default accent preset: **gold**.
 
-**Theme mode:** Redux `settings.themeMode` = `light | dark | system` (default system). `ThemeProvider` toggles `dark` on `<html>`. FOUC script in `index.html` reads `persist:beauty-salon` before React.
+**Theme mode:** Redux `settings.themeMode` = `light | dark | system` (default system). `ThemeProvider` toggles `dark` on `<html>` and syncs `meta[name=theme-color]`. FOUC script in `index.html` reads `persist:beauty-salon` before React. PWA manifest `theme_color` `#FFD700`, `background_color` `#F6F6F7`.
 
 **Logo:** `components/Logo` + `config/app.ts` `SALON_NAME`. Assets: `assets/logo.svg`, `logo-light.svg`, `logo-dark.svg`.
 
 ## Responsive shell
 
-- **lg+:** fixed `w-56` (224px) sidebar, edge-to-edge (no outer max-width chrome).
+- **lg+:** inset app frame with collapsible sidebar; content fills the rest.
 - **&lt; lg:** bottom nav (max 5: Dashboard, Appointments, Customers, Billing, **More** sheet).
-- Sticky top bar: page title (+ mobile logo) | theme toggle + avatar menu.
+- Sticky top bar: page title (+ mobile logo) | quick actions + avatar menu (theme inside menu).
 - Content padding: 16px mobile / 20px desktop (`px-4` / `md:px-5`).
 - Safe areas: `pt-safe` / `pb-safe` / `env(safe-area-inset-*)`.
 - `min-h-dvh`, inputs ≥ 16px on mobile, touch targets ≥ 44px (`.min-touch`).
+- Nav labels from `COMMON.nav`. New appointment CTA → `/appointments/new`.
 
 ## How to add a new responsive screen
 
@@ -97,8 +116,15 @@ Persist whitelist: `['auth', 'settings']` only.
 3. Fetch via a hook in `hooks/queries/` (TanStack Query). API in `service/<module>/`.
 4. Loading → `LoadingSkeleton`. Error → `ErrorState` + retry. Empty → `EmptyState`.
 5. Lists → `ResponsiveTable`. Money → `formatINR` + `tabular-nums`.
-6. Register the route in `AppRouter`. Add nav item in `AppLayout` (`primaryNav` or `moreNav`).
+6. Register the route in `AppRouter`. Add nav item in `AppLayout` (`primaryNav` or `moreNav`) with `COMMON.nav` + permission.
 7. Do **not** add a Redux slice for server data.
+
+## How to add a dashboard card
+
+1. Extend `GET /api/dashboard` in `backend/src/services/dashboard.service.ts` (omit money fields when `canViewRevenue` is false).
+2. Map the field in `frontend/src/app/service/dashboard/dashboardApi.ts`.
+3. Render with `StatCard` on `DashboardScreen` — use `highlight` only for the primary KPI (gold gradient).
+4. Add copy to `DASHBOARD` constants. Never invent client-side aggregates for money.
 
 ## How to use `ResponsiveTable`
 
@@ -141,15 +167,13 @@ Missing APIs are centralized under `src/app/service/mocks/`:
 | `customerExtrasMock.ts` | Lifetime spend; points delegated to loyaltyMock |
 | `staffSalesMock.ts` | Staff sales & incentives (reports) |
 
-**Live APIs (not mocked):** Staff (`/api/staff`), Services, Appointments (`/api/appointment` day calendar), Invoices (`/api/invoice` — used when New Bill has `appointmentId`).
+**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Staff, Designations, Services, Products (catalog), Appointments (`/api/appointment`), Invoices (+ share link), Settings, Loyalty rules/balances, Auth.
 
-Appointments UI: day calendar (staff columns, 9–21 / 30 min in `calendarConfig.ts`), form + detail sheets, `?date=` URL. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
+Appointments UI: day / week / month calendars, side panel, confirmation dialog (Print + WhatsApp, no auto-send), dedicated form pages at `/appointments/new` and `/appointments/:id/edit`. Hours from business settings; closed weekdays dimmed. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
 
-Billing product catalog reads from `inventoryMock.listCatalogSync()` so POS and inventory share SKUs. Customer detail + New Bill redeem balance read from `loyaltyMock`.
+**CSV export:** client-side via `utils/csv.ts` (`downloadCsv`) until export APIs exist.
 
-**CSV export:** client-side via `utils/csv.ts` (`downloadCsv`) until export APIs exist. Marked DEV badge on report screens.
-
-Screens must not invent their own fake numbers. See each mock’s `*_API_GAPS` / `MOCK_GAPS` for backend work remaining.
+Screens must not invent their own fake numbers. Prefer empty states. Legacy files under `service/mocks/` must not drive production UI.
 
 ## PWA
 
@@ -167,13 +191,21 @@ Screens must not invent their own fake numbers. See each mock’s `*_API_GAPS` /
 | `public/icons/icon-512.png` | 512×512 PNG | Standard |
 | `public/icons/icon-512-maskable.png` | 512×512 PNG | Maskable — keep logo inside ~80% safe zone |
 
-Current files are solid-teal placeholders.
+Current files are placeholders — replace with brand assets when available.
 
 ## Auth & API client
 
 - Base URL: `VITE_API_BASE_URL` (`utils/env.ts`).
 - Bearer token from Redux. No refresh endpoint → 401 clears session.
-- See `docs/API_NOTES.md`.
+- Login accepts **email or username**. Staff accounts are admin-created (username + temporary password); `mustChangePassword` forces `/set-password` (server also blocks other APIs until changed).
+- Avatar menu → **Account**: change password (all users); change email (**admin only**). No forgot-password link; login shows “Ask your admin to reset it.”
+- JWT `tokenVersion` invalidates sessions after password reset / login disable / password change.
+- Designations (`/api/designation`) drive staff permissions; Settings → **Roles & permissions** (admin only) with a permission matrix.
+- Backend reloads designation/role permissions on each authenticated request (not stale JWT lists). Frontend `PermissionGuard` + nav filtering use the same keys.
+- Settings is a **hub** (`/settings`) with card links to `/settings/:section` (business, tax, invoice, appointments, loyalty, roles). Unsaved-changes guard + sticky Save on sub-pages. Cards hide when the user lacks permission; direct URLs show No access.
+- Invoice templates: Cream & Gold, Blush, Compact A5, Thermal. Palettes in `theme/invoice-themes.ts` (only allowed hex outside `theme/tokens`). Shared `InvoiceDocument` + snapshot on each invoice. Public share at `/i/:token` (no app shell, noindex). PDF via `html2pdf.js` (`utils/invoicePdf.ts`). WhatsApp share via `sendInvoiceToCustomer` (wa.me / native share); Cloud API stub on backend.
+- New bill: Services / Products section cards with one section discount each (no per-line discount UI). Line discount field stays 0 for API compatibility.
+- See `docs/API_NOTES.md` and `docs/KNOWN_GAPS.md` (no email/SMTP/2FA).
 
 ## Quality
 

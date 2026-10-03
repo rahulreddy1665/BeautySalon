@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 
 import {
   createUser,
@@ -7,10 +7,11 @@ import {
   getUsers,
   updateUser,
 } from "../services/user.service";
+import type { AuthRequest } from "../middlewares/auth.middleware";
 import { sendResponse } from "../middlewares/response.middleware";
 import { ApiResponseOptions } from "../dto/response.dto";
 
-export const createUserController = async (req: Request, res: Response) => {
+export const createUserController = async (req: AuthRequest, res: Response) => {
   try {
     const data: ApiResponseOptions = await createUser(req.body);
     return sendResponse(res, {
@@ -27,7 +28,7 @@ export const createUserController = async (req: Request, res: Response) => {
   }
 };
 
-export const getUsersController = async (_req: Request, res: Response) => {
+export const getUsersController = async (_req: AuthRequest, res: Response) => {
   try {
     const data: ApiResponseOptions = await getUsers();
     return sendResponse(res, {
@@ -45,11 +46,11 @@ export const getUsersController = async (_req: Request, res: Response) => {
 };
 
 export const getUserByIdController = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await getUserById(req.params.id);
+    const data: ApiResponseOptions = await getUserById(String(req.params.id));
 
     return sendResponse(res, {
       statusCode: data.statusCode,
@@ -67,16 +68,25 @@ export const getUserByIdController = async (
 };
 
 export const updateUserController = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await updateUser(req.params.id, req.body);
+    const id = String(req.params.id);
+    const data: ApiResponseOptions = await updateUser(
+      id,
+      req.body,
+      req.user?.id,
+    );
 
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User Update" : "User Update failed",
+      message:
+        data.statusCode == 200
+          ? "User Update"
+          : ((data as { message?: string }).message ?? "User Update failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -88,16 +98,21 @@ export const updateUserController = async (
 };
 
 export const deleteUserController = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
 ) => {
   try {
-    const data: ApiResponseOptions = await deleteUser(req.params.id);
+    const id = String(req.params.id);
+    const data: ApiResponseOptions = await deleteUser(id, req.user?.id);
 
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "User Update" : "User Update failed",
+      message:
+        data.statusCode == 200
+          ? "User Update"
+          : ((data as { message?: string }).message ?? "User Update failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {

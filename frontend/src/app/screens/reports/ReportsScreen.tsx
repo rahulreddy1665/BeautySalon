@@ -9,30 +9,31 @@ import {
 
 import { PageHeader } from '@/app/components/PageHeader'
 import { Card, CardContent } from '@/app/components/ui/card'
+import { REPORTS, ROUTES } from '@/app/constants'
 
 const reports = [
   {
-    to: '/reports/sales',
-    title: 'Sales',
-    description: 'Collection, service vs product split, staff table.',
+    to: ROUTES.reportsSales,
+    title: REPORTS.hub.sales,
+    description: REPORTS.sales.description,
     icon: BarChart3,
   },
   {
-    to: '/reports/staff',
-    title: 'Staff sales & incentives',
-    description: 'Per-staff sales, incentive rate, and payout estimate.',
+    to: ROUTES.reportsStaff,
+    title: REPORTS.hub.staff,
+    description: REPORTS.staff.description,
     icon: UserRound,
   },
   {
-    to: '/reports/inventory',
-    title: 'Inventory valuation',
-    description: 'On-hand stock at cost and retail, with CSV export.',
+    to: ROUTES.reportsInventory,
+    title: REPORTS.hub.inventory,
+    description: REPORTS.inventory.description,
     icon: Package,
   },
   {
-    to: '/reports/profit',
-    title: 'Profit',
-    description: 'Revenue, expenses, and net profit breakdown.',
+    to: ROUTES.reportsProfit,
+    title: REPORTS.hub.profit,
+    description: REPORTS.profit.description,
     icon: PiggyBank,
   },
 ] as const
@@ -40,7 +41,7 @@ const reports = [
 export function ReportsScreen() {
   return (
     <div className="min-w-0 space-y-3">
-      <PageHeader description="Owner reports — sales, staff, stock, and profit." />
+      <PageHeader description={REPORTS.hub.description} />
 
       <div className="grid gap-2 sm:grid-cols-2">
         {reports.map((report) => {
@@ -49,18 +50,21 @@ export function ReportsScreen() {
             <Link
               key={report.to}
               to={report.to}
-              className="group block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Card className="h-full transition-colors group-hover:border-primary/40">
                 <CardContent className="flex items-start gap-3 py-4">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-                    <Icon className="size-4 text-foreground" strokeWidth={1.75} />
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+                    <Icon
+                      className="size-4 text-foreground"
+                      strokeWidth={1.75}
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">{report.title}</p>
+                      <p className="text-sm font-medium">{report.title}</p>
                       <ChevronRight
-                        className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground"
+                        className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
                         strokeWidth={1.75}
                       />
                     </div>

@@ -30,6 +30,8 @@ export interface CreateInvoiceInput {
   appointmentId?: string | null
   serviceItems?: CreateInvoiceServiceLine[]
   productItems?: CreateInvoiceProductLine[]
+  serviceDiscount?: InvoiceLineDiscount
+  productDiscount?: InvoiceLineDiscount
   paymentMode: PaymentMode
   tip?: number
   loyaltyRedeemPoints?: number
@@ -93,7 +95,16 @@ export interface InvoiceRecord {
   tip?: number
   amountPayable?: number
   grandTotal: number
-  templateId?: 'classic' | 'compact' | 'thermal'
+  templateId?: 'creamGold' | 'blush' | 'compact' | 'thermal' | 'classic'
+  templateSnapshot?: {
+    templateId: 'creamGold' | 'blush' | 'compact' | 'thermal' | 'classic'
+    accentPreset: string
+    accentColor: string
+    showStaffNames: boolean
+    showLogo: boolean
+    termsText: string
+    thankYouText: string
+  }
   businessSnapshot?: {
     salonName?: string
     gstin?: string
@@ -153,6 +164,84 @@ export const invoicesApi = {
         }>
       >
     >('/invoice/staff-sales', { params: { from, to } })
+    return data.data
+  },
+
+  createShareLink: async (
+    id: string,
+    opts: { renew?: boolean } = {},
+  ): Promise<{
+    reused: boolean
+    url: string | null
+    expiresAt: string
+    hasActiveLink: boolean
+  }> => {
+    const { data } = await apiClient.post<
+      ApiSuccessResponse<{
+        reused: boolean
+        url: string | null
+        expiresAt: string
+        hasActiveLink: boolean
+      }>
+    >(`/invoice/${id}/share-link`, opts)
+    return data.data
+  },
+
+  revokeShareLink: async (id: string): Promise<{ revoked: boolean }> => {
+    const { data } = await apiClient.post<
+      ApiSuccessResponse<{ revoked: boolean }>
+    >(`/invoice/${id}/revoke-share-link`)
+    return data.data
+  },
+}
+
+export interface PublicInvoicePayload {
+  invoiceNumber: string
+  createdAt: string
+  customerName: string
+  customerPhone?: string
+  serviceItems: Array<{
+    name: string
+    qty: number
+    price: number
+    lineTotal: number
+    staffName?: string
+  }>
+  productItems: Array<{
+    name: string
+    qty: number
+    price: number
+    lineTotal: number
+    staffName?: string
+  }>
+  serviceSubtotal: number
+  productSubtotal: number
+  serviceDiscountTotal: number
+  productDiscountTotal: number
+  tax: {
+    gstEnabled: boolean
+    servicesTaxable: number
+    productsTaxable: number
+    cgstTotal: number
+    sgstTotal: number
+    taxTotal: number
+  }
+  loyaltyRedeemValue: number
+  roundOff: number
+  tip: number
+  amountPayable: number
+  grandTotal: number
+  paymentMode: PaymentMode
+  templateId?: InvoiceRecord['templateId']
+  templateSnapshot?: InvoiceRecord['templateSnapshot']
+  businessSnapshot?: InvoiceRecord['businessSnapshot']
+}
+
+export const publicInvoiceApi = {
+  getByToken: async (token: string): Promise<PublicInvoicePayload> => {
+    const { data } = await apiClient.get<
+      ApiSuccessResponse<PublicInvoicePayload>
+    >(`/public/invoice/${token}`)
     return data.data
   },
 }

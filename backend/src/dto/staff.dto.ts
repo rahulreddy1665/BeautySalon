@@ -3,6 +3,7 @@ export interface CreateStaffDto {
   age: number;
   gender: "Male" | "Female" | "Other";
   isActive?: boolean;
+  designationId?: string | null;
 }
 
 export interface UpdateStaffDto {
@@ -10,6 +11,7 @@ export interface UpdateStaffDto {
   age?: number;
   gender?: "Male" | "Female" | "Other";
   isActive?: boolean;
+  designationId?: string | null;
 }
 
 export interface StaffListQuery {

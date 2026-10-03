@@ -8,6 +8,10 @@ import {
   getInvoicesController,
   getStaffSalesController,
 } from "../controller/invoice.controller";
+import {
+  createShareLinkController,
+  revokeShareLinkController,
+} from "../controller/invoice-share.controller";
 
 const router = Router();
 
@@ -23,6 +27,20 @@ router.get(
   authenticate,
   requirePermission("invoice:read"),
   getInvoicesController,
+);
+
+router.post(
+  "/:id/share-link",
+  authenticate,
+  requirePermission("invoice:read"),
+  createShareLinkController,
+);
+
+router.post(
+  "/:id/revoke-share-link",
+  authenticate,
+  requirePermission("invoice:read"),
+  revokeShareLinkController,
 );
 
 router.get(

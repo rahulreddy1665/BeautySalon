@@ -3,10 +3,8 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { FormField } from '@/app/components/FormField'
-import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
-import { Label } from '@/app/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -14,19 +12,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { SETTINGS } from '@/app/constants'
 import {
   appointmentSettingsSchema,
   type AppointmentSettingsFormValues,
 } from '@/app/helpers/settingsValidation'
 import { usePatchAppointmentSettingsMutation } from '@/app/hooks/queries/useSettingsQuery'
+import { SettingsSaveBar } from '@/app/screens/settings/SettingsSaveBar'
 import type { AppointmentSettings } from '@/app/service/settings/settingsApi'
 
 interface Props {
   initial: AppointmentSettings
   canUpdate: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  hideTitle?: boolean
 }
 
-export function AppointmentSettingsSection({ initial, canUpdate }: Props) {
+export function AppointmentSettingsSection({
+  initial,
+  canUpdate,
+  onDirtyChange,
+  hideTitle,
+}: Props) {
   const patch = usePatchAppointmentSettingsMutation()
   const form = useForm<AppointmentSettingsFormValues>({
     resolver: zodResolver(appointmentSettingsSchema),
@@ -40,6 +47,10 @@ export function AppointmentSettingsSection({ initial, canUpdate }: Props) {
   const dirty = form.formState.isDirty
   const values = form.watch()
 
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
   const onSubmit = form.handleSubmit(async (vals) => {
     await patch.mutateAsync(vals)
     form.reset(vals)
@@ -47,9 +58,11 @@ export function AppointmentSettingsSection({ initial, canUpdate }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Appointments</CardTitle>
-      </CardHeader>
+      {hideTitle ? null : (
+        <CardHeader className="pb-2">
+          <CardTitle>{SETTINGS.sections.appointments}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -109,17 +122,11 @@ export function AppointmentSettingsSection({ initial, canUpdate }: Props) {
           <p className="text-xs text-muted-foreground">
             Defaults: 9:00–21:00 · 30-minute slots. Used by the day calendar.
           </p>
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs font-normal text-muted-foreground">
-              {dirty ? 'Unsaved changes' : 'All changes saved'}
-            </Label>
-            <Button
-              type="submit"
-              disabled={!canUpdate || !dirty || patch.isPending}
-            >
-              {patch.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
+          <SettingsSaveBar
+            dirty={dirty}
+            canUpdate={canUpdate}
+            pending={patch.isPending}
+          />
         </form>
       </CardContent>
     </Card>
