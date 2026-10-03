@@ -31,11 +31,7 @@ interface ProductFormSheetProps {
   product?: SalonProduct | null
 }
 
-export function ProductFormSheet({
-  open,
-  onOpenChange,
-  product,
-}: ProductFormSheetProps) {
+export function ProductFormSheet({ open, onOpenChange, product }: ProductFormSheetProps) {
   const isEdit = Boolean(product)
   const createMutation = useCreateProductMutation()
   const updateMutation = useUpdateProductMutation()
@@ -49,9 +45,7 @@ export function ProductFormSheet({
   useEffect(() => {
     if (!open) return
     form.reset(
-      product
-        ? { name: product.name, price: product.price }
-        : { name: '', price: 0 },
+      product ? { name: product.name, price: product.price } : { name: '', price: 0 },
     )
   }, [open, product, form])
 
@@ -81,11 +75,7 @@ export function ProductFormSheet({
           <SheetDescription>Name and retail price (INR).</SheetDescription>
         </SheetHeader>
 
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={onSubmit}
-          noValidate
-        >
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit} noValidate>
           <SheetBody>
             <FormField
               label="Name"

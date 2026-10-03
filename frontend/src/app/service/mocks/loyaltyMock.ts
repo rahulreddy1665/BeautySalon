@@ -183,9 +183,7 @@ export const loyaltyMockApi = {
     return readRules()
   },
 
-  updateRules: async (
-    payload: UpdateLoyaltyRulesPayload,
-  ): Promise<LoyaltyRules> => {
+  updateRules: async (payload: UpdateLoyaltyRulesPayload): Promise<LoyaltyRules> => {
     await delay(140)
     if (payload.earnPointsPer100Inr < 0 || payload.redeemValuePerPoint < 0) {
       throw new Error('Rates cannot be negative')
@@ -214,9 +212,7 @@ export const loyaltyMockApi = {
   listLedger: async (customerId?: string): Promise<LoyaltyMovement[]> => {
     await delay(80)
     // Touch balances so seeds exist when browsing members first
-    const all = readLedger().sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    )
+    const all = readLedger().sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     if (!customerId) return all
     ensureBalance(customerId)
     return all.filter((m) => m.customerId === customerId)

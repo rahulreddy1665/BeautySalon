@@ -20,8 +20,7 @@ export const STAFF = {
     enableLogin: 'Enable login',
     resetPassword: 'Reset password',
     turnOffLogin: 'Turn off login',
-    tempPasswordOnce:
-      'Copy this temporary password now. It will not be shown again.',
+    tempPasswordOnce: 'Copy this temporary password now. It will not be shown again.',
     copyPassword: 'Copy password',
     passwordStrength: 'Use at least 8 characters. Mix letters and numbers.',
   },

@@ -18,13 +18,13 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { format } from 'date-fns'
 
 import { GlobalSearch } from '@/app/components/layout/GlobalSearch'
 import { Logo } from '@/app/components/Logo'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
 import { Avatar, AvatarFallback } from '@/app/components/ui/avatar'
 import { Button } from '@/app/components/ui/button'
+import { IconButton } from '@/app/components/ui/icon-button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,17 +44,12 @@ import {
 } from '@/app/components/ui/sheet'
 import { COMMON, ROUTES } from '@/app/constants'
 import { useNavBadgesQuery } from '@/app/hooks/queries/useNavBadgesQuery'
-import {
-  permissionForPath,
-  useHasPermission,
-} from '@/app/hooks/useHasPermission'
+import { permissionForPath, useHasPermission } from '@/app/hooks/useHasPermission'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
 import { clearCredentials } from '@/app/state/redux/slices/authSlice'
-import {
-  setThemeMode,
-  type ThemeMode,
-} from '@/app/state/redux/slices/settingsSlice'
+import { setThemeMode, type ThemeMode } from '@/app/state/redux/slices/settingsSlice'
 import { cn } from '@/app/utils'
+import { getSalonNow } from '@/app/utils/salonTime'
 
 const SIDEBAR_KEY = 'beautysalon.sidebar.collapsed'
 
@@ -108,9 +103,7 @@ const mobilePrimary: NavItem[] = [
 ]
 
 const mobileMore: NavItem[] = [
-  ...generalNav.filter(
-    (i) => !['/', '/appointments', '/customers'].includes(i.to),
-  ),
+  ...generalNav.filter((i) => !['/', '/appointments', '/customers'].includes(i.to)),
   ...financeNav.filter((i) => i.to !== '/billing'),
   ...managementNav,
 ]
@@ -233,30 +226,38 @@ function ContextualCta() {
   const canCustomer = useHasPermission('customer:create')
   const path = location.pathname
 
+  let to: string | null = null
+  let label: string | null = null
   if (path.startsWith('/appointments') && canAppt) {
-    return (
-      <Button asChild size="sm" className="h-9 rounded-full px-4">
-        <Link to={`${ROUTES.appointments}/new`}>
-          {COMMON.nav.newAppointment}
+    to = `${ROUTES.appointments}/new`
+    label = COMMON.nav.newAppointment
+  } else if (path.startsWith('/customers') && canCustomer) {
+    to = `${ROUTES.customers}?new=1`
+    label = COMMON.nav.addCustomer
+  } else if (canBill) {
+    to = ROUTES.billingNew
+    label = COMMON.nav.newBill
+  }
+  if (!to || !label) return null
+
+  return (
+    <>
+      <Button asChild size="sm" className="hidden h-10 rounded-full px-4 sm:inline-flex">
+        <Link to={to}>{label}</Link>
+      </Button>
+      <IconButton asChild className="sm:hidden" aria-label={label}>
+        <Link to={to}>
+          {path.startsWith('/appointments') ? (
+            <CalendarDays strokeWidth={1.75} />
+          ) : path.startsWith('/customers') ? (
+            <Users strokeWidth={1.75} />
+          ) : (
+            <Receipt strokeWidth={1.75} />
+          )}
         </Link>
-      </Button>
-    )
-  }
-  if (path.startsWith('/customers') && canCustomer) {
-    return (
-      <Button asChild size="sm" className="h-9 rounded-full px-4">
-        <Link to={`${ROUTES.customers}?new=1`}>{COMMON.nav.addCustomer}</Link>
-      </Button>
-    )
-  }
-  if (canBill) {
-    return (
-      <Button asChild size="sm" className="h-9 rounded-full px-4">
-        <Link to={ROUTES.billingNew}>{COMMON.nav.newBill}</Link>
-      </Button>
-    )
-  }
-  return null
+      </IconButton>
+    </>
+  )
 }
 
 function UserMenu({ compact }: { compact?: boolean }) {
@@ -282,9 +283,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
           </Avatar>
           {!compact ? (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {user?.name}
-              </span>
+              <span className="block truncate text-sm font-medium">{user?.name}</span>
               <span className="block truncate text-[11px] text-muted-foreground capitalize">
                 {roleLabel}
               </span>
@@ -365,109 +364,92 @@ export function AppLayout() {
   }, [collapsed])
 
   return (
-    <div className="min-h-dvh w-full bg-background pt-safe lg:p-3">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] lg:min-h-[calc(100dvh-1.5rem)] lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-border lg:bg-card">
-        <aside
+    <div className="flex h-dvh w-full overflow-hidden bg-background">
+      <aside
+        className={cn(
+          'hidden h-dvh shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground lg:flex',
+          collapsed ? 'w-[72px]' : 'w-[260px]',
+        )}
+      >
+        <div
           className={cn(
-            'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground lg:flex lg:h-[calc(100dvh-1.5rem)]',
-            collapsed ? 'w-[72px]' : 'w-[260px]',
+            'flex h-16 shrink-0 items-center gap-2 border-b border-border px-3',
+            collapsed && 'justify-center px-2',
           )}
         >
-          <div
-            className={cn(
-              'flex h-14 items-center gap-2 border-b border-border px-3',
-              collapsed && 'justify-center px-2',
-            )}
-          >
-            <Logo size="sm" collapsed={collapsed} />
-          </div>
-
-          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2">
-            <NavGroup
-              label={COMMON.nav.groupGeneral}
-              items={visibleGeneral}
-              collapsed={collapsed}
-              badges={badges}
-            />
-            <NavGroup
-              label={COMMON.nav.groupFinance}
-              items={visibleFinance}
-              collapsed={collapsed}
-              badges={badges}
-            />
-            <NavGroup
-              label={COMMON.nav.groupManagement}
-              items={visibleManagement}
-              collapsed={collapsed}
-              badges={badges}
-            />
-          </nav>
-
-          <div className="border-t border-border p-2">
-            <UserMenu compact={collapsed} />
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col bg-background">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm md:px-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="hidden size-9 rounded-full lg:inline-flex"
-              aria-label={
-                collapsed
-                  ? COMMON.nav.expandSidebar
-                  : COMMON.nav.collapseSidebar
-              }
-              onClick={() => setCollapsed((v) => !v)}
-            >
-              {collapsed ? (
-                <PanelLeftOpen className="size-4" strokeWidth={1.75} />
-              ) : (
-                <PanelLeftClose className="size-4" strokeWidth={1.75} />
-              )}
-            </Button>
-
-            <div className="lg:hidden">
-              <Logo size="sm" showText={false} />
-            </div>
-
-            <GlobalSearch className="max-w-md flex-1" />
-
-            <div className="ml-auto flex shrink-0 items-center gap-1.5">
-              <ThemeToggle />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="size-9 rounded-full"
-                aria-label={COMMON.nav.todayCalendar}
-                onClick={() =>
-                  navigate(
-                    `${ROUTES.appointments}?date=${format(new Date(), 'yyyy-MM-dd')}`,
-                  )
-                }
-              >
-                <CalendarDays className="size-4" strokeWidth={1.75} />
-              </Button>
-              <div className="hidden sm:block">
-                <ContextualCta />
-              </div>
-              <div className="lg:hidden">
-                <UserMenu compact />
-              </div>
-            </div>
-          </header>
-
-          <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)] md:px-5 md:py-5 lg:pb-5">
-            <Outlet />
-          </main>
+          <Logo size="sm" collapsed={collapsed} />
         </div>
+
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2">
+          <NavGroup
+            label={COMMON.nav.groupGeneral}
+            items={visibleGeneral}
+            collapsed={collapsed}
+            badges={badges}
+          />
+          <NavGroup
+            label={COMMON.nav.groupFinance}
+            items={visibleFinance}
+            collapsed={collapsed}
+            badges={badges}
+          />
+          <NavGroup
+            label={COMMON.nav.groupManagement}
+            items={visibleManagement}
+            collapsed={collapsed}
+            badges={badges}
+          />
+        </nav>
+
+        <div className="border-t border-border p-2">
+          <UserMenu compact={collapsed} />
+        </div>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] shrink-0 items-center gap-2 border-b border-border bg-card pt-[env(safe-area-inset-top,0px)] px-3 md:px-4 lg:h-16 lg:pt-0">
+          <IconButton
+            className="hidden lg:inline-flex"
+            aria-label={collapsed ? COMMON.nav.expandSidebar : COMMON.nav.collapseSidebar}
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            {collapsed ? (
+              <PanelLeftOpen strokeWidth={1.75} />
+            ) : (
+              <PanelLeftClose strokeWidth={1.75} />
+            )}
+          </IconButton>
+
+          <div className="lg:hidden">
+            <Logo size="sm" showText={false} />
+          </div>
+
+          <GlobalSearch className="max-w-md flex-1" />
+
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <ThemeToggle />
+            <IconButton
+              aria-label={COMMON.nav.todayCalendar}
+              onClick={() =>
+                navigate(`${ROUTES.appointments}?date=${getSalonNow().dateKey}`)
+              }
+            >
+              <CalendarDays strokeWidth={1.75} />
+            </IconButton>
+            <ContextualCta />
+            <div className="lg:hidden">
+              <UserMenu compact />
+            </div>
+          </div>
+        </header>
+
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)] md:px-5 md:py-5 lg:pb-5">
+          <Outlet />
+        </main>
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-safe lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
         aria-label="Mobile navigation"
       >
         {visiblePrimary.map((item) => (
@@ -512,9 +494,6 @@ export function AppLayout() {
               </SheetTitle>
             </SheetHeader>
             <div className="mt-2 space-y-0.5">
-              <div className="mb-2 px-1 sm:hidden">
-                <ContextualCta />
-              </div>
               {visibleMore.map((item) => (
                 <NavLink
                   key={item.to}
@@ -523,9 +502,7 @@ export function AppLayout() {
                   className={({ isActive }) =>
                     cn(
                       'relative flex h-10 items-center justify-between rounded-full px-3 text-sm',
-                      isActive
-                        ? 'nav-active-pill font-medium'
-                        : 'hover:bg-muted/70',
+                      isActive ? 'nav-active-pill font-medium' : 'hover:bg-muted/70',
                     )
                   }
                 >

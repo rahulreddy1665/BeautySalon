@@ -56,13 +56,8 @@ export function useCreateServiceMutation() {
 export function useUpdateServiceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: Partial<ServiceInput>
-    }) => servicesApi.update(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<ServiceInput> }) =>
+      servicesApi.update(id, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.services.all })
       toast.success('Service updated')

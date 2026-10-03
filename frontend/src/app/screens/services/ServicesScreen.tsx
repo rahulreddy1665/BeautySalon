@@ -227,11 +227,7 @@ export function ServicesScreen() {
         </>
       ) : null}
 
-      <ServiceFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        service={editing}
-      />
+      <ServiceFormSheet open={sheetOpen} onOpenChange={setSheetOpen} service={editing} />
       <ServiceImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <Dialog

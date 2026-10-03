@@ -1,11 +1,5 @@
 import { format, parseISO } from 'date-fns'
-import {
-  ArrowLeft,
-  Download,
-  MessageCircle,
-  Printer,
-  Link2Off,
-} from 'lucide-react'
+import { ArrowLeft, Download, MessageCircle, Printer, Link2Off } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -32,11 +26,7 @@ import {
 } from '@/app/service/billing/sendInvoiceToCustomer'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
 import { formatINR } from '@/app/utils'
-import {
-  downloadBlob,
-  generateInvoicePdf,
-  printInvoice,
-} from '@/app/utils/invoicePdf'
+import { downloadBlob, generateInvoicePdf, printInvoice } from '@/app/utils/invoicePdf'
 
 export function InvoiceScreen() {
   const { id } = useParams<{ id: string }>()
@@ -184,10 +174,7 @@ export function InvoiceScreen() {
         {actions}
       </div>
 
-      <div
-        ref={sheetRef}
-        className="overflow-x-auto [-webkit-overflow-scrolling:touch]"
-      >
+      <div ref={sheetRef} className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
         <InvoiceDocument
           vm={vm}
           className="mx-auto w-full min-w-0 max-w-full origin-top scale-[0.88] shadow-sm sm:scale-100 print:scale-100 print:shadow-none"

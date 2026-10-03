@@ -34,9 +34,10 @@ export const authApi = {
     email: string
     currentPassword: string
   }): Promise<{ email: string }> => {
-    const { data } = await apiClient.post<
-      ApiSuccessResponse<{ email: string }>
-    >('/auth/change-email', payload)
+    const { data } = await apiClient.post<ApiSuccessResponse<{ email: string }>>(
+      '/auth/change-email',
+      payload,
+    )
     return data.data
   },
 }

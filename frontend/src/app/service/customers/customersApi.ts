@@ -37,7 +37,10 @@ export const customersApi = {
   },
 
   create: async (payload: CustomerInput): Promise<Customer> => {
-    const { data } = await apiClient.post<ApiSuccessResponse<Customer>>('/customer', payload)
+    const { data } = await apiClient.post<ApiSuccessResponse<Customer>>(
+      '/customer',
+      payload,
+    )
     return data.data
   },
 
@@ -50,7 +53,9 @@ export const customersApi = {
   },
 
   remove: async (id: string): Promise<Customer> => {
-    const { data } = await apiClient.delete<ApiSuccessResponse<Customer>>(`/customer/${id}`)
+    const { data } = await apiClient.delete<ApiSuccessResponse<Customer>>(
+      `/customer/${id}`,
+    )
     return data.data
   },
 }

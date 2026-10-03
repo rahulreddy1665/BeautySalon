@@ -11,17 +11,12 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/app/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/app/components/ui/sheet'
 import { APPOINTMENTS, COMMON, ROUTES } from '@/app/constants'
 import { useAppointmentsQuery } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
@@ -37,15 +32,38 @@ import { MonthCalendar } from '@/app/screens/appointments/MonthCalendar'
 import { WeekCalendar } from '@/app/screens/appointments/WeekCalendar'
 import { DEFAULT_CALENDAR_HOURS } from '@/app/screens/appointments/calendarConfig'
 import { cn } from '@/app/utils'
+import { getSalonNow, parseHhMm } from '@/app/utils/salonTime'
 
 type ViewMode = 'day' | 'week' | 'month'
 
 function todayKey(): string {
-  return format(new Date(), 'yyyy-MM-dd')
+  return getSalonNow().dateKey
 }
 
 function isValidDateKey(value: string | null): value is string {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value))
+}
+
+function findNextUpcoming(items: Appointment[]): Appointment | null {
+  const salon = getSalonNow()
+  const upcoming = items
+    .filter((a) => a.status === 'booked')
+    .filter((a) => {
+      if (a.date > salon.dateKey) return true
+      if (a.date < salon.dateKey) return false
+      const start = parseHhMm(a.startTime)
+      return start != null && start >= salon.totalMinutes
+    })
+    .sort((a, b) =>
+      a.date === b.date
+        ? a.startTime.localeCompare(b.startTime)
+        : a.date.localeCompare(b.date),
+    )
+  return upcoming[0] ?? null
+}
+
+function isDesktopViewport(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
 }
 
 export function AppointmentsScreen() {
@@ -61,7 +79,6 @@ export function AppointmentsScreen() {
         ? 'week'
         : 'day'
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobilePanel, setMobilePanel] = useState(false)
   const [confirm, setConfirm] = useState<{
     kind: ConfirmKind
@@ -73,25 +90,30 @@ export function AppointmentsScreen() {
   const calendarHours = (() => {
     const business = settingsQuery.data?.business
     const appt = settingsQuery.data?.appointments
+    const slotMinutes = appt?.slotMinutes ?? DEFAULT_CALENDAR_HOURS.slotMinutes
+
     if (business?.openingTime && business?.closingTime) {
-      const [oh] = business.openingTime.split(':').map(Number)
-      const [ch, cm] = business.closingTime.split(':').map(Number)
+      const openMin = (() => {
+        const [h, m] = business.openingTime.split(':').map(Number)
+        return (h ?? 9) * 60 + (m ?? 0)
+      })()
+      const closeMin = (() => {
+        const [h, m] = business.closingTime.split(':').map(Number)
+        return (h ?? 18) * 60 + (m ?? 0)
+      })()
+      // Grid uses whole hours; endHour is exclusive upper bound (ceil close).
+      const startHour = Math.floor(openMin / 60)
+      const endHour = Math.max(startHour + 1, Math.ceil(closeMin / 60))
+      return { startHour, endHour, slotMinutes }
+    }
+    if (appt) {
       return {
-        startHour: oh ?? DEFAULT_CALENDAR_HOURS.startHour,
-        endHour:
-          (cm ?? 0) > 0
-            ? (ch ?? DEFAULT_CALENDAR_HOURS.endHour) + 1
-            : (ch ?? DEFAULT_CALENDAR_HOURS.endHour),
-        slotMinutes: appt?.slotMinutes ?? DEFAULT_CALENDAR_HOURS.slotMinutes,
+        startHour: appt.startHour,
+        endHour: appt.endHour,
+        slotMinutes,
       }
     }
-    return appt
-      ? {
-          startHour: appt.startHour,
-          endHour: appt.endHour,
-          slotMinutes: appt.slotMinutes,
-        }
-      : DEFAULT_CALENDAR_HOURS
+    return DEFAULT_CALENDAR_HOURS
   })()
 
   const closedWeekdays = useMemo(() => {
@@ -126,10 +148,8 @@ export function AppointmentsScreen() {
   const appointmentsQuery = useAppointmentsQuery(listParams)
   const staff = staffQuery.data ?? []
   const appointments = appointmentsQuery.data?.items ?? []
-  const urlId = searchParams.get('id')
-  const effectiveId = selectedId ?? urlId
-  const selected =
-    appointments.find((a) => a._id === effectiveId) ?? null
+  const urlAppointmentId = searchParams.get('appointment') ?? searchParams.get('id')
+  const selected = appointments.find((a) => a._id === urlAppointmentId) ?? null
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -138,6 +158,38 @@ export function AppointmentsScreen() {
       })
     }
   }, [searchParams, selectedDate, navigate])
+
+  useEffect(() => {
+    if (urlAppointmentId || appointmentsQuery.isLoading) return
+    if (!appointments.length) return
+    const next = findNextUpcoming(appointments)
+    if (!next) return
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+        params.set('appointment', next._id)
+        params.delete('id')
+        return params
+      },
+      { replace: true },
+    )
+  }, [urlAppointmentId, appointments, appointmentsQuery.isLoading, setSearchParams])
+
+  const setAppointmentId = (id: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+        if (id) {
+          params.set('appointment', id)
+        } else {
+          params.delete('appointment')
+        }
+        params.delete('id')
+        return params
+      },
+      { replace: true },
+    )
+  }
 
   const setDate = (next: string) => {
     setSearchParams(
@@ -207,12 +259,13 @@ export function AppointmentsScreen() {
   }
 
   const selectAppt = (appt: Appointment) => {
-    setSelectedId(appt._id)
-    setMobilePanel(true)
+    setAppointmentId(appt._id)
+    if (!isDesktopViewport()) {
+      setMobilePanel(true)
+    }
   }
 
-  const salonName =
-    settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
+  const salonName = settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
 
   return (
     <div className="min-w-0 space-y-3">
@@ -225,9 +278,7 @@ export function AppointmentsScreen() {
                 type="button"
                 className={cn(
                   'rounded-full px-3 py-1.5 text-xs font-medium',
-                  view === mode
-                    ? 'bg-gold-soft text-gold-deep'
-                    : 'text-muted-foreground',
+                  view === mode ? 'bg-gold-soft text-gold-deep' : 'text-muted-foreground',
                 )}
                 onClick={() => setView(mode)}
               >
@@ -250,9 +301,7 @@ export function AppointmentsScreen() {
             >
               <ChevronLeft className="size-4" strokeWidth={1.75} />
             </Button>
-            <p className="min-w-[9rem] text-center text-sm font-semibold">
-              {rangeLabel}
-            </p>
+            <p className="min-w-[9rem] text-center text-sm font-semibold">{rangeLabel}</p>
             <Button
               type="button"
               size="icon-sm"
@@ -274,11 +323,6 @@ export function AppointmentsScreen() {
             </Button>
           </div>
         </div>
-        <Button asChild size="sm" className="h-9 rounded-full">
-          <Link to={`${ROUTES.appointments}/new?date=${selectedDate}`}>
-            {APPOINTMENTS.list.add}
-          </Link>
-        </Button>
       </div>
 
       {staffQuery.isLoading || appointmentsQuery.isLoading ? (
@@ -304,6 +348,7 @@ export function AppointmentsScreen() {
           <div className="min-w-0">
             {view === 'day' ? (
               <DayCalendar
+                date={selectedDate}
                 staff={staff}
                 appointments={appointments}
                 selectedId={selected?._id}
@@ -340,40 +385,26 @@ export function AppointmentsScreen() {
           <div className="hidden lg:block">
             <AppointmentSidePanel
               appointment={selected}
-              onEdit={(appt) =>
-                navigate(`${ROUTES.appointments}/${appt._id}/edit`)
-              }
+              onEdit={(appt) => navigate(`${ROUTES.appointments}/${appt._id}/edit`)}
               onCancelled={(appt) => {
-                setSelectedId(appt._id)
+                setAppointmentId(appt._id)
                 setConfirm({ kind: 'cancelled', appointment: appt })
               }}
+              onStatusChange={(appt) => setAppointmentId(appt._id)}
             />
           </div>
         </div>
       ) : null}
 
       <Sheet
-        open={mobilePanel || Boolean(urlId && selected)}
+        open={mobilePanel}
         onOpenChange={(open) => {
           setMobilePanel(open)
-          if (!open && urlId) {
-            setSearchParams(
-              (prev) => {
-                const params = new URLSearchParams(prev)
-                params.delete('id')
-                return params
-              },
-              { replace: true },
-            )
-            setSelectedId(null)
-          }
         }}
       >
         <SheetContent side="bottom" className="rounded-t-2xl">
           <SheetHeader>
-            <SheetTitle className="text-sm">
-              {APPOINTMENTS.list.selectedTitle}
-            </SheetTitle>
+            <SheetTitle className="text-sm">{APPOINTMENTS.list.selectedTitle}</SheetTitle>
           </SheetHeader>
           <div className="mt-2 max-h-[70dvh] overflow-y-auto">
             <AppointmentSidePanel
@@ -383,9 +414,13 @@ export function AppointmentsScreen() {
                 navigate(`${ROUTES.appointments}/${appt._id}/edit`)
               }}
               onCancelled={(appt) => {
-                setSelectedId(appt._id)
+                setAppointmentId(appt._id)
                 setMobilePanel(false)
                 setConfirm({ kind: 'cancelled', appointment: appt })
+              }}
+              onStatusChange={(appt) => {
+                setAppointmentId(appt._id)
+                setMobilePanel(false)
               }}
             />
           </div>

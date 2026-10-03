@@ -28,7 +28,10 @@ import {
   useDesignationsQuery,
   useUpdateDesignationMutation,
 } from '@/app/hooks/queries/useDesignationsQuery'
-import { designationsApi, type Designation } from '@/app/service/designations/designationsApi'
+import {
+  designationsApi,
+  type Designation,
+} from '@/app/service/designations/designationsApi'
 import { toErrorMessage } from '@/app/utils'
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
 import { useQueryClient } from '@tanstack/react-query'
@@ -154,9 +157,7 @@ function PermissionMatrix({
                   </label>
                 </th>
               ))}
-              <th className="px-2 py-2 font-normal">
-                {SETTINGS.designations.selectAll}
-              </th>
+              <th className="px-2 py-2 font-normal">{SETTINGS.designations.selectAll}</th>
             </tr>
           </thead>
           <tbody>
@@ -173,9 +174,7 @@ function PermissionMatrix({
                           className="size-4 accent-primary"
                           checked={selected.has(key)}
                           disabled={disabled}
-                          onChange={(e) =>
-                            setScreenAction(screen, a, e.target.checked)
-                          }
+                          onChange={(e) => setScreenAction(screen, a, e.target.checked)}
                           aria-label={`${screen.label} ${actionLabel(a)}`}
                         />
                       ) : (
@@ -203,10 +202,7 @@ function PermissionMatrix({
       {/* Mobile expandable cards */}
       <div className="space-y-2 lg:hidden">
         {PERMISSION_SCREENS.map((screen) => (
-          <details
-            key={screen.id}
-            className="rounded-md border border-border px-3 py-2"
-          >
+          <details key={screen.id} className="rounded-md border border-border px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium">
               {screen.label}
             </summary>
@@ -225,9 +221,7 @@ function PermissionMatrix({
                       className="size-5 accent-primary"
                       checked={selected.has(key)}
                       disabled={disabled}
-                      onChange={(e) =>
-                        setScreenAction(screen, a, e.target.checked)
-                      }
+                      onChange={(e) => setScreenAction(screen, a, e.target.checked)}
                     />
                   </label>
                 )
@@ -253,12 +247,8 @@ function DesignationEditor({
   const createMutation = useCreateDesignationMutation()
   const updateMutation = useUpdateDesignationMutation()
   const [name, setName] = useState(designation?.name ?? '')
-  const [perms, setPerms] = useState(
-    () => new Set(designation?.permissions ?? []),
-  )
-  const [maxDiscount, setMaxDiscount] = useState(
-    designation?.maxDiscountPercent ?? 0,
-  )
+  const [perms, setPerms] = useState(() => new Set(designation?.permissions ?? []))
+  const [maxDiscount, setMaxDiscount] = useState(designation?.maxDiscountPercent ?? 0)
   const [canViewRevenue, setCanViewRevenue] = useState(
     Boolean(designation?.canViewRevenue),
   )
@@ -309,9 +299,7 @@ function DesignationEditor({
       <SheetContent side="right" className="sm:max-w-xl lg:max-w-3xl">
         <SheetHeader>
           <SheetTitle>
-            {isNew
-              ? SETTINGS.designations.createTitle
-              : SETTINGS.designations.editTitle}
+            {isNew ? SETTINGS.designations.createTitle : SETTINGS.designations.editTitle}
           </SheetTitle>
         </SheetHeader>
         <SheetBody className="space-y-4">
@@ -343,9 +331,7 @@ function DesignationEditor({
                 value={maxDiscount}
                 disabled={Boolean(designation?.isSystemAdmin)}
                 onChange={(e) =>
-                  setMaxDiscount(
-                    Math.min(100, Math.max(0, Number(e.target.value) || 0)),
-                  )
+                  setMaxDiscount(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
                 }
               />
             </div>
@@ -372,20 +358,13 @@ function DesignationEditor({
           </div>
         </SheetBody>
         <SheetFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {COMMON.actions.cancel}
           </Button>
           <Button
             type="button"
             disabled={
-              pending ||
-              !name.trim() ||
-              !dirty ||
-              Boolean(designation?.isSystemAdmin)
+              pending || !name.trim() || !dirty || Boolean(designation?.isSystemAdmin)
             }
             onClick={() => void save()}
           >
@@ -454,9 +433,7 @@ export function DesignationsSettingsSection({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {d.isSystemAdmin
-                      ? SETTINGS.designations.adminEntry
-                      : d.name}
+                    {d.isSystemAdmin ? SETTINGS.designations.adminEntry : d.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {d.isSystemAdmin
@@ -471,13 +448,8 @@ export function DesignationsSettingsSection({
                     </Badge>
                   ) : (
                     <>
-                      <Badge
-                        variant="outline"
-                        className="rounded-md font-normal"
-                      >
-                        {d.isActive
-                          ? COMMON.labels.active
-                          : COMMON.labels.inactive}
+                      <Badge variant="outline" className="rounded-md font-normal">
+                        {d.isActive ? COMMON.labels.active : COMMON.labels.inactive}
                       </Badge>
                       {canUpdate ? (
                         <>
@@ -498,9 +470,7 @@ export function DesignationsSettingsSection({
                             size="sm"
                             variant="outline"
                             className="h-8"
-                            disabled={
-                              (d.staffCount ?? 0) > 0 || deleting === d._id
-                            }
+                            disabled={(d.staffCount ?? 0) > 0 || deleting === d._id}
                             title={
                               (d.staffCount ?? 0) > 0
                                 ? SETTINGS.designations.cannotDeleteAssigned
@@ -511,16 +481,12 @@ export function DesignationsSettingsSection({
                               void designationsApi
                                 .remove(d._id)
                                 .then(() => {
-                                  toast.success(
-                                    SETTINGS.toasts.designationDeleted,
-                                  )
+                                  toast.success(SETTINGS.toasts.designationDeleted)
                                   void queryClient.invalidateQueries({
                                     queryKey: queryKeys.designations.all,
                                   })
                                 })
-                                .catch((err) =>
-                                  toast.error(toErrorMessage(err)),
-                                )
+                                .catch((err) => toast.error(toErrorMessage(err)))
                                 .finally(() => setDeleting(null))
                             }}
                           >

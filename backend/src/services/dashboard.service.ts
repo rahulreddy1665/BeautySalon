@@ -94,10 +94,9 @@ function rangeBounds(range: DashboardRange, now = new Date()) {
   };
 }
 
-function pctChange(current: number, previous: number): number {
+function pctChange(current: number, previous: number): number | null {
   if (previous > 0) return round2(((current - previous) / previous) * 100);
-  if (current > 0) return 100;
-  return 0;
+  return null;
 }
 
 function invoiceRevenue(inv: {

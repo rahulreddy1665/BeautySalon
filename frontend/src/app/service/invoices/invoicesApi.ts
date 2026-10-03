@@ -188,9 +188,9 @@ export const invoicesApi = {
   },
 
   revokeShareLink: async (id: string): Promise<{ revoked: boolean }> => {
-    const { data } = await apiClient.post<
-      ApiSuccessResponse<{ revoked: boolean }>
-    >(`/invoice/${id}/revoke-share-link`)
+    const { data } = await apiClient.post<ApiSuccessResponse<{ revoked: boolean }>>(
+      `/invoice/${id}/revoke-share-link`,
+    )
     return data.data
   },
 }
@@ -239,9 +239,9 @@ export interface PublicInvoicePayload {
 
 export const publicInvoiceApi = {
   getByToken: async (token: string): Promise<PublicInvoicePayload> => {
-    const { data } = await apiClient.get<
-      ApiSuccessResponse<PublicInvoicePayload>
-    >(`/public/invoice/${token}`)
+    const { data } = await apiClient.get<ApiSuccessResponse<PublicInvoicePayload>>(
+      `/public/invoice/${token}`,
+    )
     return data.data
   },
 }

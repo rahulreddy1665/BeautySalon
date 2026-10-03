@@ -43,10 +43,7 @@ interface Props {
   hideTitle?: boolean
 }
 
-function livePreview(
-  values: InvoiceSettingsFormValues,
-  nextNumber: number,
-): string {
+function livePreview(values: InvoiceSettingsFormValues, nextNumber: number): string {
   const pad = String(nextNumber).padStart(values.numberPadding || 5, '0')
   const prefix = (values.prefix || 'INV').toUpperCase()
   return values.includeYear
@@ -74,16 +71,14 @@ export function InvoiceSettingsSection({
     resolver: zodResolver(invoiceSettingsSchema),
     defaultValues: {
       ...initial,
-      templateId:
-        initial.templateId === 'classic' ? 'creamGold' : initial.templateId,
+      templateId: initial.templateId === 'classic' ? 'creamGold' : initial.templateId,
       accentPreset: initial.accentPreset ?? 'gold',
       accentColor: initial.accentColor ?? DEFAULT_ACCENT,
       showStaffNames: initial.showStaffNames !== false,
       showLogo: initial.showLogo !== false,
       termsText: initial.termsText ?? SETTINGS.invoice.termsDefault,
       thankYouText: initial.thankYouText ?? SETTINGS.invoice.thankYouDefault,
-      whatsappMessage:
-        initial.whatsappMessage ?? SETTINGS.invoice.whatsappDefault,
+      whatsappMessage: initial.whatsappMessage ?? SETTINGS.invoice.whatsappDefault,
       shareLinkDays: initial.shareLinkDays ?? 30,
       nextNumber: preview?.nextNumber,
     },
@@ -92,16 +87,14 @@ export function InvoiceSettingsSection({
   useEffect(() => {
     form.reset({
       ...initial,
-      templateId:
-        initial.templateId === 'classic' ? 'creamGold' : initial.templateId,
+      templateId: initial.templateId === 'classic' ? 'creamGold' : initial.templateId,
       accentPreset: initial.accentPreset ?? 'gold',
       accentColor: initial.accentColor ?? DEFAULT_ACCENT,
       showStaffNames: initial.showStaffNames !== false,
       showLogo: initial.showLogo !== false,
       termsText: initial.termsText ?? SETTINGS.invoice.termsDefault,
       thankYouText: initial.thankYouText ?? SETTINGS.invoice.thankYouDefault,
-      whatsappMessage:
-        initial.whatsappMessage ?? SETTINGS.invoice.whatsappDefault,
+      whatsappMessage: initial.whatsappMessage ?? SETTINGS.invoice.whatsappDefault,
       shareLinkDays: initial.shareLinkDays ?? 30,
       nextNumber: preview?.nextNumber,
     })
@@ -139,11 +132,7 @@ export function InvoiceSettingsSection({
               htmlFor="prefix"
               error={form.formState.errors.prefix?.message}
             >
-              <Input
-                id="prefix"
-                disabled={!canUpdate}
-                {...form.register('prefix')}
-              />
+              <Input id="prefix" disabled={!canUpdate} {...form.register('prefix')} />
             </FormField>
             <FormField label={SETTINGS.invoice.padding} htmlFor="pad">
               <Input
@@ -189,11 +178,9 @@ export function InvoiceSettingsSection({
             <Select
               value={values.rounding}
               onValueChange={(v) =>
-                form.setValue(
-                  'rounding',
-                  v as InvoiceSettingsFormValues['rounding'],
-                  { shouldDirty: true },
-                )
+                form.setValue('rounding', v as InvoiceSettingsFormValues['rounding'], {
+                  shouldDirty: true,
+                })
               }
               disabled={!canUpdate}
             >
@@ -263,8 +250,7 @@ export function InvoiceSettingsSection({
             <FormField
               label={SETTINGS.invoice.customAccent}
               error={
-                values.accentPreset === 'custom' &&
-                !isValidHexColor(values.accentColor)
+                values.accentPreset === 'custom' && !isValidHexColor(values.accentColor)
                   ? 'Use #RRGGBB'
                   : undefined
               }

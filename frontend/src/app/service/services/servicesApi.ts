@@ -67,9 +67,8 @@ export const servicesApi = {
   },
 
   getCategories: async (): Promise<string[]> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<string[]>>(
-      '/service/categories',
-    )
+    const { data } =
+      await apiClient.get<ApiSuccessResponse<string[]>>('/service/categories')
     return data.data ?? []
   },
 

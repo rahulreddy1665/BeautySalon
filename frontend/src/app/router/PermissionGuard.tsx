@@ -5,9 +5,7 @@ import { useAppSelector } from '@/app/hooks/useRedux'
 
 function requiredPermissionForPath(pathname: string): string | null {
   if (pathname === '/' || pathname === '') return NAV_PERMISSION['/'] ?? null
-  const entries = Object.entries(NAV_PERMISSION).sort(
-    (a, b) => b[0].length - a[0].length,
-  )
+  const entries = Object.entries(NAV_PERMISSION).sort((a, b) => b[0].length - a[0].length)
   for (const [prefix, perm] of entries) {
     if (prefix === '/') continue
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {

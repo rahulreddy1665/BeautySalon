@@ -47,8 +47,7 @@ export function useUpdateLoyaltyRulesMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: UpdateLoyaltyRulesPayload) =>
-      loyaltyApi.updateRules(payload),
+    mutationFn: (payload: UpdateLoyaltyRulesPayload) => loyaltyApi.updateRules(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.loyalty.rules() })
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings.all })

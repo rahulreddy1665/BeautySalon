@@ -21,6 +21,15 @@ export function formatINR(value: number, precise = false): string {
   return (precise ? inrPrecise : inr).format(value)
 }
 
+/** Null money (no canViewRevenue) → em dash. */
+export function formatMoneyOrDash(
+  value: number | null | undefined,
+  precise = false,
+): string {
+  if (value == null) return '—'
+  return formatINR(value, precise)
+}
+
 export function formatNumber(value: number): string {
   return numberIn.format(value)
 }

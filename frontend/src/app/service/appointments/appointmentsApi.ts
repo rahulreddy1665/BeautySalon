@@ -1,14 +1,11 @@
 import { apiClient } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
-export type AppointmentStatus =
-  | 'booked'
-  | 'completed'
-  | 'cancelled'
-  | 'no_show'
+export type AppointmentStatus = 'booked' | 'completed' | 'cancelled' | 'no_show'
 
 export interface AppointmentServiceLine {
-  service: string | { _id: string; name?: string; price?: number; durationMinutes?: number }
+  service:
+    string | { _id: string; name?: string; price?: number; durationMinutes?: number }
   name: string
   durationMinutes: number
   staff: string | { _id: string; name?: string; isActive?: boolean }
@@ -17,9 +14,7 @@ export interface AppointmentServiceLine {
 export interface Appointment {
   _id: string
   customer?:
-    | string
-    | { _id: string; name?: string; lastName?: string; phone?: number }
-    | null
+    string | { _id: string; name?: string; lastName?: string; phone?: number } | null
   guestName?: string
   guestPhone?: string
   services: AppointmentServiceLine[]
@@ -88,12 +83,11 @@ export function appointmentServiceId(line: AppointmentServiceLine): string {
 }
 
 export const appointmentsApi = {
-  list: async (
-    params: AppointmentListParams = {},
-  ): Promise<PaginatedAppointments> => {
-    const { data } = await apiClient.get<
-      ApiSuccessResponse<PaginatedAppointments>
-    >('/appointment', { params })
+  list: async (params: AppointmentListParams = {}): Promise<PaginatedAppointments> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<PaginatedAppointments>>(
+      '/appointment',
+      { params },
+    )
     return data.data
   },
 
@@ -112,10 +106,7 @@ export const appointmentsApi = {
     return data.data
   },
 
-  update: async (
-    id: string,
-    payload: UpdateAppointmentInput,
-  ): Promise<Appointment> => {
+  update: async (id: string, payload: UpdateAppointmentInput): Promise<Appointment> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<Appointment>>(
       `/appointment/${id}`,
       payload,
@@ -123,10 +114,7 @@ export const appointmentsApi = {
     return data.data
   },
 
-  changeStatus: async (
-    id: string,
-    status: AppointmentStatus,
-  ): Promise<Appointment> => {
+  changeStatus: async (id: string, status: AppointmentStatus): Promise<Appointment> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<Appointment>>(
       `/appointment/${id}/status`,
       { status },

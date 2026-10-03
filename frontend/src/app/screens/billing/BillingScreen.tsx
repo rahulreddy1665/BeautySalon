@@ -1,5 +1,5 @@
 import { format, parseISO } from 'date-fns'
-import { Plus, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -13,7 +13,6 @@ import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Badge } from '@/app/components/ui/badge'
-import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import {
   Select,
@@ -22,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { BILLING } from '@/app/constants'
 import { useBillsQuery } from '@/app/hooks/queries/useBillingQuery'
 import type { BillRecord } from '@/app/service/billing/billingApi'
 import type { PaymentMode } from '@/app/service/invoices/invoicesApi'
@@ -93,17 +93,7 @@ export function BillingScreen() {
 
   return (
     <div className="min-w-0 space-y-3">
-      <PageHeader
-        description="Invoices from /api/invoice · filter by date and payment mode."
-        actions={
-          <Button asChild size="sm" className="min-touch h-9">
-            <Link to="/billing/new">
-              <Plus className="size-4" strokeWidth={1.75} />
-              New bill
-            </Link>
-          </Button>
-        }
-      />
+      <PageHeader description={BILLING.list.description} />
 
       <DateRangeFilter value={range} onChange={setRange} />
 

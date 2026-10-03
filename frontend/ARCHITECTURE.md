@@ -101,13 +101,22 @@ ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens fo
 
 ## Responsive shell
 
-- **lg+:** inset app frame with collapsible sidebar; content fills the rest.
-- **&lt; lg:** bottom nav (max 5: Dashboard, Appointments, Customers, Billing, **More** sheet).
-- Sticky top bar: page title (+ mobile logo) | quick actions + avatar menu (theme inside menu).
-- Content padding: 16px mobile / 20px desktop (`px-4` / `md:px-5`).
+- **Full-bleed:** no outer page gap, radius, or frame. Sidebar flush left/top/bottom; top bar flush top/right; content fills the rest (`h-dvh`, content scrolls).
+- **lg+:** collapsible sidebar (`w-[260px]` / `72px`); logo row and top bar share **64px** height and one continuous bottom border; sidebar has a right border only.
+- **&lt; lg:** mobile top bar = **56px + safe-area-inset-top**; bottom nav adds **safe-area-inset-bottom**.
+- Sticky top bar: search | theme + calendar `IconButton`s (40×40) | contextual CTA (New bill / New appointment / Add customer — icon-only under `sm`).
+- Content padding: 16px mobile / 20px desktop. Page headers must **not** duplicate top-bar primary CTAs.
 - Safe areas: `pt-safe` / `pb-safe` / `env(safe-area-inset-*)`.
-- `min-h-dvh`, inputs ≥ 16px on mobile, touch targets ≥ 44px (`.min-touch`).
+- `min-h-dvh` / `h-dvh`, inputs ≥ 16px on mobile, touch targets ≥ 44px (`.min-touch`).
 - Nav labels from `COMMON.nav`. New appointment CTA → `/appointments/new`.
+
+## PWA
+
+- `vite-plugin-pwa` `registerType: 'prompt'`; `PwaUpdatePrompt` in `AppProviders`.
+- Manifest `theme_color` = light top-bar (`#FFFFFF`); `background_color` = `#F6F6F7`.
+- Dual `<meta name="theme-color">` (light/dark) + runtime sync to card/sidebar white / `#141414`.
+- `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style=default`, `apple-touch-icon`.
+- Installed PWAs cache the manifest — users must remove/re-add the home-screen app after theme changes. HTTPS required outside localhost.
 
 ## How to add a new responsive screen
 
@@ -160,38 +169,36 @@ Missing APIs are centralized under `src/app/service/mocks/`:
 
 | File | Used by |
 |------|---------|
-| `reportMocks.ts` | Sales / profit reports |
 | `billingMock.ts` | Walk-in bills list (localStorage) until Billing FE fully switches |
 | `inventoryMock.ts` | Products, stock adjust, history (localStorage) |
 | `loyaltyMock.ts` | Points rules, balances, ledger (localStorage) |
 | `customerExtrasMock.ts` | Lifetime spend; points delegated to loyaltyMock |
-| `staffSalesMock.ts` | Staff sales & incentives (reports) |
 
-**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Staff, Designations, Services, Products (catalog), Appointments (`/api/appointment`), Invoices (+ share link), Settings, Loyalty rules/balances, Auth.
+**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Reports (`/api/reports/*`), Staff, Designations, Services, Products (catalog), Appointments (`/api/appointment`), Invoices (+ share link), Settings, Loyalty rules/balances, Auth.
 
-Appointments UI: day / week / month calendars, side panel, confirmation dialog (Print + WhatsApp, no auto-send), dedicated form pages at `/appointments/new` and `/appointments/:id/edit`. Hours from business settings; closed weekdays dimmed. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
+Appointments UI: day / week / month calendars; desktop right panel (`?appointment=id`, auto-select next upcoming); mobile bottom sheet; lock rules (past end / final status) via Asia/Kolkata; past slots disabled; edit URL of locked appointments is view-only. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
 
-**CSV export:** client-side via `utils/csv.ts` (`downloadCsv`) until export APIs exist.
+## Reports
+
+- Hub `/reports`: key numbers (this month) + grouped cards (Sales, Team, Customers, Operations).
+- Six pages share `ReportPageLayout` + URL `from`/`to` (`useReportRangeParams`, default this month) + `DateRangeFilter` presets.
+- Data from `reportsApi` / `useReportsQuery` — **never** sum invoice rows on the client.
+- Money omitted when `canViewRevenue` is false; CSV export needs `canExport` or `report:export`.
+- CSV via server export payload + `utils/csv.ts` (`downloadCsv` with UTF-8 BOM for Excel ₹).
+- Definitions popover text lives in `constants/reports.ts`.
+- **No** inventory valuation, profit, discount, loyalty, tax, or daily-closing reports.
+
+### How to add a report
+
+1. Add aggregation in `backend/src/services/reports.service.ts` + controller method + route under `/api/reports/...` with `report:read` (and `requireExport` if exporting).
+2. Document the endpoint in `docs/API_NOTES.md`.
+3. Add `reportsApi` method + query hook + `queryKeys.reports.*`.
+4. Add strings to `constants/reports.ts` and a route in `ROUTES` / `AppRouter`.
+5. Build the page with `ReportPageLayout`, URL range, KPIs, one chart (`ReportCharts` + `ChartTooltip`), `ResponsiveTable`, export button.
+6. Add a hub card under the right group in `ReportsScreen`.
+7. Hide money without revenue permission; gate export with `useCanExportReports`.
 
 Screens must not invent their own fake numbers. Prefer empty states. Legacy files under `service/mocks/` must not drive production UI.
-
-## PWA
-
-- `vite-plugin-pwa` with `registerType: 'prompt'`.
-- Manifest + Workbox precache **app shell only** (JS/CSS/HTML/fonts/icons).
-- **Do not** cache `/api` responses. No offline billing.
-- `PwaUpdatePrompt` asks users to refresh when a new SW waits.
-- Push notifications: not implemented; SW left open for a future handler.
-
-### Icons you must replace
-
-| File | Size | Notes |
-|------|------|--------|
-| `public/icons/icon-192.png` | 192×192 PNG | Standard |
-| `public/icons/icon-512.png` | 512×512 PNG | Standard |
-| `public/icons/icon-512-maskable.png` | 512×512 PNG | Maskable — keep logo inside ~80% safe zone |
-
-Current files are placeholders — replace with brand assets when available.
 
 ## Auth & API client
 

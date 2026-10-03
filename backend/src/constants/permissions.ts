@@ -29,6 +29,7 @@ export const ALLOWED_PERMISSIONS = [
   "loyalty:update",
   "loyalty:adjust",
   "report:read",
+  "report:export",
   "settings:read",
   "settings:update",
 ] as const;

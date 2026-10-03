@@ -103,9 +103,7 @@ export function AppointmentConfirmDialog({
             strokeWidth={1.5}
           />
           <DialogTitle className="text-xl">{titleFor(kind)}</DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            {APPOINTMENTS.confirm.subtitle}
-          </p>
+          <p className="text-sm text-muted-foreground">{APPOINTMENTS.confirm.subtitle}</p>
         </DialogHeader>
 
         <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
@@ -114,47 +112,33 @@ export function AppointmentConfirmDialog({
           </p>
           <dl className="space-y-1.5">
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.customer}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.customer}</dt>
               <dd className="font-medium">{customer}</dd>
             </div>
             {phone ? (
               <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">
-                  {APPOINTMENTS.confirm.phone}
-                </dt>
+                <dt className="text-muted-foreground">{APPOINTMENTS.confirm.phone}</dt>
                 <dd className="tabular-nums">{phone}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.services}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.services}</dt>
               <dd className="max-w-[60%] text-right">{services}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.staff}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.staff}</dt>
               <dd className="text-right">{staff}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.date}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.date}</dt>
               <dd>{dateLabel}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.time}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.time}</dt>
               <dd className="tabular-nums">{timeLabel}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {APPOINTMENTS.confirm.duration}
-              </dt>
+              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.duration}</dt>
               <dd>
                 {duration} {APPOINTMENTS.form.estimatedMinutes}
               </dd>
@@ -172,11 +156,7 @@ export function AppointmentConfirmDialog({
           <Button type="button" variant="outline" onClick={onPrint}>
             {APPOINTMENTS.confirm.print}
           </Button>
-          <Button
-            type="button"
-            disabled={!phone}
-            onClick={onWhatsApp}
-          >
+          <Button type="button" disabled={!phone} onClick={onWhatsApp}>
             {APPOINTMENTS.confirm.sendWhatsApp}
           </Button>
         </DialogFooter>

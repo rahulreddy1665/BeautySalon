@@ -18,10 +18,7 @@ import {
 } from '@/app/components/ui/select'
 import { COMMON, STAFF } from '@/app/constants'
 import { useStaffListQuery } from '@/app/hooks/queries/useStaffQuery'
-import type {
-  StaffLoginStatus,
-  StaffMember,
-} from '@/app/service/staff/staffApi'
+import type { StaffLoginStatus, StaffMember } from '@/app/service/staff/staffApi'
 import { StaffFormSheet } from '@/app/screens/staff/StaffFormSheet'
 
 function loginLabel(status?: StaffLoginStatus): string {
@@ -39,9 +36,7 @@ function loginLabel(status?: StaffLoginStatus): string {
 
 export function StaffScreen() {
   const [search, setSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>(
-    'all',
-  )
+  const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>('all')
   const [page, setPage] = useState(1)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
@@ -72,9 +67,7 @@ export function StaffScreen() {
     {
       accessorKey: 'age',
       header: STAFF.form.age,
-      cell: ({ getValue }) => (
-        <span className="tabular-nums">{Number(getValue())}</span>
-      ),
+      cell: ({ getValue }) => <span className="tabular-nums">{Number(getValue())}</span>,
     },
     {
       accessorKey: 'gender',
@@ -98,9 +91,7 @@ export function StaffScreen() {
       header: COMMON.labels.status,
       cell: ({ getValue }) => (
         <Badge variant="outline" className="rounded-md font-normal">
-          {getValue() === false
-            ? COMMON.labels.inactive
-            : COMMON.labels.active}
+          {getValue() === false ? COMMON.labels.inactive : COMMON.labels.active}
         </Badge>
       ),
     },
@@ -226,11 +217,7 @@ export function StaffScreen() {
         </>
       ) : null}
 
-      <StaffFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        staff={editing}
-      />
+      <StaffFormSheet open={sheetOpen} onOpenChange={setSheetOpen} staff={editing} />
     </div>
   )
 }

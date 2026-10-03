@@ -27,7 +27,9 @@ export function EmptyState({
     >
       <Inbox className="size-8 text-muted-foreground" strokeWidth={1.5} />
       <h3 className="text-sm font-semibold">{title}</h3>
-      {description ? <p className="max-w-sm text-sm text-muted-foreground">{description}</p> : null}
+      {description ? (
+        <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      ) : null}
       {actionLabel && onAction ? (
         <Button type="button" size="sm" className="mt-2 min-touch" onClick={onAction}>
           {actionLabel}

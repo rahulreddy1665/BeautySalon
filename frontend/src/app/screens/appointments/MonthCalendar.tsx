@@ -76,10 +76,7 @@ export function MonthCalendar({ month, appointments, onDayClick }: Props) {
                 </p>
               ) : null}
               {list.slice(0, 2).map((a) => (
-                <p
-                  key={a._id}
-                  className="truncate text-[10px] text-muted-foreground"
-                >
+                <p key={a._id} className="truncate text-[10px] text-muted-foreground">
                   {appointmentCustomerLabel(a)}
                 </p>
               ))}

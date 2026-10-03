@@ -11,8 +11,8 @@ export function SettingsHubScreen() {
   const isAdmin = user?.role === 'admin'
   const canRead = Boolean(
     isAdmin ||
-      user?.permissions?.includes('settings:read') ||
-      user?.permissions?.includes('settings:update'),
+    user?.permissions?.includes('settings:read') ||
+    user?.permissions?.includes('settings:update'),
   )
 
   if (!canRead) {
@@ -38,12 +38,8 @@ export function SettingsHubScreen() {
             <div className="mb-3 flex size-12 items-center justify-center rounded-md bg-primary/15 text-primary">
               <section.icon className="size-7" strokeWidth={1.5} />
             </div>
-            <h2 className="text-base font-semibold tracking-tight">
-              {section.label}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {section.description}
-            </p>
+            <h2 className="text-base font-semibold tracking-tight">{section.label}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
           </Link>
         ))}
       </div>

@@ -1,10 +1,4 @@
-import {
-  addDays,
-  format,
-  isSameDay,
-  parseISO,
-  startOfWeek,
-} from 'date-fns'
+import { addDays, format, isSameDay, parseISO, startOfWeek } from 'date-fns'
 
 import {
   appointmentCustomerLabel,
@@ -15,6 +9,7 @@ import {
   CALENDAR_SLOT_HEIGHT_PX,
   DEFAULT_CALENDAR_HOURS,
   appointmentHeightPx,
+  appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
   formatHourLabel,
@@ -23,6 +18,7 @@ import {
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
+import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface Props {
   weekStart: string
@@ -62,7 +58,7 @@ export function WeekCalendar({
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <div
-        className="grid min-w-[720px]"
+        className="grid min-w-[720px] overflow-y-hidden"
         style={{
           gridTemplateColumns: `56px repeat(7, minmax(110px, 1fr))`,
         }}
@@ -70,9 +66,7 @@ export function WeekCalendar({
         <div className="sticky left-0 z-10 border-b border-r border-border bg-card" />
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd')
-          const closed = closedWeekdays.includes(
-            WEEKDAY_KEYS[day.getDay()] ?? '',
-          )
+          const closed = closedWeekdays.includes(WEEKDAY_KEYS[day.getDay()] ?? '')
           const isToday = isSameDay(day, today)
           return (
             <div
@@ -111,70 +105,78 @@ export function WeekCalendar({
 
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd')
-          const closed = closedWeekdays.includes(
-            WEEKDAY_KEYS[day.getDay()] ?? '',
+          const closed = closedWeekdays.includes(WEEKDAY_KEYS[day.getDay()] ?? '')
+          const dayAppts = appointments.filter(
+            (a) =>
+              a.date === key && appointmentOverlapsHours(a.startTime, a.endTime, hours),
           )
-          const dayAppts = appointments.filter((a) => a.date === key)
           return (
             <div
               key={key}
               className={cn(
-                'relative border-r border-border last:border-r-0',
+                'relative overflow-hidden border-r border-border last:border-r-0',
                 closed && 'bg-muted/30',
               )}
               style={{ height: gridHeight }}
             >
               {slots.map((mins) => {
                 const startTime = minutesToTime(mins)
+                const past = isSlotInPast(key, startTime)
                 return (
                   <button
                     key={mins}
                     type="button"
-                    disabled={closed}
-                    className="absolute inset-x-0 w-full border-b border-border/60 hover:bg-muted/40 disabled:pointer-events-none"
+                    disabled={closed || past}
+                    className={cn(
+                      'absolute inset-x-0 w-full border-b border-border/60 disabled:pointer-events-none',
+                      past || closed
+                        ? 'cursor-not-allowed bg-muted/20'
+                        : 'hover:bg-muted/40',
+                    )}
                     style={{
                       top: appointmentTopPx(startTime, hours),
                       height: CALENDAR_SLOT_HEIGHT_PX,
                     }}
-                    onClick={() => onSlotClick(key, startTime)}
+                    onClick={() => {
+                      if (closed || past) return
+                      onSlotClick(key, startTime)
+                    }}
                   />
                 )
               })}
-              {dayAppts.map((appt) => (
-                <button
-                  key={appt._id}
-                  type="button"
-                  className={cn(
-                    'absolute inset-x-0.5 z-10 overflow-hidden rounded-lg px-1 py-0.5 text-left text-[10px]',
-                    appointmentStatusClasses(
-                      appt.status,
-                      selectedId === appt._id,
-                    ),
-                  )}
-                  style={{
-                    top: appointmentTopPx(appt.startTime, hours),
-                    height: Math.max(
-                      appointmentHeightPx(appt.startTime, appt.endTime, hours) -
-                        2,
-                      28,
-                    ),
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAppointmentClick(appt)
-                  }}
-                >
-                  <p className="truncate font-semibold">
-                    {appointmentCustomerLabel(appt)}
-                  </p>
-                  <p className="truncate opacity-80">
-                    {appt.services[0]?.name}
-                  </p>
-                  <p className="truncate opacity-70">
-                    {appointmentStaffName(appt.services[0]!)}
-                  </p>
-                </button>
-              ))}
+              {dayAppts.map((appt) => {
+                const past = isAppointmentEndPast(appt.date, appt.endTime)
+                const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
+                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const height = Math.min(
+                  Math.max(rawHeight - 2, 28),
+                  Math.max(0, gridHeight - top),
+                )
+                return (
+                  <button
+                    key={appt._id}
+                    type="button"
+                    className={cn(
+                      'absolute inset-x-0.5 z-10 overflow-hidden rounded-lg px-1 py-0.5 text-left text-[10px]',
+                      appointmentStatusClasses(appt.status, selectedId === appt._id),
+                      past && 'opacity-60',
+                    )}
+                    style={{ top, height }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAppointmentClick(appt)
+                    }}
+                  >
+                    <p className="truncate font-semibold">
+                      {appointmentCustomerLabel(appt)}
+                    </p>
+                    <p className="truncate opacity-80">{appt.services[0]?.name}</p>
+                    <p className="truncate opacity-70">
+                      {appointmentStaffName(appt.services[0]!)}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
           )
         })}

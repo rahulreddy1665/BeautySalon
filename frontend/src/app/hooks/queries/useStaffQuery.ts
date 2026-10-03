@@ -48,13 +48,8 @@ export function useCreateStaffMutation() {
 export function useUpdateStaffMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: Partial<StaffInput>
-    }) => staffApi.update(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<StaffInput> }) =>
+      staffApi.update(id, payload),
     onSuccess: (staff) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.staff.all })
       void queryClient.invalidateQueries({

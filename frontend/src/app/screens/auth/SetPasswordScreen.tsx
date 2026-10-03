@@ -64,9 +64,7 @@ export function SetPasswordScreen() {
       <div className="space-y-2">
         <Logo size="lg" />
         <h1 className="text-lg font-semibold">{AUTH.setPassword.title}</h1>
-        <p className="text-sm text-muted-foreground">
-          {AUTH.setPassword.description}
-        </p>
+        <p className="text-sm text-muted-foreground">{AUTH.setPassword.description}</p>
       </div>
       <form className="space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
         <div className="space-y-1.5">

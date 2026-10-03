@@ -2,30 +2,13 @@ import { apiClient } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type RoundingRule = 'none' | 'nearest' | 'up' | 'down'
-export type InvoiceTemplateId =
-  | 'creamGold'
-  | 'blush'
-  | 'compact'
-  | 'thermal'
-  | 'classic'
+export type InvoiceTemplateId = 'creamGold' | 'blush' | 'compact' | 'thermal' | 'classic'
 
 export type InvoiceAccentPreset =
-  | 'gold'
-  | 'blush'
-  | 'teal'
-  | 'charcoal'
-  | 'sage'
-  | 'plum'
-  | 'custom'
+  'gold' | 'blush' | 'teal' | 'charcoal' | 'sage' | 'plum' | 'custom'
 
 export type Weekday =
-  | 'monday'
-  | 'tuesday'
-  | 'wednesday'
-  | 'thursday'
-  | 'friday'
-  | 'saturday'
-  | 'sunday'
+  'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 
 export interface BusinessSettings {
   salonName: string
@@ -106,9 +89,7 @@ export function logoDataUrl(business?: BusinessSettings | null): string | null {
 
 export const settingsApi = {
   get: async (): Promise<SalonSettings> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<SalonSettings>>(
-      '/settings',
-    )
+    const { data } = await apiClient.get<ApiSuccessResponse<SalonSettings>>('/settings')
     return data.data
   },
 
@@ -122,7 +103,9 @@ export const settingsApi = {
     return data.data
   },
 
-  uploadLogo: async (file: File): Promise<{
+  uploadLogo: async (
+    file: File,
+  ): Promise<{
     logoBase64: string
     logoMimeType: string
   }> => {
@@ -148,13 +131,9 @@ export const settingsApi = {
     return data.data
   },
 
-  patchInvoice: async (
-    payload: Partial<InvoiceSettings> & { nextNumber?: number },
-  ) => {
+  patchInvoice: async (payload: Partial<InvoiceSettings> & { nextNumber?: number }) => {
     const { data } = await apiClient.patch<
-      ApiSuccessResponse<
-        InvoiceSettings & { preview?: string; nextNumber?: number }
-      >
+      ApiSuccessResponse<InvoiceSettings & { preview?: string; nextNumber?: number }>
     >('/settings/invoice', payload)
     return data.data
   },
@@ -162,15 +141,14 @@ export const settingsApi = {
   patchAppointments: async (
     payload: Partial<AppointmentSettings>,
   ): Promise<AppointmentSettings> => {
-    const { data } = await apiClient.patch<
-      ApiSuccessResponse<AppointmentSettings>
-    >('/settings/appointments', payload)
+    const { data } = await apiClient.patch<ApiSuccessResponse<AppointmentSettings>>(
+      '/settings/appointments',
+      payload,
+    )
     return data.data
   },
 
-  patchLoyalty: async (
-    payload: Partial<LoyaltySettings>,
-  ): Promise<LoyaltySettings> => {
+  patchLoyalty: async (payload: Partial<LoyaltySettings>): Promise<LoyaltySettings> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<LoyaltySettings>>(
       '/settings/loyalty',
       payload,

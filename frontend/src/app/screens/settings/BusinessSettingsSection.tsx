@@ -17,10 +17,7 @@ import {
   useRemoveLogoMutation,
   useUploadLogoMutation,
 } from '@/app/hooks/queries/useSettingsQuery'
-import {
-  logoDataUrl,
-  type BusinessSettings,
-} from '@/app/service/settings/settingsApi'
+import { logoDataUrl, type BusinessSettings } from '@/app/service/settings/settingsApi'
 
 interface Props {
   initial: BusinessSettings
@@ -151,11 +148,7 @@ export function BusinessSettingsSection({
             htmlFor="salonName"
             error={form.formState.errors.salonName?.message}
           >
-            <Input
-              id="salonName"
-              disabled={!canUpdate}
-              {...form.register('salonName')}
-            />
+            <Input id="salonName" disabled={!canUpdate} {...form.register('salonName')} />
           </FormField>
 
           <FormField label="Address" htmlFor="address">
@@ -174,11 +167,7 @@ export function BusinessSettingsSection({
               htmlFor="pincode"
               error={form.formState.errors.pincode?.message}
             >
-              <Input
-                id="pincode"
-                disabled={!canUpdate}
-                {...form.register('pincode')}
-              />
+              <Input id="pincode" disabled={!canUpdate} {...form.register('pincode')} />
             </FormField>
           </div>
 

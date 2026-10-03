@@ -2,10 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
-import {
-  invoicesApi,
-  type CreateInvoiceInput,
-} from '@/app/service/invoices/invoicesApi'
+import { invoicesApi, type CreateInvoiceInput } from '@/app/service/invoices/invoicesApi'
 import { toErrorMessage } from '@/app/utils'
 
 export function useInvoicesQuery(params: Record<string, unknown> = {}) {

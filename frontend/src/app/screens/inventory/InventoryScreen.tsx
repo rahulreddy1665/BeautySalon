@@ -192,11 +192,7 @@ export function InventoryScreen() {
         </>
       ) : null}
 
-      <ProductFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        product={editing}
-      />
+      <ProductFormSheet open={sheetOpen} onOpenChange={setSheetOpen} product={editing} />
       <ProductImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <Dialog
@@ -209,17 +205,12 @@ export function InventoryScreen() {
           <DialogHeader>
             <DialogTitle>Delete product?</DialogTitle>
             <DialogDescription>
-              Removes {deleteTarget?.name}. Past invoices keep the name/price
-              snapshot.
+              Removes {deleteTarget?.name}. Past invoices keep the name/price snapshot.
             </DialogDescription>
           </DialogHeader>
           <DialogBody />
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteTarget(null)}
-            >
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
             </Button>
             <Button

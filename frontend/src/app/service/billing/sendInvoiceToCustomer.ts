@@ -6,10 +6,7 @@
 
 import { BILLING, SETTINGS } from '@/app/constants'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
-import {
-  downloadBlob,
-  generateInvoicePdf,
-} from '@/app/utils/invoicePdf'
+import { downloadBlob, generateInvoicePdf } from '@/app/utils/invoicePdf'
 import { fillWhatsAppMessage, normalizeWhatsAppPhone } from '@/app/utils/phone'
 
 const CACHE_PREFIX = 'invoice-share-url:'

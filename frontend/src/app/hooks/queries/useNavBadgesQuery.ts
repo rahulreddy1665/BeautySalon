@@ -20,9 +20,7 @@ export function useNavBadgesQuery() {
           ? appointmentsApi.list({ date: today, page: 1, limit: 1 })
           : Promise.resolve(null),
         canCustomers ? customersApi.getAll() : Promise.resolve(null),
-        canServices
-          ? servicesApi.list({ page: 1, limit: 1 })
-          : Promise.resolve(null),
+        canServices ? servicesApi.list({ page: 1, limit: 1 }) : Promise.resolve(null),
       ])
       return {
         appointmentsToday: appts?.total ?? null,

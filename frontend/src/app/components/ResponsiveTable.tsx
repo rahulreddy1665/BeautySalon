@@ -92,7 +92,10 @@ export function ResponsiveTable<TData extends object>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-10 whitespace-nowrap px-3 text-xs">
+                  <TableHead
+                    key={header.id}
+                    className="h-10 whitespace-nowrap px-3 text-xs"
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}

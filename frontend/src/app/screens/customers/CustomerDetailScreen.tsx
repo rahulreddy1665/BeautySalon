@@ -163,11 +163,7 @@ export function CustomerDetailScreen() {
         </CardContent>
       </Card>
 
-      <CustomerFormSheet
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        customer={customer}
-      />
+      <CustomerFormSheet open={editOpen} onOpenChange={setEditOpen} customer={customer} />
     </div>
   )
 }

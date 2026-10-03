@@ -59,8 +59,7 @@ export function AppointmentDetailSheet({
 
   if (!appointment) return null
 
-  const canBill =
-    appointment.status === 'booked' && !invoiceId(appointment)
+  const canBill = appointment.status === 'booked' && !invoiceId(appointment)
   const canEdit = appointment.status === 'booked'
   const canCancel = appointment.status === 'booked'
   const linkedInvoice = invoiceId(appointment)
@@ -86,9 +85,7 @@ export function AppointmentDetailSheet({
               {appointment.status.replace('_', ' ')}
             </Badge>
             {phone ? (
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {phone}
-              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">{phone}</span>
             ) : null}
           </div>
 
@@ -117,9 +114,7 @@ export function AppointmentDetailSheet({
           </div>
 
           {appointment.notes ? (
-            <p className="text-sm text-muted-foreground">
-              Notes: {appointment.notes}
-            </p>
+            <p className="text-sm text-muted-foreground">Notes: {appointment.notes}</p>
           ) : null}
 
           {canEdit ? (

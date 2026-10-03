@@ -10,9 +10,7 @@ export function useHasPermission(permission?: string): boolean {
 
 export function permissionForPath(path: string): string | null {
   if (path === '/' || path === '') return NAV_PERMISSION['/'] ?? null
-  const entries = Object.entries(NAV_PERMISSION).sort(
-    (a, b) => b[0].length - a[0].length,
-  )
+  const entries = Object.entries(NAV_PERMISSION).sort((a, b) => b[0].length - a[0].length)
   for (const [prefix, perm] of entries) {
     if (prefix === '/') continue
     if (path === prefix || path.startsWith(`${prefix}/`)) {

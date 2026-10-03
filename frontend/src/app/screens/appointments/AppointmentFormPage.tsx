@@ -36,11 +36,10 @@ import {
   AppointmentConfirmDialog,
   type ConfirmKind,
 } from '@/app/screens/appointments/AppointmentConfirmDialog'
-import {
-  minutesToTime,
-  timeToMinutes,
-} from '@/app/screens/appointments/calendarConfig'
+import { minutesToTime, timeToMinutes } from '@/app/screens/appointments/calendarConfig'
 import { formatINR, toErrorMessage } from '@/app/utils'
+import { isAppointmentLocked } from '@/app/utils/salonTime'
+import { AppointmentSidePanel } from '@/app/screens/appointments/AppointmentSidePanel'
 
 const lineSchema = z.object({
   serviceId: z.string().min(1, 'Pick a service'),
@@ -159,9 +158,7 @@ export function AppointmentFormPage() {
   )
 
   const endTimePreview =
-    startTime && duration > 0
-      ? minutesToTime(timeToMinutes(startTime) + duration)
-      : '—'
+    startTime && duration > 0 ? minutesToTime(timeToMinutes(startTime) + duration) : '—'
 
   const priceTotal = useMemo(
     () =>
@@ -209,8 +206,40 @@ export function AppointmentFormPage() {
 
   if (isEdit && appointmentQuery.isLoading) return <LoadingSkeleton rows={8} />
 
-  const salonName =
-    settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
+  const salonName = settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
+
+  const lockedEdit =
+    isEdit &&
+    appointmentQuery.data &&
+    isAppointmentLocked(
+      appointmentQuery.data.status,
+      appointmentQuery.data.date,
+      appointmentQuery.data.endTime,
+    )
+
+  if (lockedEdit && appointmentQuery.data) {
+    return (
+      <div className="mx-auto min-w-0 max-w-lg space-y-4">
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="h-9 px-2">
+            <Link to={ROUTES.appointments}>
+              <ArrowLeft className="size-4" strokeWidth={1.75} />
+              {APPOINTMENTS.form.back}
+            </Link>
+          </Button>
+          <h1 className="text-xl font-semibold">{APPOINTMENTS.form.viewTitle}</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {APPOINTMENTS.form.viewOnlyBanner}
+        </p>
+        <AppointmentSidePanel
+          appointment={appointmentQuery.data}
+          onEdit={() => undefined}
+          onCancelled={() => undefined}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="min-w-0 space-y-4 pb-24">
@@ -222,9 +251,7 @@ export function AppointmentFormPage() {
           </Link>
         </Button>
         <h1 className="text-xl font-semibold">
-          {isEdit
-            ? APPOINTMENTS.form.editTitle
-            : APPOINTMENTS.form.createTitle}
+          {isEdit ? APPOINTMENTS.form.editTitle : APPOINTMENTS.form.createTitle}
         </h1>
       </div>
 
@@ -238,20 +265,14 @@ export function AppointmentFormPage() {
               <FormField label={APPOINTMENTS.form.customer}>
                 <Select
                   value={mode}
-                  onValueChange={(v) =>
-                    form.setValue('mode', v as 'customer' | 'guest')
-                  }
+                  onValueChange={(v) => form.setValue('mode', v as 'customer' | 'guest')}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="guest">
-                      {APPOINTMENTS.form.guest}
-                    </SelectItem>
-                    <SelectItem value="customer">
-                      {APPOINTMENTS.form.customer}
-                    </SelectItem>
+                    <SelectItem value="guest">{APPOINTMENTS.form.guest}</SelectItem>
+                    <SelectItem value="customer">{APPOINTMENTS.form.customer}</SelectItem>
                   </SelectContent>
                 </Select>
               </FormField>
@@ -264,11 +285,8 @@ export function AppointmentFormPage() {
                     value={form.watch('customerId') || undefined}
                     onValueChange={(v) => {
                       form.setValue('customerId', v)
-                      const c = (customersQuery.data ?? []).find(
-                        (x) => x._id === v,
-                      )
-                      if (c?.phone)
-                        form.setValue('guestPhone', String(c.phone))
+                      const c = (customersQuery.data ?? []).find((x) => x._id === v)
+                      if (c?.phone) form.setValue('guestPhone', String(c.phone))
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -277,8 +295,7 @@ export function AppointmentFormPage() {
                     <SelectContent>
                       {(customersQuery.data ?? []).map((c) => (
                         <SelectItem key={c._id} value={c._id}>
-                          {[c.name, c.lastName].filter(Boolean).join(' ')} ·{' '}
-                          {c.phone}
+                          {[c.name, c.lastName].filter(Boolean).join(' ')} · {c.phone}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -300,14 +317,12 @@ export function AppointmentFormPage() {
               {mode === 'customer' ? (
                 <FormField label={APPOINTMENTS.form.guestPhone}>
                   <Input
-                    value={
-                      (() => {
-                        const c = (customersQuery.data ?? []).find(
-                          (x) => x._id === form.watch('customerId'),
-                        )
-                        return c?.phone != null ? String(c.phone) : ''
-                      })()
-                    }
+                    value={(() => {
+                      const c = (customersQuery.data ?? []).find(
+                        (x) => x._id === form.watch('customerId'),
+                      )
+                      return c?.phone != null ? String(c.phone) : ''
+                    })()}
                     readOnly
                   />
                 </FormField>
@@ -322,9 +337,7 @@ export function AppointmentFormPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() =>
-                  append({ serviceId: '', staffId: prefillStaff ?? '' })
-                }
+                onClick={() => append({ serviceId: '', staffId: prefillStaff ?? '' })}
               >
                 <Plus className="size-3.5" strokeWidth={1.75} />
                 {APPOINTMENTS.form.addService}
@@ -338,15 +351,10 @@ export function AppointmentFormPage() {
                 >
                   <FormField
                     label={APPOINTMENTS.form.services}
-                    error={
-                      form.formState.errors.services?.[index]?.serviceId
-                        ?.message
-                    }
+                    error={form.formState.errors.services?.[index]?.serviceId?.message}
                   >
                     <Select
-                      value={
-                        form.watch(`services.${index}.serviceId`) || undefined
-                      }
+                      value={form.watch(`services.${index}.serviceId`) || undefined}
                       onValueChange={(v) =>
                         form.setValue(`services.${index}.serviceId`, v)
                       }
@@ -368,15 +376,10 @@ export function AppointmentFormPage() {
                     <FormField
                       label={APPOINTMENTS.form.assignStaff}
                       className="min-w-0 flex-1"
-                      error={
-                        form.formState.errors.services?.[index]?.staffId
-                          ?.message
-                      }
+                      error={form.formState.errors.services?.[index]?.staffId?.message}
                     >
                       <Select
-                        value={
-                          form.watch(`services.${index}.staffId`) || undefined
-                        }
+                        value={form.watch(`services.${index}.staffId`) || undefined}
                         onValueChange={(v) =>
                           form.setValue(`services.${index}.staffId`, v)
                         }

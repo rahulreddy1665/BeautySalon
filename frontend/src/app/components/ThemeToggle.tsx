@@ -1,6 +1,6 @@
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
 
-import { Button } from '@/app/components/ui/button'
+import { IconButton } from '@/app/components/ui/icon-button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,10 +9,7 @@ import {
 } from '@/app/components/ui/dropdown-menu'
 import { COMMON } from '@/app/constants'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
-import {
-  setThemeMode,
-  type ThemeMode,
-} from '@/app/state/redux/slices/settingsSlice'
+import { setThemeMode, type ThemeMode } from '@/app/state/redux/slices/settingsSlice'
 
 const options: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: COMMON.nav.themeLight, icon: Sun },
@@ -27,16 +24,10 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          aria-label={COMMON.nav.theme}
-          className="min-touch size-9 rounded-full"
-        >
-          <Sun className="size-4 dark:hidden" strokeWidth={1.75} />
-          <Moon className="hidden size-4 dark:block" strokeWidth={1.75} />
-        </Button>
+        <IconButton aria-label={COMMON.nav.theme}>
+          <Sun className="dark:hidden" strokeWidth={1.75} />
+          <Moon className="hidden dark:block" strokeWidth={1.75} />
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
         {options.map((option) => (

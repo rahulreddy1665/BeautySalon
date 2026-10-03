@@ -10,7 +10,8 @@ export type DashboardRange = 'today' | 'week' | 'month'
 
 export interface DashboardStat {
   value: number
-  deltaPercent: number
+  /** Null when prior period had no baseline (avoid fake 0% / 100%). */
+  deltaPercent: number | null
   subtitle?: string
   walkIns?: number
   tips?: number

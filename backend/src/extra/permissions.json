@@ -8,6 +8,10 @@
     "description": "View reports"
   },
   {
+    "name": "report:export",
+    "description": "Export reports"
+  },
+  {
     "name": "user:create",
     "description": "Create users"
   },

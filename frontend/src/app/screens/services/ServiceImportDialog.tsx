@@ -42,19 +42,13 @@ function downloadTemplate() {
   XLSX.writeFile(wb, 'services-template.xlsx')
 }
 
-export function ServiceImportDialog({
-  open,
-  onOpenChange,
-}: ServiceImportDialogProps) {
+export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogProps) {
   const importMutation = useImportServicesMutation()
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<PreviewRow[]>([])
   const [results, setResults] = useState<ServiceImportRowResult[] | null>(null)
 
-  const hasPreviewErrors = useMemo(
-    () => preview.some((r) => Boolean(r.error)),
-    [preview],
-  )
+  const hasPreviewErrors = useMemo(() => preview.some((r) => Boolean(r.error)), [preview])
 
   const parseFile = async (next: File) => {
     setFile(next)
@@ -74,23 +68,15 @@ export function ServiceImportDialog({
         const keys = Object.keys(row)
         const pick = (...names: string[]) => {
           for (const name of names) {
-            const key = keys.find(
-              (k) => k.trim().toLowerCase() === name.toLowerCase(),
-            )
+            const key = keys.find((k) => k.trim().toLowerCase() === name.toLowerCase())
             if (key !== undefined) return row[key]
           }
           return ''
         }
         const name = String(pick('name', 'service name', 'service')).trim()
-        const category = String(
-          pick('category', 'service category'),
-        ).trim()
+        const category = String(pick('category', 'service category')).trim()
         const priceRaw = pick('price', 'price (inr)', 'amount')
-        const durationRaw = pick(
-          'duration (min)',
-          'duration',
-          'durationminutes',
-        )
+        const durationRaw = pick('duration (min)', 'duration', 'durationminutes')
         const price = Number(priceRaw)
         let error: string | undefined
         if (!name || !category) error = 'Name and category required'
@@ -129,19 +115,14 @@ export function ServiceImportDialog({
         <DialogHeader>
           <DialogTitle>Import services</DialogTitle>
           <DialogDescription>
-            Upload a spreadsheet. Blank duration defaults to 30 minutes. Bad
-            rows are reported without stopping the rest.
+            Upload a spreadsheet. Blank duration defaults to 30 minutes. Bad rows are
+            reported without stopping the rest.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={downloadTemplate}
-            >
+            <Button type="button" size="sm" variant="outline" onClick={downloadTemplate}>
               <Download className="size-4" strokeWidth={1.75} />
               Download template
             </Button>
@@ -160,9 +141,7 @@ export function ServiceImportDialog({
             </label>
           </div>
 
-          {file ? (
-            <p className="text-xs text-muted-foreground">{file.name}</p>
-          ) : null}
+          {file ? <p className="text-xs text-muted-foreground">{file.name}</p> : null}
 
           {preview.length > 0 && !results ? (
             <div className="max-h-56 overflow-auto rounded-md border border-border">
@@ -193,9 +172,7 @@ export function ServiceImportDialog({
                         {row.error ? (
                           <span className="text-destructive">{row.error}</span>
                         ) : (
-                          <span className="tabular-nums">
-                            {row.duration || '30'}
-                          </span>
+                          <span className="tabular-nums">{row.duration || '30'}</span>
                         )}
                       </td>
                     </tr>

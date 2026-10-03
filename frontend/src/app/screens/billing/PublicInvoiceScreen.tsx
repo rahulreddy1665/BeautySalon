@@ -11,11 +11,7 @@ import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
 import { BILLING, COMMON } from '@/app/constants'
 import { publicInvoiceApi } from '@/app/service/invoices/invoicesApi'
-import {
-  downloadBlob,
-  generateInvoicePdf,
-  printInvoice,
-} from '@/app/utils/invoicePdf'
+import { downloadBlob, generateInvoicePdf, printInvoice } from '@/app/utils/invoicePdf'
 
 export function PublicInvoiceScreen() {
   const { token } = useParams<{ token: string }>()
@@ -59,19 +55,14 @@ export function PublicInvoiceScreen() {
   const vm = buildPublicInvoiceViewModel(query.data)
 
   const onDownloadPdf = async () => {
-    const el = sheetRef.current?.querySelector(
-      '.invoice-sheet',
-    ) as HTMLElement | null
+    const el = sheetRef.current?.querySelector('.invoice-sheet') as HTMLElement | null
     if (!el) {
       printInvoice()
       return
     }
     setDownloading(true)
     try {
-      const result = await generateInvoicePdf(
-        el,
-        `${query.data.invoiceNumber}.pdf`,
-      )
+      const result = await generateInvoicePdf(el, `${query.data.invoiceNumber}.pdf`)
       if (result.ok) {
         downloadBlob(result.blob, result.fileName)
         return
@@ -86,12 +77,7 @@ export function PublicInvoiceScreen() {
   return (
     <div className="mx-auto min-h-dvh w-full max-w-4xl bg-background px-3 py-4 sm:px-4">
       <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
-        <Button
-          type="button"
-          size="sm"
-          className="h-8"
-          onClick={() => printInvoice()}
-        >
+        <Button type="button" size="sm" className="h-8" onClick={() => printInvoice()}>
           <Printer className="size-4" strokeWidth={1.75} />
           {BILLING.invoice.print}
         </Button>

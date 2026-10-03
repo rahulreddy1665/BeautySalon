@@ -6,17 +6,12 @@ import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { AUTH, ROUTES } from '@/app/constants'
-import {
-  getLoginErrorMessage,
-  useLoginMutation,
-} from '@/app/hooks/auth/useLoginMutation'
+import { getLoginErrorMessage, useLoginMutation } from '@/app/hooks/auth/useLoginMutation'
 import { useAppSelector } from '@/app/hooks/useRedux'
 
 export function LoginScreen() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
-  const mustChange = useAppSelector(
-    (state) => state.auth.user?.mustChangePassword,
-  )
+  const mustChange = useAppSelector((state) => state.auth.user?.mustChangePassword)
   const location = useLocation()
   const loginMutation = useLoginMutation()
 
@@ -24,8 +19,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState('Admin@123')
 
   const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from
-      ?.pathname ?? '/'
+    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/'
 
   if (isAuthenticated && mustChange) {
     return <Navigate to={ROUTES.setPassword} replace />
@@ -90,9 +84,7 @@ export function LoginScreen() {
           {loginMutation.isPending ? AUTH.submitting : AUTH.submit}
         </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          {AUTH.forgotHint}
-        </p>
+        <p className="text-center text-xs text-muted-foreground">{AUTH.forgotHint}</p>
       </form>
     </div>
   )

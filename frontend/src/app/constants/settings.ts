@@ -3,8 +3,7 @@ export const SETTINGS = {
     'Configure how your salon looks on bills, when you are open, and who can do what.',
   hubTitle: 'Settings',
   backToSettings: 'Settings',
-  leaveUnsaved:
-    'You have unsaved changes. Leave this page without saving?',
+  leaveUnsaved: 'You have unsaved changes. Leave this page without saving?',
   unsavedHint: 'Unsaved changes',
   allSaved: 'All changes saved',
   saving: 'Saving…',
@@ -83,13 +82,11 @@ export const SETTINGS = {
     showLogo: 'Show logo on invoice',
     termsText: 'Terms & conditions',
     thankYouText: 'Thank-you message',
-    thankYouDefault:
-      'Thank you for visiting. We look forward to seeing you again.',
+    thankYouDefault: 'Thank you for visiting. We look forward to seeing you again.',
     whatsappMessage: 'WhatsApp message',
     whatsappDefault:
       'Hi {customer}, here is your invoice from {salon} for {amount}. View: {link}',
-    whatsappHint:
-      'Placeholders: {customer} {salon} {amount} {link}',
+    whatsappHint: 'Placeholders: {customer} {salon} {amount} {link}',
     whatsappExample: 'Example',
     shareLinkDays: 'Public link expiry (days)',
     customerFallback: 'Customer',

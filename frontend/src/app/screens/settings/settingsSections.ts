@@ -1,22 +1,10 @@
-import {
-  Building2,
-  CalendarDays,
-  FileText,
-  Gift,
-  Percent,
-  UserCog,
-} from 'lucide-react'
+import { Building2, CalendarDays, FileText, Gift, Percent, UserCog } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { SETTINGS } from '@/app/constants'
 
 export type SettingsSectionId =
-  | 'business'
-  | 'tax'
-  | 'invoice'
-  | 'appointments'
-  | 'loyalty'
-  | 'roles'
+  'business' | 'tax' | 'invoice' | 'appointments' | 'loyalty' | 'roles'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -67,9 +55,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   },
 ]
 
-export function normalizeSettingsSection(
-  raw?: string,
-): SettingsSectionId | null {
+export function normalizeSettingsSection(raw?: string): SettingsSectionId | null {
   if (!raw) return null
   if (raw === 'designations') return 'roles'
   if (SETTINGS_SECTIONS.some((s) => s.id === raw)) {

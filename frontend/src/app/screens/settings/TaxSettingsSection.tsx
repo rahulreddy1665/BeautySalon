@@ -163,8 +163,8 @@ export function TaxSettingsSection({
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Tax is calculated on the net amount after discounts. Tip is never
-            taxed. HSN/SAC, IGST and multi-state rules are not supported yet.
+            Tax is calculated on the net amount after discounts. Tip is never taxed.
+            HSN/SAC, IGST and multi-state rules are not supported yet.
           </p>
 
           <SettingsSaveBar

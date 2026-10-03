@@ -44,9 +44,7 @@ export function Logo({
         />
       </span>
       {showLabel ? (
-        <span className="truncate text-sm font-semibold tracking-tight">
-          {name}
-        </span>
+        <span className="truncate text-sm font-semibold tracking-tight">{name}</span>
       ) : (
         <span className="sr-only">{name}</span>
       )}

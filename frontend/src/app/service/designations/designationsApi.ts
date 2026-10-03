@@ -13,15 +13,14 @@ export interface Designation {
   staffCount?: number
 }
 
-export type DesignationInput = Partial<
-  Omit<Designation, '_id' | 'isSystemAdmin'>
-> & { name?: string }
+export type DesignationInput = Partial<Omit<Designation, '_id' | 'isSystemAdmin'>> & {
+  name?: string
+}
 
 export const designationsApi = {
   list: async (): Promise<Designation[]> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<Designation[]>>(
-      '/designation',
-    )
+    const { data } =
+      await apiClient.get<ApiSuccessResponse<Designation[]>>('/designation')
     return data.data
   },
 
@@ -33,10 +32,7 @@ export const designationsApi = {
     return data.data
   },
 
-  update: async (
-    id: string,
-    payload: DesignationInput,
-  ): Promise<Designation> => {
+  update: async (id: string, payload: DesignationInput): Promise<Designation> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<Designation>>(
       `/designation/${id}`,
       payload,

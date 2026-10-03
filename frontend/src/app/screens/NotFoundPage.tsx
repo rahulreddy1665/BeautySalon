@@ -19,9 +19,7 @@ export function ForbiddenPage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-2 px-4 text-center">
       <h1 className="text-xl font-semibold">{COMMON.errors.noAccess}</h1>
-      <p className="text-sm text-muted-foreground">
-        {COMMON.errors.noAccessHint}
-      </p>
+      <p className="text-sm text-muted-foreground">{COMMON.errors.noAccessHint}</p>
       <Button asChild variant="outline" className="mt-2 min-touch">
         <Link to={ROUTES.home}>{COMMON.errors.goHome}</Link>
       </Button>

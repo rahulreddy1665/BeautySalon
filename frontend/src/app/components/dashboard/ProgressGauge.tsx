@@ -20,10 +20,7 @@ export function ProgressGauge({ percent, label, detail }: Props) {
   const s = polar(start)
   const e = polar(end)
   const large = p > 50 ? 1 : 0
-  const arc =
-    p <= 0
-      ? ''
-      : `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+  const arc = p <= 0 ? '' : `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
 
   return (
     <div className="flex flex-col items-center">

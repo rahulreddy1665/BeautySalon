@@ -23,12 +23,7 @@ export type LineKind = (typeof LINE_KINDS)[number]
 export const ROUNDING_RULES = ['none', 'nearest', 'up', 'down'] as const
 export type RoundingRule = (typeof ROUNDING_RULES)[number]
 
-export const INVOICE_TEMPLATES = [
-  'creamGold',
-  'blush',
-  'compact',
-  'thermal',
-] as const
+export const INVOICE_TEMPLATES = ['creamGold', 'blush', 'compact', 'thermal'] as const
 export type InvoiceTemplateId = (typeof INVOICE_TEMPLATES)[number]
 
 export const WEEKDAYS = [

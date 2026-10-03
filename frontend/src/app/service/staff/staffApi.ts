@@ -3,10 +3,7 @@ import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type StaffGender = 'Male' | 'Female' | 'Other'
 export type StaffLoginStatus =
-  | 'login_enabled'
-  | 'login_off'
-  | 'must_change_password'
-  | 'no_login'
+  'login_enabled' | 'login_off' | 'must_change_password' | 'no_login'
 
 export interface StaffMember {
   _id: string
@@ -53,10 +50,9 @@ export interface StaffLoginResult {
 
 export const staffApi = {
   list: async (params: StaffListParams = {}): Promise<PaginatedStaff> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<PaginatedStaff>>(
-      '/staff',
-      { params },
-    )
+    const { data } = await apiClient.get<ApiSuccessResponse<PaginatedStaff>>('/staff', {
+      params,
+    })
     return data.data
   },
 
@@ -66,9 +62,7 @@ export const staffApi = {
   },
 
   getById: async (id: string): Promise<StaffMember> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<StaffMember>>(
-      `/staff/${id}`,
-    )
+    const { data } = await apiClient.get<ApiSuccessResponse<StaffMember>>(`/staff/${id}`)
     return data.data
   },
 
@@ -80,10 +74,7 @@ export const staffApi = {
     return data.data
   },
 
-  update: async (
-    id: string,
-    payload: Partial<StaffInput>,
-  ): Promise<StaffMember> => {
+  update: async (id: string, payload: Partial<StaffInput>): Promise<StaffMember> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<StaffMember>>(
       `/staff/${id}`,
       payload,

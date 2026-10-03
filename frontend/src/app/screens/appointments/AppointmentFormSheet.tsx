@@ -212,18 +212,12 @@ export function AppointmentFormSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={onSubmit}
-          noValidate
-        >
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit} noValidate>
           <SheetBody>
             <FormField label="Customer type">
               <Select
                 value={mode}
-                onValueChange={(v) =>
-                  form.setValue('mode', v as 'customer' | 'guest')
-                }
+                onValueChange={(v) => form.setValue('mode', v as 'customer' | 'guest')}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -250,8 +244,7 @@ export function AppointmentFormSheet({
                   <SelectContent>
                     {(customersQuery.data ?? []).map((c) => (
                       <SelectItem key={c._id} value={c._id}>
-                        {[c.name, c.lastName].filter(Boolean).join(' ')} ·{' '}
-                        {c.phone}
+                        {[c.name, c.lastName].filter(Boolean).join(' ')} · {c.phone}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -278,11 +271,7 @@ export function AppointmentFormSheet({
                 htmlFor="appt-date"
                 error={form.formState.errors.date?.message}
               >
-                <Input
-                  id="appt-date"
-                  type="date"
-                  {...form.register('date')}
-                />
+                <Input id="appt-date" type="date" {...form.register('date')} />
               </FormField>
               <FormField
                 label="Start time"
@@ -330,9 +319,7 @@ export function AppointmentFormSheet({
                 >
                   <FormField
                     label="Service"
-                    error={
-                      form.formState.errors.services?.[index]?.serviceId?.message
-                    }
+                    error={form.formState.errors.services?.[index]?.serviceId?.message}
                   >
                     <Select
                       value={form.watch(`services.${index}.serviceId`) || undefined}
@@ -356,14 +343,10 @@ export function AppointmentFormSheet({
                     <FormField
                       label="Staff"
                       className="min-w-0 flex-1"
-                      error={
-                        form.formState.errors.services?.[index]?.staffId?.message
-                      }
+                      error={form.formState.errors.services?.[index]?.staffId?.message}
                     >
                       <Select
-                        value={
-                          form.watch(`services.${index}.staffId`) || undefined
-                        }
+                        value={form.watch(`services.${index}.staffId`) || undefined}
                         onValueChange={(v) =>
                           form.setValue(`services.${index}.staffId`, v)
                         }

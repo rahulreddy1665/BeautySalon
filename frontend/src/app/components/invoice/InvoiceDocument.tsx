@@ -75,22 +75,20 @@ function LineTable({
             <tr
               key={`${line.name}-${i}`}
               className="inv-row break-inside-avoid"
-              style={{ borderBottom: '1px solid color-mix(in srgb, var(--inv-muted) 25%, transparent)' }}
+              style={{
+                borderBottom:
+                  '1px solid color-mix(in srgb, var(--inv-muted) 25%, transparent)',
+              }}
             >
               <td className="py-1.5 pr-2 align-top">
                 <p className="font-medium">{line.name}</p>
                 {showStaff && line.staffName ? (
-                  <p
-                    className="text-[11px]"
-                    style={{ color: 'var(--inv-muted)' }}
-                  >
+                  <p className="text-[11px]" style={{ color: 'var(--inv-muted)' }}>
                     {line.staffName}
                   </p>
                 ) : null}
               </td>
-              <td className="py-1.5 text-right tabular-nums align-top">
-                {line.qty}
-              </td>
+              <td className="py-1.5 text-right tabular-nums align-top">{line.qty}</td>
               <td className="py-1.5 text-right tabular-nums align-top">
                 {formatMoney(line.rate)}
               </td>
@@ -106,55 +104,59 @@ function LineTable({
 }
 
 function TotalsBlock({ vm }: { vm: InvoiceViewModel }) {
-  const rows: Array<{ label: string; value: string; strong?: boolean; accent?: boolean }> =
-    [
-      {
-        label: BILLING.new.servicesDiscount,
-        value: `−${vm.formatMoney(vm.serviceDiscount)}`,
-        hide: vm.serviceDiscount <= 0,
-      },
-      {
-        label: BILLING.new.productsDiscount,
-        value: `−${vm.formatMoney(vm.productDiscount)}`,
-        hide: vm.productDiscount <= 0,
-      },
-      {
-        label: SETTINGS.invoice.taxable,
-        value: vm.formatMoney(vm.taxable),
-      },
-      ...(vm.gstEnabled
-        ? [
-            { label: BILLING.new.cgst, value: vm.formatMoney(vm.cgst) },
-            { label: BILLING.new.sgst, value: vm.formatMoney(vm.sgst) },
-          ]
-        : []),
-      {
-        label: BILLING.new.loyaltyRedeem,
-        value: `−${vm.formatMoney(vm.loyaltyRedeem)}`,
-        hide: vm.loyaltyRedeem <= 0,
-      },
-      {
-        label: BILLING.new.roundOff,
-        value: vm.formatMoney(vm.roundOff),
-        hide: vm.roundOff === 0,
-      },
-      {
-        label: BILLING.new.tip,
-        value: vm.formatMoney(vm.tip),
-        hide: vm.tip <= 0,
-      },
-      {
-        label: BILLING.new.grandTotal,
-        value: vm.formatMoney(vm.total),
-        strong: true,
-        accent: true,
-      },
-    ].filter((r) => !('hide' in r && r.hide)) as Array<{
-      label: string
-      value: string
-      strong?: boolean
-      accent?: boolean
-    }>
+  const rows: Array<{
+    label: string
+    value: string
+    strong?: boolean
+    accent?: boolean
+  }> = [
+    {
+      label: BILLING.new.servicesDiscount,
+      value: `−${vm.formatMoney(vm.serviceDiscount)}`,
+      hide: vm.serviceDiscount <= 0,
+    },
+    {
+      label: BILLING.new.productsDiscount,
+      value: `−${vm.formatMoney(vm.productDiscount)}`,
+      hide: vm.productDiscount <= 0,
+    },
+    {
+      label: SETTINGS.invoice.taxable,
+      value: vm.formatMoney(vm.taxable),
+    },
+    ...(vm.gstEnabled
+      ? [
+          { label: BILLING.new.cgst, value: vm.formatMoney(vm.cgst) },
+          { label: BILLING.new.sgst, value: vm.formatMoney(vm.sgst) },
+        ]
+      : []),
+    {
+      label: BILLING.new.loyaltyRedeem,
+      value: `−${vm.formatMoney(vm.loyaltyRedeem)}`,
+      hide: vm.loyaltyRedeem <= 0,
+    },
+    {
+      label: BILLING.new.roundOff,
+      value: vm.formatMoney(vm.roundOff),
+      hide: vm.roundOff === 0,
+    },
+    {
+      label: BILLING.new.tip,
+      value: vm.formatMoney(vm.tip),
+      hide: vm.tip <= 0,
+    },
+    {
+      label: BILLING.new.grandTotal,
+      value: vm.formatMoney(vm.total),
+      strong: true,
+      accent: true,
+    },
+  ].filter((r) => !('hide' in r && r.hide)) as Array<{
+    label: string
+    value: string
+    strong?: boolean
+    accent?: boolean
+  }>
 
   return (
     <div className="ml-auto mt-4 w-full max-w-xs space-y-1 text-sm">
@@ -223,29 +225,19 @@ export function InvoiceDocument({
         />
       ) : null}
 
-      <div
-        className={cn(
-          'relative p-6 sm:p-8',
-          isThermal && 'p-3',
-          isCompact && 'p-5',
-        )}
-      >
+      <div className={cn('relative p-6 sm:p-8', isThermal && 'p-3', isCompact && 'p-5')}>
         <header className="inv-header break-inside-avoid text-center">
           {vm.showLogo && vm.logoUrl ? (
             <img
               src={vm.logoUrl}
               alt=""
-              className={cn(
-                'mx-auto mb-2 object-contain',
-                isThermal ? 'h-10' : 'h-14',
-              )}
+              className={cn('mx-auto mb-2 object-contain', isThermal ? 'h-10' : 'h-14')}
             />
           ) : null}
           <p
             className={cn(
               'font-semibold tracking-tight',
-              !isThermal &&
-                'font-[family-name:var(--font-invoice-serif)] text-xl',
+              !isThermal && 'font-[family-name:var(--font-invoice-serif)] text-xl',
               isThermal && 'text-sm uppercase',
             )}
           >
@@ -268,12 +260,7 @@ export function InvoiceDocument({
           />
         </header>
 
-        <div
-          className={cn(
-            'mt-5 grid gap-4 text-sm',
-            !isThermal && 'sm:grid-cols-2',
-          )}
-        >
+        <div className={cn('mt-5 grid gap-4 text-sm', !isThermal && 'sm:grid-cols-2')}>
           <div className={cn(isThermal && 'text-left')}>
             <p
               className="text-[11px] font-semibold uppercase tracking-wide"
@@ -285,12 +272,8 @@ export function InvoiceDocument({
             {vm.address ? (
               <p style={{ color: 'var(--inv-muted)' }}>{vm.address}</p>
             ) : null}
-            {vm.phone ? (
-              <p style={{ color: 'var(--inv-muted)' }}>{vm.phone}</p>
-            ) : null}
-            {vm.email ? (
-              <p style={{ color: 'var(--inv-muted)' }}>{vm.email}</p>
-            ) : null}
+            {vm.phone ? <p style={{ color: 'var(--inv-muted)' }}>{vm.phone}</p> : null}
+            {vm.email ? <p style={{ color: 'var(--inv-muted)' }}>{vm.email}</p> : null}
             {vm.gstin ? (
               <p className="tabular-nums">
                 {SETTINGS.business.gstin}: {vm.gstin}
@@ -360,9 +343,8 @@ export function InvoiceDocument({
           <div className={cn(!isThermal && 'sm:text-right')}>
             <p className="font-semibold">{SETTINGS.invoice.paymentMethod}</p>
             <p className="mt-1">
-              {COMMON.paymentMode[
-                vm.paymentMode as keyof typeof COMMON.paymentMode
-              ] ?? vm.paymentMode}
+              {COMMON.paymentMode[vm.paymentMode as keyof typeof COMMON.paymentMode] ??
+                vm.paymentMode}
             </p>
             <p
               className={cn(

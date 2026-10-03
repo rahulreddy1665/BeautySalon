@@ -154,10 +154,7 @@ function paymentModeFromSplit(payment: PaymentSplit): PaymentMode {
 }
 
 function computeTotals(payload: CreateBillPayload) {
-  const subtotal = payload.lines.reduce(
-    (sum, line) => sum + line.unitPrice * line.qty,
-    0,
-  )
+  const subtotal = payload.lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0)
   const afterDiscount = Math.max(0, subtotal - payload.discountAmount)
   const afterLoyalty = Math.max(0, afterDiscount - payload.loyaltyRedeemValue)
   const gstAmount = Math.round((afterLoyalty * payload.gstPercent) / 100)

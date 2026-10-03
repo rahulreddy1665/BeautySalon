@@ -49,13 +49,8 @@ export function useCreateProductMutation() {
 export function useUpdateProductMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: Partial<ProductInput>
-    }) => productsApi.update(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<ProductInput> }) =>
+      productsApi.update(id, payload),
     onSuccess: (product) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all })
       void queryClient.invalidateQueries({

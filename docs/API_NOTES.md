@@ -218,15 +218,51 @@ Create reads settings for tax, rounding, numbering, template. Snapshot on invoic
 Gaps (not implemented): HSN/SAC, IGST, multi-state tax, WhatsApp Cloud API send.  
 PDF: client-side via `html2pdf.js` (`utils/invoicePdf.ts`) — on demand, not stored.
 
+### Reports (`/api/reports`)
+
+All routes require `authenticate` + `report:read`. Export routes also require designation `canExport` **or** `report:export` (admin always allowed).
+
+Date query params: `from`, `to` as `YYYY-MM-DD` in **Asia/Kolkata**. Max range **366** days; `from` must be ≤ `to`. Previous period = equal length immediately before `from`. Day grouping uses salon TZ (not server local).
+
+**Revenue** = `amountPayable − tip` (tax included as stored on the invoice; discounts and loyalty redemption already reduce payable; tip excluded). All invoice statuses count (no void/cancelled status exists).
+
+Money fields are `null` / blank when `canViewRevenue` is false (not only hidden in UI).
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/reports/overview` | Hub key numbers for this month-to-date vs previous equal length |
+| GET | `/api/reports/sales` | KPIs, chart series (day/week/month), service/product + payment splits, paginated bills (`q`, `sort`, `order`, `page`, `limit`) |
+| GET | `/api/reports/sales/export` | Full filtered rows `{ filename, headers, rows }` for CSV |
+| GET | `/api/reports/staff` | Staff sales with proportional section-discount attribution |
+| GET | `/api/reports/staff/export` | CSV rows |
+| GET | `/api/reports/staff/:staffId/lines` | Line items for expand |
+| GET | `/api/reports/customers` | `tab=top\|inactive`, `inactiveDays=30\|60\|90` |
+| GET | `/api/reports/customers/export` | CSV rows |
+| GET | `/api/reports/appointments` | Status KPIs, busy grid, walk-in vs appointment bills |
+| GET | `/api/reports/appointments/export` | CSV rows |
+| GET | `/api/reports/services` | `category`, `notSold=true` |
+| GET | `/api/reports/services/export` | CSV rows |
+| GET | `/api/reports/products` | Product sales + sales-per-staff (no stock) |
+| GET | `/api/reports/products/export` | CSV rows |
+
+**Staff section discount allocation:**  
+`serviceNet = serviceSubtotal − serviceDiscountTotal`; for each line `attributed = lineTotal × (serviceNet / Σ lineTotals)` when sum &gt; 0. Same for products. Tips are not attributed (`tipsReceived: null`).
+
+Indexes: uses existing `Invoice.createdAt` and `Appointment.date+status` (no new indexes added).
+
 ### Customers / Roles / Permissions / Booking
 
-Unchanged from earlier notes (except new permissions seeded for staff/appointment/invoice/product/settings/loyalty).
+Unchanged from earlier notes (except new permissions seeded for staff/appointment/invoice/product/settings/loyalty/`report:export`).
 
 ## Not in backend yet / deferred
 
-- Profit / expenses — skipped  
+- Profit / expenses module — out of scope (no expense tracking)  
+- Staff incentives / commissions engine — not implemented  
+- Customer birthdate / birthday reports — no birthdate field on customers  
+- Tip attribution to staff — tip is invoice-level only (frontend tip staff is not persisted)  
 - Recurring appointments, reminders, drag-drop — out of scope  
 - HSN/SAC, IGST, multi-state GST  
+- Scheduled / emailed reports, PDF report export, custom report builder  
 
 ## Libraries added
 

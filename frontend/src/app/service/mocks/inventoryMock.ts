@@ -69,13 +69,7 @@ export const INVENTORY_API_GAPS = [
   'POS sale → stock-out link — missing',
 ] as const
 
-export const INVENTORY_CATEGORIES = [
-  'Hair',
-  'Skin',
-  'Nails',
-  'Color',
-  'Retail',
-] as const
+export const INVENTORY_CATEGORIES = ['Hair', 'Skin', 'Nails', 'Color', 'Retail'] as const
 
 const STORAGE_KEY = 'beauty-salon.inventory.mocks'
 const HISTORY_KEY = 'beauty-salon.inventory.history'
@@ -342,9 +336,7 @@ export const inventoryMockApi = {
 
     if (payload.sku) {
       const skuTaken = store.products.some(
-        (p) =>
-          p.id !== id &&
-          p.sku.toLowerCase() === payload.sku!.trim().toLowerCase(),
+        (p) => p.id !== id && p.sku.toLowerCase() === payload.sku!.trim().toLowerCase(),
       )
       if (skuTaken) throw new Error('SKU already exists')
     }
@@ -375,10 +367,7 @@ export const inventoryMockApi = {
     return updated
   },
 
-  adjust: async (
-    id: string,
-    payload: AdjustStockPayload,
-  ): Promise<InventoryProduct> => {
+  adjust: async (id: string, payload: AdjustStockPayload): Promise<InventoryProduct> => {
     await delay(160)
     const qty = Math.floor(payload.qty)
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -420,9 +409,7 @@ export const inventoryMockApi = {
     writeStore({ products })
 
     const movementQty =
-      payload.type === 'adjust'
-        ? Math.abs(nextQty - current.qtyOnHand)
-        : qty
+      payload.type === 'adjust' ? Math.abs(nextQty - current.qtyOnHand) : qty
 
     const history = readHistory()
     writeHistory([

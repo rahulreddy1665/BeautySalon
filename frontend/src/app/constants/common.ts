@@ -81,7 +81,6 @@ export const COMMON = {
     loyalty: 'Loyalty',
     reports: 'Reports',
     salesReport: 'Sales report',
-    profitReport: 'Profit report',
     settings: 'Settings',
     account: 'Account',
     groupGeneral: 'General',

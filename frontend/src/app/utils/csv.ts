@@ -1,6 +1,6 @@
 /**
  * Client-side CSV download helper.
- * Used when the backend has no export endpoint (mark UI as "Export CSV · client").
+ * Prepends UTF-8 BOM so Excel shows ₹ correctly.
  */
 
 function escapeCsvCell(value: string | number | boolean | null | undefined): string {
@@ -21,7 +21,9 @@ export function downloadCsv(
     headers.map(escapeCsvCell).join(','),
     ...rows.map((row) => row.map(escapeCsvCell).join(',')),
   ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const blob = new Blob([`\uFEFF${lines.join('\n')}`], {
+    type: 'text/csv;charset=utf-8',
+  })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url

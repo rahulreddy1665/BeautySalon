@@ -48,6 +48,7 @@ const MANAGER_PERMS = [
   "settings:update",
   "invoice:update",
   "report:read",
+  "report:export",
 ];
 
 const seed = async (): Promise<void> => {

@@ -19,10 +19,7 @@ export const staffLoginSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .regex(
-      /^[a-z0-9._]{4,20}$/,
-      '4–20 chars: letters, numbers, dot, or underscore',
-    ),
+    .regex(/^[a-z0-9._]{4,20}$/, '4–20 chars: letters, numbers, dot, or underscore'),
   temporaryPassword: z.string().min(8, 'At least 8 characters'),
 })
 

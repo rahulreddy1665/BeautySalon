@@ -42,8 +42,7 @@ function prepareClone(source: HTMLElement): {
 
   const host = document.createElement('div')
   host.setAttribute('aria-hidden', 'true')
-  host.style.cssText =
-    'position:fixed;left:-10000px;top:0;pointer-events:none;opacity:1;'
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;pointer-events:none;opacity:1;'
   host.appendChild(clone)
   document.body.appendChild(host)
   return { host, clone }

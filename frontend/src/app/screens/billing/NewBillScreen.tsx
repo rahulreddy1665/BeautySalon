@@ -18,12 +18,7 @@ import {
   SelectValue,
 } from '@/app/components/ui/select'
 import { Separator } from '@/app/components/ui/separator'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/app/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/app/components/ui/sheet'
 import { BILLING, COMMON, PAYMENT_MODES, TIP_CHIP_AMOUNTS, ROUTES } from '@/app/constants'
 import { useAppointmentQuery } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
@@ -70,13 +65,7 @@ import { formatINR, toErrorMessage } from '@/app/utils'
 const ROW_GRID =
   'lg:grid lg:grid-cols-[minmax(0,1fr)_200px_112px_96px_104px_40px] lg:items-center lg:gap-x-3'
 
-function QtyStepper({
-  qty,
-  onChange,
-}: {
-  qty: number
-  onChange: (qty: number) => void
-}) {
+function QtyStepper({ qty, onChange }: { qty: number; onChange: (qty: number) => void }) {
   return (
     <div className="flex h-11 w-[112px] items-stretch overflow-hidden rounded-md border border-input lg:h-10">
       <button
@@ -180,10 +169,7 @@ function LineRow({
           <Trash2 className="size-4" strokeWidth={1.75} />
         </Button>
         <div className="min-w-0 pr-12">
-          <p
-            className="line-clamp-2 text-sm font-medium"
-            title={line.name}
-          >
+          <p className="line-clamp-2 text-sm font-medium" title={line.name}>
             {line.name}
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -192,23 +178,15 @@ function LineRow({
         </div>
         <div className="w-full">{staffSelect}</div>
         <div className="flex items-center justify-between gap-3">
-          <QtyStepper
-            qty={line.qty}
-            onChange={(qty) => onPatch({ qty })}
-          />
-          <p className="text-sm font-medium tabular-nums">
-            {formatINR(lineTotal)}
-          </p>
+          <QtyStepper qty={line.qty} onChange={(qty) => onPatch({ qty })} />
+          <p className="text-sm font-medium tabular-nums">{formatINR(lineTotal)}</p>
         </div>
       </div>
 
       {/* Desktop row */}
       <div className={`hidden border-b border-border py-3 last:border-0 ${ROW_GRID}`}>
         <div className="min-w-0">
-          <p
-            className="line-clamp-2 text-sm font-medium"
-            title={line.name}
-          >
+          <p className="line-clamp-2 text-sm font-medium" title={line.name}>
             {line.name}
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -316,9 +294,7 @@ function ItemSectionCard({
   const [search, setSearch] = useState('')
   const results = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return catalog
-      .filter((c) => !q || c.name.toLowerCase().includes(q))
-      .slice(0, 8)
+    return catalog.filter((c) => !q || c.name.toLowerCase().includes(q)).slice(0, 8)
   }, [catalog, search])
   const subtotal = lines.reduce((s, l) => s + l.unitPrice * l.qty, 0)
 
@@ -368,9 +344,7 @@ function ItemSectionCard({
           <p className="py-4 text-sm text-muted-foreground">{emptyHint}</p>
         ) : (
           <>
-            <div
-              className={`mb-1 hidden text-xs text-muted-foreground ${ROW_GRID}`}
-            >
+            <div className={`mb-1 hidden text-xs text-muted-foreground ${ROW_GRID}`}>
               <span>{BILLING.new.item}</span>
               <span>{staffHeader}</span>
               <span>{BILLING.new.qty}</span>
@@ -492,7 +466,12 @@ function SummaryBody({
               value={cart.loyaltyRedeemPoints || ''}
               onChange={(e) => onRedeem(Number(e.target.value) || 0)}
             />
-            <Button type="button" variant="outline" className="min-touch h-11" onClick={onUseMax}>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-touch h-11"
+              onClick={onUseMax}
+            >
               {BILLING.new.useMax}
             </Button>
           </div>
@@ -651,9 +630,7 @@ export function NewBillScreen() {
   const loyaltyRules = settingsQuery.data?.loyalty
   const taxSettings = settingsQuery.data?.tax
   const invoiceSettings = settingsQuery.data?.invoice
-  const loyaltyEnabled = Boolean(
-    loyaltyRules?.enabled && cart.customerId && !cart.walkIn,
-  )
+  const loyaltyEnabled = Boolean(loyaltyRules?.enabled && cart.customerId && !cart.walkIn)
 
   const taxInput = useMemo(
     () => ({
@@ -664,10 +641,7 @@ export function NewBillScreen() {
       productsCgst: taxSettings?.products.cgstPercent ?? 0,
       productsSgst: taxSettings?.products.sgstPercent ?? 0,
       rounding: (invoiceSettings?.rounding ?? 'none') as
-        | 'none'
-        | 'nearest'
-        | 'up'
-        | 'down',
+        'none' | 'nearest' | 'up' | 'down',
       maxRedeemPercent: loyaltyRules?.maxRedeemPercent ?? 0,
     }),
     [taxSettings, invoiceSettings, loyaltyRules],
@@ -730,18 +704,14 @@ export function NewBillScreen() {
 
   const customerResults = useMemo(() => {
     const q = customerSearch.trim().toLowerCase()
-    if (!q || cart.walkIn === false && !customerSearch) {
+    if (!q || (cart.walkIn === false && !customerSearch)) {
       if (!q) return []
     }
     return (customersQuery.data ?? [])
       .filter((c) => {
         const name = [c.name, c.lastName].filter(Boolean).join(' ').toLowerCase()
         const phone = String(c.phone ?? '')
-        return (
-          name.includes(q) ||
-          phone.includes(q) ||
-          c._id.toLowerCase().includes(q)
-        )
+        return name.includes(q) || phone.includes(q) || c._id.toLowerCase().includes(q)
       })
       .slice(0, 8)
   }, [customerSearch, customersQuery.data, cart.walkIn])
@@ -749,8 +719,7 @@ export function NewBillScreen() {
   const serviceLines = cart.lines.filter((l) => l.kind === 'service')
   const productLines = cart.lines.filter((l) => l.kind === 'product')
   const missingStaff = cart.lines.some((l) => !l.staffId)
-  const canCheckout =
-    cart.lines.length > 0 && !missingStaff && Boolean(cart.paymentMode)
+  const canCheckout = cart.lines.length > 0 && !missingStaff && Boolean(cart.paymentMode)
   const checkoutReason =
     cart.lines.length === 0
       ? BILLING.new.needLines
@@ -857,9 +826,7 @@ export function NewBillScreen() {
     staffOptions,
     onRedeem: (n: number) => dispatch(setLoyaltyRedeemPoints(n)),
     onUseMax: () =>
-      dispatch(
-        setLoyaltyRedeemPoints(loyaltyBalanceQuery.data?.points ?? 0),
-      ),
+      dispatch(setLoyaltyRedeemPoints(loyaltyBalanceQuery.data?.points ?? 0)),
     onTip: (n: number) => dispatch(setTip(n)),
     onTipStaff: (id: string | null) => dispatch(setTipStaffId(id)),
     onPaymentMode: (m: 'cash' | 'upi' | 'card') => dispatch(setPaymentMode(m)),
@@ -913,9 +880,7 @@ export function NewBillScreen() {
                     <Label>{COMMON.labels.name}</Label>
                     <Input
                       className="min-touch h-11"
-                      value={
-                        cart.customerName === 'Walk-in' ? '' : cart.customerName
-                      }
+                      value={cart.customerName === 'Walk-in' ? '' : cart.customerName}
                       disabled={fromAppointment}
                       onChange={(e) =>
                         dispatch(setWalkInDetails({ name: e.target.value }))
@@ -952,9 +917,7 @@ export function NewBillScreen() {
                   {customerResults.length > 0 ? (
                     <ul className="rounded-md border border-border bg-card">
                       {customerResults.map((c) => {
-                        const name = [c.name, c.lastName]
-                          .filter(Boolean)
-                          .join(' ')
+                        const name = [c.name, c.lastName].filter(Boolean).join(' ')
                         return (
                           <li key={c._id}>
                             <button

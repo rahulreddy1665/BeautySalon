@@ -86,9 +86,8 @@ export function usePatchTaxMutation() {
 export function usePatchInvoiceSettingsMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (
-      payload: Partial<InvoiceSettings> & { nextNumber?: number },
-    ) => settingsApi.patchInvoice(payload),
+    mutationFn: (payload: Partial<InvoiceSettings> & { nextNumber?: number }) =>
+      settingsApi.patchInvoice(payload),
     onSuccess: () => {
       invalidateSettings(queryClient)
       toast.success('Invoice settings saved')
@@ -117,8 +116,7 @@ export function usePatchAppointmentSettingsMutation() {
 export function usePatchLoyaltySettingsMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: Partial<LoyaltySettings>) =>
-      settingsApi.patchLoyalty(payload),
+    mutationFn: (payload: Partial<LoyaltySettings>) => settingsApi.patchLoyalty(payload),
     onSuccess: () => {
       invalidateSettings(queryClient)
       toast.success('Loyalty settings saved')

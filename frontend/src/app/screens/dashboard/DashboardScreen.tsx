@@ -1,4 +1,5 @@
-import { format, parseISO } from 'date-fns'
+import { endOfDay, format, parseISO, startOfMonth, subDays } from 'date-fns'
+import { CalendarDays, IndianRupee, Users, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -7,10 +8,11 @@ import { ProgressGauge } from '@/app/components/dashboard/ProgressGauge'
 import { EmptyState } from '@/app/components/EmptyState'
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
+import { SectionCardHeader } from '@/app/components/SectionCardHeader'
 import { StatCard } from '@/app/components/StatCard'
 import { Avatar, AvatarFallback } from '@/app/components/ui/avatar'
 import { Button } from '@/app/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import { Card, CardContent } from '@/app/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -42,18 +44,54 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
+function walkInsLabel(count: number): string {
+  if (count === 1) return DASHBOARD.walkInOne
+  return DASHBOARD.walkInsCount.replace('{count}', String(count))
+}
+
+function ViewAllLink({ to }: { to: string }) {
+  return (
+    <Button
+      asChild
+      size="sm"
+      variant="outline"
+      className="h-7 rounded-full px-2.5 text-xs"
+    >
+      <Link to={to}>{DASHBOARD.viewAll}</Link>
+    </Button>
+  )
+}
+
+function staffReportLink(range: DashboardRange): string {
+  const now = new Date()
+  let from: Date
+  let to: Date = endOfDay(now)
+  if (range === 'today') {
+    from = now
+    to = now
+  } else if (range === 'week') {
+    from = subDays(now, 6)
+  } else {
+    from = startOfMonth(now)
+  }
+  const qs = new URLSearchParams({
+    from: format(from, 'yyyy-MM-dd'),
+    to: format(to, 'yyyy-MM-dd'),
+  })
+  return `${ROUTES.reportsStaff}?${qs.toString()}`
+}
+
 export function DashboardScreen() {
   const [range, setRange] = useState<DashboardRange>('today')
-  const [chartMode, setChartMode] = useState<
-    'revenue' | 'services' | 'products'
-  >('revenue')
-  const { data, isLoading, isError, error, refetch } =
-    useOwnerDashboardQuery(range)
+  const [chartMode, setChartMode] = useState<'revenue' | 'services' | 'products'>(
+    'revenue',
+  )
+  const { data, isLoading, isError, error, refetch } = useOwnerDashboardQuery(range)
   const settingsQuery = useSalonSettingsQuery()
-  const salonName =
-    settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
+  const salonName = settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
 
   const showMoney = Boolean(data?.canViewRevenue)
+  const topPerformersHref = staffReportLink(range)
 
   return (
     <div className="min-w-0 space-y-4">
@@ -65,10 +103,7 @@ export function DashboardScreen() {
           <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium">
             {salonName}
           </span>
-          <Select
-            value={range}
-            onValueChange={(v) => setRange(v as DashboardRange)}
-          >
+          <Select value={range} onValueChange={(v) => setRange(v as DashboardRange)}>
             <SelectTrigger className="h-9 w-[140px] rounded-full">
               <SelectValue />
             </SelectTrigger>
@@ -96,6 +131,7 @@ export function DashboardScreen() {
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <StatCard
               highlight
+              icon={Users}
               label={DASHBOARD.activeClients}
               value={data.stats.activeClients.value}
               delta={data.stats.activeClients.deltaPercent}
@@ -103,14 +139,16 @@ export function DashboardScreen() {
               className="h-full"
             />
             <StatCard
+              icon={CalendarDays}
               label={DASHBOARD.appointmentsToday}
               value={data.stats.appointments.value}
               delta={data.stats.appointments.deltaPercent}
-              subtitle={`${data.stats.appointments.walkIns} ${DASHBOARD.walkIns}`}
+              subtitle={walkInsLabel(data.stats.appointments.walkIns)}
               className="h-full"
             />
             {showMoney && data.stats.revenue ? (
               <StatCard
+                icon={IndianRupee}
                 label={DASHBOARD.revenue}
                 value={data.stats.revenue.value}
                 format="inr"
@@ -120,6 +158,7 @@ export function DashboardScreen() {
             ) : null}
             {showMoney && data.stats.collectionToday ? (
               <StatCard
+                icon={Wallet}
                 label={DASHBOARD.collectionToday}
                 value={data.stats.collectionToday.value}
                 format="inr"
@@ -134,21 +173,19 @@ export function DashboardScreen() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-5">
-            <Card className="flex h-full flex-col lg:col-span-2">
-              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>{DASHBOARD.appointmentsToday}</CardTitle>
-                <Button asChild variant="link" size="sm" className="h-auto px-0">
-                  <Link to={ROUTES.appointments}>{DASHBOARD.viewAll}</Link>
-                </Button>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-2">
+            <Card className="flex h-full flex-col gap-0 py-0 lg:col-span-2">
+              <SectionCardHeader
+                title={DASHBOARD.appointmentsToday}
+                action={<ViewAllLink to={ROUTES.appointments} />}
+              />
+              <CardContent className="flex-1 space-y-2 px-4 pb-4">
                 {data.todaysAppointments.length === 0 ? (
                   <EmptyState title={DASHBOARD.emptyAppointments} />
                 ) : (
                   data.todaysAppointments.slice(0, 8).map((row) => (
                     <Link
                       key={row.id}
-                      to={`${ROUTES.appointments}?date=${format(new Date(), 'yyyy-MM-dd')}&id=${row.id}`}
+                      to={`${ROUTES.appointments}?date=${format(new Date(), 'yyyy-MM-dd')}&appointment=${row.id}`}
                       className={cn(
                         'flex gap-3 rounded-xl border border-border border-l-4 bg-card p-2.5 transition-colors hover:bg-muted/40',
                         statusBorder(row.status),
@@ -159,9 +196,7 @@ export function DashboardScreen() {
                         {row.startTime}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {row.customerName}
-                        </p>
+                        <p className="truncate text-sm font-medium">{row.customerName}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {row.services.join(', ')}
                         </p>
@@ -175,42 +210,41 @@ export function DashboardScreen() {
               </CardContent>
             </Card>
 
-            <Card className="flex h-full flex-col lg:col-span-3">
-              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>{DASHBOARD.revenueStatistics}</CardTitle>
-                {showMoney ? (
-                  <div className="flex gap-1 rounded-full bg-muted p-0.5">
-                    {(
-                      [
-                        ['revenue', DASHBOARD.revenue],
-                        ['services', DASHBOARD.servicesLegend],
-                        ['products', DASHBOARD.productsLegend],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={cn(
-                          'rounded-full px-2.5 py-1 text-[11px] font-medium',
-                          chartMode === key
-                            ? 'bg-gold-soft text-gold-deep'
-                            : 'text-muted-foreground',
-                        )}
-                        onClick={() => setChartMode(key)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </CardHeader>
-              <CardContent className="flex-1">
+            <Card className="flex h-full flex-col gap-0 py-0 lg:col-span-3">
+              <SectionCardHeader
+                title={DASHBOARD.revenueStatistics}
+                action={
+                  showMoney ? (
+                    <div className="flex gap-1 rounded-full bg-muted p-0.5">
+                      {(
+                        [
+                          ['revenue', DASHBOARD.revenue],
+                          ['services', DASHBOARD.servicesLegend],
+                          ['products', DASHBOARD.productsLegend],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={cn(
+                            'rounded-full px-2.5 py-1 text-[11px] font-medium',
+                            chartMode === key
+                              ? 'bg-gold-soft text-gold-deep'
+                              : 'text-muted-foreground',
+                          )}
+                          onClick={() => setChartMode(key)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : undefined
+                }
+              />
+              <CardContent className="flex-1 px-4 pb-4">
                 {showMoney && data.monthlyRevenue?.length ? (
                   data.monthlyRevenue.some((m) => m.revenue > 0) ? (
-                    <MonthlyRevenueChart
-                      data={data.monthlyRevenue}
-                      mode={chartMode}
-                    />
+                    <MonthlyRevenueChart data={data.monthlyRevenue} mode={chartMode} />
                   ) : (
                     <EmptyState title={DASHBOARD.emptyTrend} />
                   )
@@ -222,16 +256,12 @@ export function DashboardScreen() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Card className="flex h-full flex-col">
-              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>{DASHBOARD.topPerformers}</CardTitle>
-                {showMoney ? (
-                  <Button asChild variant="link" size="sm" className="h-auto px-0">
-                    <Link to={ROUTES.reportsStaff}>{DASHBOARD.viewAll}</Link>
-                  </Button>
-                ) : null}
-              </CardHeader>
-              <CardContent className="flex-1 space-y-3">
+            <Card className="flex h-full flex-col gap-0 py-0">
+              <SectionCardHeader
+                title={DASHBOARD.topPerformers}
+                action={showMoney ? <ViewAllLink to={topPerformersHref} /> : undefined}
+              />
+              <CardContent className="flex-1 space-y-3 px-4 pb-4">
                 {!showMoney || !data.topPerformers?.length ? (
                   <EmptyState title={DASHBOARD.emptyStaff} />
                 ) : (
@@ -264,11 +294,9 @@ export function DashboardScreen() {
               </CardContent>
             </Card>
 
-            <Card className="flex h-full flex-col">
-              <CardHeader className="pb-2">
-                <CardTitle>{DASHBOARD.todaysProgress}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
+            <Card className="flex h-full flex-col gap-0 py-0">
+              <SectionCardHeader title={DASHBOARD.todaysProgress} />
+              <CardContent className="flex flex-1 flex-col gap-4 px-4 pb-4">
                 <ProgressGauge
                   percent={data.todaysProgress.percent}
                   label={`${data.todaysProgress.completed}/${data.todaysProgress.total}`}
@@ -278,21 +306,9 @@ export function DashboardScreen() {
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     {(
                       [
-                        [
-                          'cash',
-                          DASHBOARD.cash,
-                          data.todaysProgress.paymentSplit.cash,
-                        ],
-                        [
-                          'upi',
-                          DASHBOARD.upi,
-                          data.todaysProgress.paymentSplit.upi,
-                        ],
-                        [
-                          'card',
-                          DASHBOARD.card,
-                          data.todaysProgress.paymentSplit.card,
-                        ],
+                        ['cash', DASHBOARD.cash, data.todaysProgress.paymentSplit.cash],
+                        ['upi', DASHBOARD.upi, data.todaysProgress.paymentSplit.upi],
+                        ['card', DASHBOARD.card, data.todaysProgress.paymentSplit.card],
                       ] as const
                     ).map(([key, label, amount]) => (
                       <div
@@ -310,11 +326,12 @@ export function DashboardScreen() {
               </CardContent>
             </Card>
 
-            <Card className="flex h-full flex-col md:col-span-2 xl:col-span-1">
-              <CardHeader className="pb-2">
-                <CardTitle>{DASHBOARD.recentCustomers}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-2">
+            <Card className="flex h-full flex-col gap-0 py-0 md:col-span-2 xl:col-span-1">
+              <SectionCardHeader
+                title={DASHBOARD.recentCustomers}
+                action={<ViewAllLink to={ROUTES.customers} />}
+              />
+              <CardContent className="flex-1 space-y-2 px-4 pb-4">
                 {data.recentCustomers.length === 0 ? (
                   <EmptyState title={DASHBOARD.emptyCustomers} />
                 ) : (

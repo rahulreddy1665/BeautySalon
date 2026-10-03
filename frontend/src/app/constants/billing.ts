@@ -91,8 +91,7 @@ export const BILLING = {
     walkInPhoneContinue: 'Continue',
     invalidPhone: 'Enter a valid phone number',
     shareFailed: 'Could not prepare WhatsApp share',
-    pdfUnavailable:
-      'Could not create the PDF. Try Print → Save as PDF instead.',
+    pdfUnavailable: 'Could not create the PDF. Try Print → Save as PDF instead.',
     linkRevoked: 'Public link revoked',
   },
   toasts: {

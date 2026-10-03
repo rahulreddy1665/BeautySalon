@@ -33,7 +33,9 @@ export function formatHourLabel(minutesFromMidnight: number): string {
   const m = minutesFromMidnight % 60
   const period = h >= 12 ? 'PM' : 'AM'
   const hour12 = h % 12 === 0 ? 12 : h % 12
-  return m === 0 ? `${hour12} ${period}` : `${hour12}:${String(m).padStart(2, '0')} ${period}`
+  return m === 0
+    ? `${hour12} ${period}`
+    : `${hour12}:${String(m).padStart(2, '0')} ${period}`
 }
 
 export function buildTimeSlots(hours: CalendarHours = DEFAULT_CALENDAR_HOURS): number[] {
@@ -45,6 +47,30 @@ export function buildTimeSlots(hours: CalendarHours = DEFAULT_CALENDAR_HOURS): n
     slots.push(t)
   }
   return slots
+}
+
+/** True when a clock time falls inside [startHour, endHour). */
+export function isTimeWithinHours(
+  time: string,
+  hours: CalendarHours = DEFAULT_CALENDAR_HOURS,
+): boolean {
+  const mins = timeToMinutes(time)
+  const start = hours.startHour * 60
+  const end = hours.endHour * 60
+  return mins >= start && mins < end
+}
+
+/** Appointment overlaps the visible calendar window. */
+export function appointmentOverlapsHours(
+  startTime: string,
+  endTime: string,
+  hours: CalendarHours = DEFAULT_CALENDAR_HOURS,
+): boolean {
+  const start = hours.startHour * 60
+  const end = hours.endHour * 60
+  const aStart = timeToMinutes(startTime)
+  const aEnd = Math.max(aStart + 1, timeToMinutes(endTime))
+  return aStart < end && aEnd > start
 }
 
 export function appointmentTopPx(

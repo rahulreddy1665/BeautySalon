@@ -19,7 +19,7 @@ export default defineConfig({
         name: 'BeautySalon',
         short_name: 'BeautySalon',
         description: 'Salon management — billing, appointments, and reports',
-        theme_color: '#FFD700',
+        theme_color: '#FFFFFF',
         background_color: '#F6F6F7',
         display: 'standalone',
         start_url: '/',

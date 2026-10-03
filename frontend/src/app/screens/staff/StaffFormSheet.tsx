@@ -146,11 +146,7 @@ function StaffFormBody({
   })
 
   return (
-    <form
-      className="flex min-h-0 flex-1 flex-col"
-      onSubmit={onSubmit}
-      noValidate
-    >
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit} noValidate>
       <SheetBody>
         {shownTemp ? (
           <div className="mb-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
@@ -216,9 +212,7 @@ function StaffFormBody({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Male">{COMMON.gender.Male}</SelectItem>
-                    <SelectItem value="Female">
-                      {COMMON.gender.Female}
-                    </SelectItem>
+                    <SelectItem value="Female">{COMMON.gender.Female}</SelectItem>
                     <SelectItem value="Other">{COMMON.gender.Other}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -266,9 +260,7 @@ function StaffFormBody({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">{COMMON.labels.active}</SelectItem>
-                  <SelectItem value="inactive">
-                    {COMMON.labels.inactive}
-                  </SelectItem>
+                  <SelectItem value="inactive">{COMMON.labels.inactive}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -357,28 +349,18 @@ function StaffFormBody({
   )
 }
 
-export function StaffFormSheet({
-  open,
-  onOpenChange,
-  staff,
-}: StaffFormSheetProps) {
+export function StaffFormSheet({ open, onOpenChange, staff }: StaffFormSheetProps) {
   const formKey = `${staff?._id ?? 'new'}-${open ? 'open' : 'closed'}`
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>
-            {staff ? STAFF.form.editTitle : STAFF.form.createTitle}
-          </SheetTitle>
+          <SheetTitle>{staff ? STAFF.form.editTitle : STAFF.form.createTitle}</SheetTitle>
           <SheetDescription>{STAFF.form.noLoginHint}</SheetDescription>
         </SheetHeader>
         {open ? (
-          <StaffFormBody
-            key={formKey}
-            staff={staff}
-            onOpenChange={onOpenChange}
-          />
+          <StaffFormBody key={formKey} staff={staff} onOpenChange={onOpenChange} />
         ) : null}
       </SheetContent>
     </Sheet>

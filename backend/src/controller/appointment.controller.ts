@@ -108,6 +108,7 @@ export const updateAppointmentController = async (
           ? "Appointment Update"
           : "Appointment Update failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -138,6 +139,7 @@ export const changeAppointmentStatusController = async (
         data.message ??
         (data.statusCode == 200 ? "Appointment status updated" : "Failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -160,6 +162,7 @@ export const cancelAppointmentController = async (
         data.message ??
         (data.statusCode == 200 ? "Appointment cancelled" : "Cancel failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {

@@ -10,9 +10,7 @@ import {
 } from '@/app/theme/invoice-themes'
 import { formatINR } from '@/app/utils'
 
-export function buildPublicInvoiceViewModel(
-  inv: PublicInvoicePayload,
-): InvoiceViewModel {
+export function buildPublicInvoiceViewModel(inv: PublicInvoicePayload): InvoiceViewModel {
   const snap = inv.templateSnapshot
   const templateId = resolveTemplateId(snap?.templateId ?? inv.templateId)
   const accentPreset = (snap?.accentPreset ?? 'gold') as InvoiceAccentPreset
@@ -23,9 +21,7 @@ export function buildPublicInvoiceViewModel(
       ? `data:${biz.logoMimeType};base64,${biz.logoBase64}`
       : null
 
-  const dateLabel = inv.createdAt
-    ? format(parseISO(inv.createdAt), 'dd MMM yyyy')
-    : ''
+  const dateLabel = inv.createdAt ? format(parseISO(inv.createdAt), 'dd MMM yyyy') : ''
 
   return {
     templateId,
@@ -34,9 +30,7 @@ export function buildPublicInvoiceViewModel(
     showLogo: snap?.showLogo !== false,
     termsText: snap?.termsText ?? '',
     thankYouText:
-      snap?.thankYouText ||
-      biz?.invoiceFooterNote ||
-      SETTINGS.invoice.thankYouDefault,
+      snap?.thankYouText || biz?.invoiceFooterNote || SETTINGS.invoice.thankYouDefault,
     salonName: biz?.salonName || COMMON.appName,
     logoUrl,
     address: biz?.address,
@@ -68,8 +62,7 @@ export function buildPublicInvoiceViewModel(
     serviceDiscount: inv.serviceDiscountTotal,
     productDiscount: inv.productDiscountTotal,
     taxable: (() => {
-      const fromTax =
-        (inv.tax?.servicesTaxable ?? 0) + (inv.tax?.productsTaxable ?? 0)
+      const fromTax = (inv.tax?.servicesTaxable ?? 0) + (inv.tax?.productsTaxable ?? 0)
       if (fromTax > 0) return fromTax
       return (
         inv.serviceSubtotal +

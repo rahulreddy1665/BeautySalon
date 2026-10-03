@@ -40,15 +40,12 @@ export type UpdateLoyaltyRulesPayload = Partial<LoyaltyRules>
 
 export const loyaltyApi = {
   getRules: async (): Promise<LoyaltyRules> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<LoyaltyRules>>(
-      '/loyalty/rules',
-    )
+    const { data } =
+      await apiClient.get<ApiSuccessResponse<LoyaltyRules>>('/loyalty/rules')
     return data.data
   },
 
-  updateRules: async (
-    payload: UpdateLoyaltyRulesPayload,
-  ): Promise<LoyaltyRules> => {
+  updateRules: async (payload: UpdateLoyaltyRulesPayload): Promise<LoyaltyRules> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<LoyaltyRules>>(
       '/loyalty/rules',
       payload,
@@ -60,9 +57,7 @@ export const loyaltyApi = {
     const { data } = await apiClient.get<ApiSuccessResponse<LoyaltyBalance[]>>(
       '/loyalty/balances',
       {
-        params: customerIds?.length
-          ? { customerIds: customerIds.join(',') }
-          : undefined,
+        params: customerIds?.length ? { customerIds: customerIds.join(',') } : undefined,
       },
     )
     return data.data

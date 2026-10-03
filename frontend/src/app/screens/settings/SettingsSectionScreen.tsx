@@ -30,12 +30,10 @@ export function SettingsSectionScreen() {
   const isAdmin = user?.role === 'admin'
   const canRead = Boolean(
     isAdmin ||
-      user?.permissions?.includes('settings:read') ||
-      user?.permissions?.includes('settings:update'),
+    user?.permissions?.includes('settings:read') ||
+    user?.permissions?.includes('settings:update'),
   )
-  const canUpdate = Boolean(
-    isAdmin || user?.permissions?.includes('settings:update'),
-  )
+  const canUpdate = Boolean(isAdmin || user?.permissions?.includes('settings:update'))
   const settingsQuery = useSalonSettingsQuery({
     enabled: sectionId !== 'roles',
   })
@@ -72,10 +70,7 @@ export function SettingsSectionScreen() {
     )
   }
 
-  if (
-    sectionId !== 'roles' &&
-    (settingsQuery.isError || !settingsQuery.data)
-  ) {
+  if (sectionId !== 'roles' && (settingsQuery.isError || !settingsQuery.data)) {
     return (
       <ErrorState
         error={settingsQuery.error}
@@ -146,13 +141,7 @@ export function SettingsSectionScreen() {
 function SectionHeader({ title, dirty }: { title: string; dirty: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-8"
-        asChild
-      >
+      <Button type="button" size="sm" variant="outline" className="h-8" asChild>
         <Link
           to={ROUTES.settings}
           onClick={(e) => {

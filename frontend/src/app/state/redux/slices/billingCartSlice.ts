@@ -67,7 +67,10 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
-function applyDiscount(base: number, discount: CartLineDiscount | SectionDiscount): number {
+function applyDiscount(
+  base: number,
+  discount: CartLineDiscount | SectionDiscount,
+): number {
   const value = Math.max(0, Number(discount.value) || 0)
   if (discount.type === 'percent') {
     return round2(Math.min(base, (base * value) / 100))
@@ -89,10 +92,7 @@ const billingCartSlice = createSlice({
       state.loyaltyRedeemPoints = 0
       state.tip = 0
     },
-    setCustomer: (
-      state,
-      action: PayloadAction<{ id: string; name: string }>,
-    ) => {
+    setCustomer: (state, action: PayloadAction<{ id: string; name: string }>) => {
       state.walkIn = false
       state.customerId = action.payload.id
       state.customerName = action.payload.name
@@ -130,7 +130,9 @@ const billingCartSlice = createSlice({
         walkIn: boolean
         walkInPhone?: string
         notes?: string
-        lines: Array<Omit<CartLine, 'id' | 'discount'> & { id?: string; discount?: CartLineDiscount }>
+        lines: Array<
+          Omit<CartLine, 'id' | 'discount'> & { id?: string; discount?: CartLineDiscount }
+        >
       }>,
     ) => {
       const payload = action.payload
@@ -263,7 +265,13 @@ function sectionTax(
   const cgstAmt = round2((net * cgst) / 100)
   const sgstAmt = round2((net * sgst) / 100)
   const taxTotal = round2(cgstAmt + sgstAmt)
-  return { taxable: net, cgst: cgstAmt, sgst: sgstAmt, taxTotal, gross: round2(net + taxTotal) }
+  return {
+    taxable: net,
+    cgst: cgstAmt,
+    sgst: sgstAmt,
+    taxTotal,
+    gross: round2(net + taxTotal),
+  }
 }
 
 function applyRounding(amount: number, rule: DisplayTotalsInput['rounding']) {
@@ -281,10 +289,7 @@ function applyRounding(amount: number, rule: DisplayTotalsInput['rounding']) {
 }
 
 /** Display-only estimate matching server order. */
-export function selectCartTotals(
-  cart: BillingCartState,
-  tax?: DisplayTotalsInput,
-) {
+export function selectCartTotals(cart: BillingCartState, tax?: DisplayTotalsInput) {
   const serviceLines = cart.lines.filter((l) => l.kind === 'service')
   const productLines = cart.lines.filter((l) => l.kind === 'product')
 
@@ -345,23 +350,16 @@ export function selectCartTotals(
       : round2(netAfterDiscounts + taxTotal)
     : netAfterDiscounts
 
-  const maxRedeemValue = round2(
-    (netAfterDiscounts * (tax?.maxRedeemPercent ?? 0)) / 100,
-  )
+  const maxRedeemValue = round2((netAfterDiscounts * (tax?.maxRedeemPercent ?? 0)) / 100)
   const loyaltyRedeemValue = round2(
-    Math.min(
-      cart.loyaltyRedeemPoints * cart.pointsValueRatio,
-      maxRedeemValue,
-    ),
+    Math.min(cart.loyaltyRedeemPoints * cart.pointsValueRatio, maxRedeemValue),
   )
   const afterLoyalty = round2(Math.max(0, afterTax - loyaltyRedeemValue))
   const { rounded, roundOff } = applyRounding(afterLoyalty, tax?.rounding ?? 'none')
   const tip = cart.tip
   const payable = round2(rounded + tip)
   const change =
-    cart.paymentMode === 'cash'
-      ? round2(Math.max(0, cart.cashReceived - payable))
-      : 0
+    cart.paymentMode === 'cash' ? round2(Math.max(0, cart.cashReceived - payable)) : 0
 
   return {
     serviceGross,

@@ -75,10 +75,7 @@ export const productsApi = {
     return data.data
   },
 
-  update: async (
-    id: string,
-    payload: Partial<ProductInput>,
-  ): Promise<SalonProduct> => {
+  update: async (id: string, payload: Partial<ProductInput>): Promise<SalonProduct> => {
     const { data } = await apiClient.patch<ApiSuccessResponse<SalonProduct>>(
       `/product/${id}`,
       payload,
@@ -96,11 +93,13 @@ export const productsApi = {
   importFile: async (file: File): Promise<ProductImportResult> => {
     const form = new FormData()
     form.append('file', file)
-    const { data } = await apiClient.post<
-      ApiSuccessResponse<ProductImportResult>
-    >('/product/import', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const { data } = await apiClient.post<ApiSuccessResponse<ProductImportResult>>(
+      '/product/import',
+      form,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    )
     return data.data
   },
 }

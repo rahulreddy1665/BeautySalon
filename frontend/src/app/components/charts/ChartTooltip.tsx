@@ -5,9 +5,7 @@ import { theme } from '@/app/theme'
 
 function readCssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim()
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return value || fallback
 }
 

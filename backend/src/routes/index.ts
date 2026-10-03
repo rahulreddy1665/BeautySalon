@@ -15,9 +15,11 @@ import loyaltyRoutes from "./loyalty.routes";
 import designationRoutes from "./designation.routes";
 import publicRoutes from "./public.routes";
 import dashboardRoutes from "./dashboard.routes";
+import reportsRoutes from "./reports.routes";
 
 const router = Router();
 router.use("/dashboard", dashboardRoutes);
+router.use("/reports", reportsRoutes);
 router.use("/auth", authRoutes);
 router.use("/user", userRoutes);
 router.use("/service", serviceRoutes);

@@ -4,9 +4,15 @@ import { Appointment } from "../models/appointment.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
-import { ErrorCodes, ErrorMessages } from "../constants/errors";
+import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { getOrCreateSettings } from "./settings.service";
 import type { Weekday } from "../models/settings.model";
+import {
+  getSalonNow,
+  isAppointmentLocked,
+  isFinalAppointmentStatus,
+  parseHhMm,
+} from "../utils/salonTime";
 
 const WEEKDAY_KEYS: Weekday[] = [
   "sunday",
@@ -207,26 +213,24 @@ async function assertNoStaffConflict(opts: {
 
 function assertNotPast(date: string, startTime: string, allowPast: boolean) {
   if (allowPast) return;
-  const startMin = parseTimeToMinutes(startTime);
+  const startMin = parseHhMm(startTime);
   if (startMin === null) {
     throw Object.assign(new Error("Invalid startTime (use HH:mm)"), {
       statusCode: 400,
     });
   }
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  if (date < today) {
+  const salon = getSalonNow();
+  if (date < salon.dateKey) {
     throw Object.assign(new Error("Cannot book in the past"), {
       statusCode: 400,
+      code: ErrorCodes.APPOINTMENT_LOCKED,
     });
   }
-  if (date === today) {
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    if (startMin < nowMin) {
-      throw Object.assign(new Error("Cannot book a past time today"), {
-        statusCode: 400,
-      });
-    }
+  if (date === salon.dateKey && startMin < salon.totalMinutes) {
+    throw Object.assign(new Error("Cannot book a past time today"), {
+      statusCode: 400,
+      code: ErrorCodes.APPOINTMENT_LOCKED,
+    });
   }
 }
 
@@ -378,19 +382,14 @@ export const updateAppointment = async (
     if (!current) {
       return { statusCode: 404, data: null, message: "Appointment not found" };
     }
-    if (current.status === "completed") {
-      return {
-        statusCode: 400,
-        data: null,
-        message: "Completed appointments cannot be edited",
-      };
-    }
-    if (current.status === "cancelled") {
-      return {
-        statusCode: 400,
-        data: null,
-        message: "Cancelled appointments cannot be edited",
-      };
+    if (
+      isAppointmentLocked(current.status, current.date, current.endTime)
+    ) {
+      return fail(
+        400,
+        ErrorMessages[ErrorCodes.APPOINTMENT_LOCKED],
+        ErrorCodes.APPOINTMENT_LOCKED,
+      );
     }
 
     const date = data.date ?? current.date;
@@ -403,11 +402,8 @@ export const updateAppointment = async (
       return { statusCode: 400, data: null, message: "startTime must be HH:mm" };
     }
 
-    // Reschedule may keep past original; only enforce past when changing date/time
-    const changingSchedule =
-      (data.date !== undefined && data.date !== current.date) ||
-      (data.startTime !== undefined && data.startTime !== current.startTime);
-    assertNotPast(date, startTime, !changingSchedule);
+    // New schedule must not be in the past (salon zone).
+    assertNotPast(date, startTime, false);
 
     const lines = data.services
       ? await buildServiceLines(data.services)
@@ -485,12 +481,30 @@ export const changeAppointmentStatus = async (
     if (!current) {
       return { statusCode: 404, data: null, message: "Appointment not found" };
     }
-    if (current.status === "completed") {
-      return {
-        statusCode: 400,
-        data: null,
-        message: "Completed appointments cannot change status",
-      };
+    if (isFinalAppointmentStatus(current.status)) {
+      return fail(
+        400,
+        ErrorMessages[ErrorCodes.APPOINTMENT_LOCKED],
+        ErrorCodes.APPOINTMENT_LOCKED,
+      );
+    }
+    // Cancel is blocked once the slot has ended; no-show / completed still OK.
+    if (
+      status === "cancelled" &&
+      isAppointmentLocked(current.status, current.date, current.endTime)
+    ) {
+      return fail(
+        400,
+        ErrorMessages[ErrorCodes.APPOINTMENT_LOCKED],
+        ErrorCodes.APPOINTMENT_LOCKED,
+      );
+    }
+    if (current.status !== "booked") {
+      return fail(
+        400,
+        ErrorMessages[ErrorCodes.APPOINTMENT_LOCKED],
+        ErrorCodes.APPOINTMENT_LOCKED,
+      );
     }
     current.status = status;
     await current.save();

@@ -168,11 +168,7 @@ export function AccountScreen() {
                     required
                   />
                 </div>
-                <Button
-                  type="submit"
-                  className="min-touch"
-                  disabled={emailPending}
-                >
+                <Button type="submit" className="min-touch" disabled={emailPending}>
                   {AUTH.account.saveEmail}
                 </Button>
               </form>

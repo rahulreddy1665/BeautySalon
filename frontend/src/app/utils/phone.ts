@@ -29,13 +29,13 @@ export function fillWhatsAppMessage(
   vars: {
     customer: string
     salon: string
-    amount: string
-    link: string
+    amount?: string
+    link?: string
   },
 ): string {
   return template
     .replaceAll('{customer}', vars.customer)
     .replaceAll('{salon}', vars.salon)
-    .replaceAll('{amount}', vars.amount)
-    .replaceAll('{link}', vars.link)
+    .replaceAll('{amount}', vars.amount ?? '')
+    .replaceAll('{link}', vars.link ?? '')
 }

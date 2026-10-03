@@ -29,8 +29,7 @@ export function useAppointmentQuery(id: string | undefined) {
 export function useCreateAppointmentMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: CreateAppointmentInput) =>
-      appointmentsApi.create(payload),
+    mutationFn: (payload: CreateAppointmentInput) => appointmentsApi.create(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
@@ -44,13 +43,8 @@ export function useCreateAppointmentMutation() {
 export function useUpdateAppointmentMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: UpdateAppointmentInput
-    }) => appointmentsApi.update(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateAppointmentInput }) =>
+      appointmentsApi.update(id, payload),
     onSuccess: (appt) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({
@@ -66,13 +60,8 @@ export function useUpdateAppointmentMutation() {
 export function useChangeAppointmentStatusMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string
-      status: AppointmentStatus
-    }) => appointmentsApi.changeStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
+      appointmentsApi.changeStatus(id, status),
     onSuccess: (appt) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({

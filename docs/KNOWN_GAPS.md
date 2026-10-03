@@ -4,17 +4,21 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Profit / expenses report | Empty state | No expense API — screen shows unavailable |
-| Inventory valuation (qty/cost) | Empty state | Products are catalog-only (name/price); no stock fields |
-| Lifetime spend on customer | Deferred | Loyalty balance is live; spend rollup not wired |
-| Report CSV | Client-side only | `utils/csv.ts` until export endpoints exist |
+| Profit / expenses module | Out of scope | No expense API — removed from reports hub |
+| Inventory valuation (qty/cost) | Out of scope | Products are catalog-only (name/price); no stock fields in reports |
+| Staff incentives / commissions | Gap | No incentive engine — staff report omits “incentive earned” |
+| Tip attribution to staff | Gap | Tip is invoice-level only; UI tip-staff is not persisted — staff `tipsReceived` is null |
+| Customer birthdate / birthdays | Gap | Customer has phone + `createdAt`; no birthdate field |
+| Lifetime spend on customer | Partial | Reports compute spend in range; loyalty balance when loyalty enabled |
 | Login / password-change rate limit | Gap | No rate-limiting middleware in the repo |
 | Public invoice share-link rate limit | Gap | Same — no rate-limiting middleware; public `GET /api/public/invoice/:token` is unauthenticated |
 | Invoice PDF fidelity | Known tradeoff | `html2pdf.js` matches the on-screen template; some text may be rasterized vs native Print → Save as PDF |
 | WhatsApp Cloud API | Prepared stub | `backend/src/services/send-invoice.service.ts` `sendInvoiceToCustomer` is a no-op; free flow uses wa.me / navigator.share |
 | HSN/SAC, IGST | Deferred | Intra-state CGST/SGST only |
 | Recurring appointments / SMS / drag-drop | Out of scope | Per product decision |
-| PWA icons | Placeholder | Manifest theme is gold; icon PNGs still need brand art |
+| Salon timezone setting | Gap | Reports / locks use **Asia/Kolkata** (no timezone field on settings yet) |
+| Scheduled / emailed reports | Out of scope | No jobs or email |
+| PWA icons | Placeholder | Manifest theme is top-bar white; icon PNGs still need brand art |
 
 ## Auth / account (by design)
 
@@ -27,4 +31,4 @@
 
 ## Legacy mock modules
 
-`frontend/src/app/service/mocks/` may still exist on disk but **production screens must not import them** for numbers. Prefer empty states.
+`frontend/src/app/service/mocks/` may still exist on disk but **production screens must not import them** for numbers. Prefer empty states. Report mocks were removed.

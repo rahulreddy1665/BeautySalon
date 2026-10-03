@@ -8,16 +8,20 @@ import {
   CALENDAR_SLOT_HEIGHT_PX,
   DEFAULT_CALENDAR_HOURS,
   appointmentHeightPx,
+  appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
   formatHourLabel,
+  isTimeWithinHours,
   minutesToTime,
   type CalendarHours,
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
+import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface DayCalendarProps {
+  date: string
   staff: StaffMember[]
   appointments: Appointment[]
   selectedId?: string | null
@@ -27,6 +31,7 @@ interface DayCalendarProps {
 }
 
 export function DayCalendar({
+  date,
   staff,
   appointments,
   selectedId,
@@ -48,7 +53,7 @@ export function DayCalendar({
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <div
-        className="grid min-w-[640px]"
+        className="grid min-w-[640px] overflow-y-hidden"
         style={{
           gridTemplateColumns: `56px repeat(${staff.length}, minmax(140px, 1fr))`,
         }}
@@ -76,51 +81,64 @@ export function DayCalendar({
         </div>
 
         {staff.map((member) => {
-          const columnAppts = appointments.filter((appt) =>
-            appt.services.some((line) => appointmentStaffId(line) === member._id),
+          const columnAppts = appointments.filter(
+            (appt) =>
+              appointmentOverlapsHours(appt.startTime, appt.endTime, hours) &&
+              appt.services.some((line) => appointmentStaffId(line) === member._id),
           )
           return (
             <div
               key={member._id}
-              className="relative border-r border-border last:border-r-0"
+              className="relative overflow-hidden border-r border-border last:border-r-0"
               style={{ height: gridHeight }}
             >
               {slots.map((mins) => {
                 const startTime = minutesToTime(mins)
+                const past = isSlotInPast(date, startTime)
+                const inHours = isTimeWithinHours(startTime, hours)
                 return (
                   <button
                     key={mins}
                     type="button"
-                    className="absolute inset-x-0 w-full border-b border-border/70 transition-colors hover:bg-muted/50"
+                    disabled={past || !inHours}
+                    className={cn(
+                      'absolute inset-x-0 w-full border-b border-border/70 transition-colors',
+                      past || !inHours
+                        ? 'cursor-not-allowed bg-muted/20'
+                        : 'hover:bg-muted/50',
+                    )}
                     style={{
                       top: appointmentTopPx(startTime, hours),
                       height: CALENDAR_SLOT_HEIGHT_PX,
                     }}
                     aria-label={`Book ${member.name} at ${startTime}`}
-                    onClick={() => onSlotClick(member._id, startTime)}
+                    onClick={() => {
+                      if (past || !inHours) return
+                      onSlotClick(member._id, startTime)
+                    }}
                   />
                 )
               })}
 
               {columnAppts.map((appt) => {
-                const top = appointmentTopPx(appt.startTime, hours)
-                const height = appointmentHeightPx(
-                  appt.startTime,
-                  appt.endTime,
-                  hours,
+                const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
+                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const height = Math.min(
+                  Math.max(rawHeight - 2, 28),
+                  Math.max(0, gridHeight - top),
                 )
+                const past = isAppointmentEndPast(appt.date, appt.endTime)
                 return (
                   <button
                     key={`${appt._id}-${member._id}`}
                     type="button"
                     className={cn(
-                      'absolute inset-x-1 z-10 overflow-hidden rounded-lg px-1.5 py-1 text-left',
-                      appointmentStatusClasses(
-                        appt.status,
-                        selectedId === appt._id,
-                      ),
+                      'absolute inset-x-1 z-10 overflow-hidden rounded-lg px-1.5 py-1 text-left transition-shadow',
+                      appointmentStatusClasses(appt.status, selectedId === appt._id),
+                      past && 'opacity-60',
+                      !past && 'hover:brightness-[0.98]',
                     )}
-                    style={{ top, height: Math.max(height - 2, 28) }}
+                    style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onAppointmentClick(appt)

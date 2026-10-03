@@ -21,11 +21,13 @@ import { InventoryScreen } from '@/app/screens/inventory/InventoryScreen'
 import { ProductDetailScreen } from '@/app/screens/inventory/ProductDetailScreen'
 import { LoyaltyScreen } from '@/app/screens/loyalty/LoyaltyScreen'
 import { ForbiddenPage, NotFoundPage } from '@/app/screens/NotFoundPage'
-import { ProfitReportScreen } from '@/app/screens/reports/ProfitReportScreen'
+import { AppointmentsReportScreen } from '@/app/screens/reports/AppointmentsReportScreen'
+import { CustomersReportScreen } from '@/app/screens/reports/CustomersReportScreen'
+import { ProductsReportScreen } from '@/app/screens/reports/ProductsReportScreen'
 import { ReportsScreen } from '@/app/screens/reports/ReportsScreen'
 import { SalesReportScreen } from '@/app/screens/reports/SalesReportScreen'
+import { ServicesReportScreen } from '@/app/screens/reports/ServicesReportScreen'
 import { StaffSalesReportScreen } from '@/app/screens/reports/StaffSalesReportScreen'
-import { InventoryValuationScreen } from '@/app/screens/reports/InventoryValuationScreen'
 import { ServicesScreen } from '@/app/screens/services/ServicesScreen'
 import { SettingsHubScreen } from '@/app/screens/settings/SettingsHubScreen'
 import { SettingsSectionScreen } from '@/app/screens/settings/SettingsSectionScreen'
@@ -48,14 +50,8 @@ export function AppRouter() {
             <Route index element={<DashboardScreen />} />
             <Route path="account" element={<AccountScreen />} />
             <Route path="appointments" element={<AppointmentsScreen />} />
-            <Route
-              path="appointments/new"
-              element={<AppointmentFormPage />}
-            />
-            <Route
-              path="appointments/:id/edit"
-              element={<AppointmentFormPage />}
-            />
+            <Route path="appointments/new" element={<AppointmentFormPage />} />
+            <Route path="appointments/:id/edit" element={<AppointmentFormPage />} />
             <Route path="customers" element={<CustomersScreen />} />
             <Route path="customers/:id" element={<CustomerDetailScreen />} />
             <Route path="billing" element={<BillingScreen />} />
@@ -68,10 +64,7 @@ export function AppRouter() {
             <Route path="inventory/:id" element={<ProductDetailScreen />} />
             <Route path="loyalty" element={<LoyaltyScreen />} />
             <Route path="settings" element={<SettingsHubScreen />} />
-            <Route
-              path="settings/:section"
-              element={<SettingsSectionScreen />}
-            />
+            <Route path="settings/:section" element={<SettingsSectionScreen />} />
 
             <Route
               element={
@@ -81,11 +74,10 @@ export function AppRouter() {
               <Route path="reports" element={<ReportsScreen />} />
               <Route path="reports/sales" element={<SalesReportScreen />} />
               <Route path="reports/staff" element={<StaffSalesReportScreen />} />
-              <Route
-                path="reports/inventory"
-                element={<InventoryValuationScreen />}
-              />
-              <Route path="reports/profit" element={<ProfitReportScreen />} />
+              <Route path="reports/customers" element={<CustomersReportScreen />} />
+              <Route path="reports/appointments" element={<AppointmentsReportScreen />} />
+              <Route path="reports/services" element={<ServicesReportScreen />} />
+              <Route path="reports/products" element={<ProductsReportScreen />} />
             </Route>
           </Route>
         </Route>

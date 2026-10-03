@@ -19,6 +19,7 @@ export const ErrorCodes = {
   USERNAME_TAKEN: "USERNAME_TAKEN",
   EMAIL_TAKEN: "EMAIL_TAKEN",
   DESIGNATION_REQUIRED: "DESIGNATION_REQUIRED",
+  APPOINTMENT_LOCKED: "APPOINTMENT_LOCKED",
   INTERNAL: "INTERNAL",
 } as const;
 
@@ -45,6 +46,8 @@ export const ErrorMessages = {
   [ErrorCodes.EMAIL_TAKEN]: "That email is already in use",
   [ErrorCodes.DESIGNATION_REQUIRED]:
     "Select a designation before enabling login",
+  [ErrorCodes.APPOINTMENT_LOCKED]:
+    "This appointment has passed and can no longer be edited.",
   [ErrorCodes.INTERNAL]: "Something went wrong",
 
   SALON_NAME_REQUIRED: "Salon name is required",

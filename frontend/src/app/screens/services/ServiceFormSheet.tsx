@@ -42,11 +42,7 @@ function toValues(service?: SalonService | null): ServiceFormValues {
   }
 }
 
-export function ServiceFormSheet({
-  open,
-  onOpenChange,
-  service,
-}: ServiceFormSheetProps) {
+export function ServiceFormSheet({ open, onOpenChange, service }: ServiceFormSheetProps) {
   const isEdit = Boolean(service)
   const createMutation = useCreateServiceMutation()
   const updateMutation = useUpdateServiceMutation()

@@ -41,9 +41,7 @@ export function LoyaltySettingsSection({
   const values = form.watch()
   const dirty = form.formState.isDirty
   const exampleBill = 1000
-  const earnExample = Math.floor(
-    (exampleBill / 100) * (values.earnPointsPer100Inr || 0),
-  )
+  const earnExample = Math.floor((exampleBill / 100) * (values.earnPointsPer100Inr || 0))
   const redeemExample = (values.redeemValuePerPoint || 0) * 100
 
   useEffect(() => {
@@ -150,13 +148,12 @@ export function LoyaltySettingsSection({
 
           <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             Example: a {formatINR(exampleBill)} net bill earns{' '}
-            <span className="font-medium text-foreground">{earnExample}</span>{' '}
-            points · 100 points redeem for{' '}
+            <span className="font-medium text-foreground">{earnExample}</span> points ·
+            100 points redeem for{' '}
             <span className="font-medium text-foreground">
               {formatINR(redeemExample)}
             </span>
-            . Points earn on net after discounts and redemption (excludes tax
-            and tip).
+            . Points earn on net after discounts and redemption (excludes tax and tip).
           </p>
 
           <SettingsSaveBar

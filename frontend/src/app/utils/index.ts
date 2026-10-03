@@ -1,5 +1,10 @@
 export { cn } from './cn'
 export { env } from './env'
 export { createAppError, toErrorMessage } from './errors'
-export { formatINR, formatNumber, formatDeltaPercent } from './currency'
+export {
+  formatINR,
+  formatMoneyOrDash,
+  formatNumber,
+  formatDeltaPercent,
+} from './currency'
 export { downloadCsv } from './csv'

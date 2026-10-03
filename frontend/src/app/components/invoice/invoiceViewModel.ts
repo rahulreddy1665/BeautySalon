@@ -101,9 +101,7 @@ export function buildInvoiceViewModel(
     showLogo: snap?.showLogo !== false,
     termsText: snap?.termsText ?? '',
     thankYouText:
-      snap?.thankYouText ||
-      biz?.invoiceFooterNote ||
-      SETTINGS.invoice.thankYouDefault,
+      snap?.thankYouText || biz?.invoiceFooterNote || SETTINGS.invoice.thankYouDefault,
     salonName: biz?.salonName || COMMON.appName,
     logoUrl,
     address: biz?.address,
@@ -125,8 +123,7 @@ export function buildInvoiceViewModel(
     serviceDiscount: inv.serviceDiscountTotal,
     productDiscount: inv.productDiscountTotal,
     taxable: (() => {
-      const fromTax =
-        (inv.tax?.servicesTaxable ?? 0) + (inv.tax?.productsTaxable ?? 0)
+      const fromTax = (inv.tax?.servicesTaxable ?? 0) + (inv.tax?.productsTaxable ?? 0)
       if (fromTax > 0) return fromTax
       return (
         inv.serviceSubtotal +

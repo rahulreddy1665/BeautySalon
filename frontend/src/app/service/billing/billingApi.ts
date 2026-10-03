@@ -67,8 +67,7 @@ export interface BillRecord {
 function customerNameFromInvoice(inv: InvoiceRecord): string {
   if (inv.walkIn) return inv.walkInName || 'Walk-in'
   return (
-    [inv.customer?.name, inv.customer?.lastName].filter(Boolean).join(' ') ||
-    'Customer'
+    [inv.customer?.name, inv.customer?.lastName].filter(Boolean).join(' ') || 'Customer'
   )
 }
 

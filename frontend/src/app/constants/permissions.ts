@@ -85,7 +85,7 @@ export const PERMISSION_SCREENS = [
     label: 'Reports',
     keys: {
       view: 'report:read',
-      create: null,
+      create: 'report:export',
       edit: null,
       delete: null,
     },
@@ -104,12 +104,7 @@ export const PERMISSION_SCREENS = [
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete'
 
-export const PERMISSION_ACTIONS: PermissionAction[] = [
-  'view',
-  'create',
-  'edit',
-  'delete',
-]
+export const PERMISSION_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete']
 
 export const NAV_PERMISSION: Record<string, string> = {
   '/': 'dashboard:read',

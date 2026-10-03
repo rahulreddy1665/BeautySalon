@@ -128,9 +128,7 @@ export function StaffDetailScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold">{staff.name}</h2>
         <Badge variant="outline" className="rounded-md font-normal">
-          {staff.isActive === false
-            ? COMMON.labels.inactive
-            : COMMON.labels.active}
+          {staff.isActive === false ? COMMON.labels.inactive : COMMON.labels.active}
         </Badge>
         <Badge variant="outline" className="rounded-md font-normal">
           {loginLabel(staff.loginStatus)}
@@ -161,8 +159,7 @@ export function StaffDetailScreen() {
             </div>
           ) : null}
 
-          {(staff.loginStatus === 'no_login' ||
-            staff.loginStatus === 'login_off') && (
+          {(staff.loginStatus === 'no_login' || staff.loginStatus === 'login_off') && (
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>{STAFF.detail.username}</Label>

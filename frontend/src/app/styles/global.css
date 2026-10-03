@@ -156,7 +156,7 @@
   --sidebar-collapsed-width: 72px;
   --bottom-nav-height: 56px;
   --header-height: 56px;
-  --theme-color: #ffd700;
+  --theme-color: #ffffff;
 }
 
 .dark {
@@ -228,7 +228,7 @@
   --status-no-show-bg: #27272a;
 
   --shadow-popover: 0 8px 30px rgb(0 0 0 / 0.45);
-  --theme-color: #0b0b0b;
+  --theme-color: #141414;
 }
 
 @layer base {

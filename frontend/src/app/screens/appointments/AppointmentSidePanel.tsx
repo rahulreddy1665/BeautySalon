@@ -5,6 +5,7 @@ import { Button } from '@/app/components/ui/button'
 import { APPOINTMENTS, ROUTES } from '@/app/constants'
 import {
   useCancelAppointmentMutation,
+  useChangeAppointmentStatusMutation,
 } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useServicesCatalogQuery } from '@/app/hooks/queries/useServicesQuery'
 import {
@@ -15,12 +16,14 @@ import {
 } from '@/app/service/appointments/appointmentsApi'
 import { appointmentStatusChipClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { formatINR } from '@/app/utils'
+import { isAppointmentLocked, isFinalAppointmentStatus } from '@/app/utils/salonTime'
 import { cn } from '@/app/utils'
 
 interface Props {
   appointment: Appointment | null
   onEdit: (appt: Appointment) => void
   onCancelled: (appt: Appointment) => void
+  onStatusChange?: (appt: Appointment) => void
   className?: string
 }
 
@@ -33,9 +36,11 @@ export function AppointmentSidePanel({
   appointment,
   onEdit,
   onCancelled,
+  onStatusChange,
   className,
 }: Props) {
   const cancelMutation = useCancelAppointmentMutation()
+  const statusMutation = useChangeAppointmentStatusMutation()
   const servicesQuery = useServicesCatalogQuery()
 
   if (!appointment) {
@@ -64,8 +69,23 @@ export function AppointmentSidePanel({
     const svc = catalog.find((s) => s._id === appointmentServiceId(line))
     return sum + (svc?.price ?? 0)
   }, 0)
-  const canBill =
-    appointment.status === 'booked' && !appointment.invoice
+  const locked = isAppointmentLocked(
+    appointment.status,
+    appointment.date,
+    appointment.endTime,
+  )
+  const final = isFinalAppointmentStatus(appointment.status)
+  const canBill = appointment.status === 'booked' && !appointment.invoice
+  const canNoShow = appointment.status === 'booked'
+  const canEdit = !locked
+  const canCancel = appointment.status === 'booked' && !locked
+
+  const lockHint = final
+    ? APPOINTMENTS.list.viewOnlyStatus.replace(
+        '{status}',
+        APPOINTMENTS.status[appointment.status],
+      )
+    : APPOINTMENTS.list.viewOnlyPast
 
   return (
     <aside
@@ -96,11 +116,11 @@ export function AppointmentSidePanel({
         </div>
       </div>
 
+      {locked ? <p className="mt-3 text-xs text-muted-foreground">{lockHint}</p> : null}
+
       <dl className="mt-4 space-y-2 text-sm">
         <div>
-          <dt className="text-xs text-muted-foreground">
-            {APPOINTMENTS.detail.phone}
-          </dt>
+          <dt className="text-xs text-muted-foreground">{APPOINTMENTS.detail.phone}</dt>
           <dd className="tabular-nums">{phone}</dd>
         </div>
         <div>
@@ -118,45 +138,55 @@ export function AppointmentSidePanel({
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">
-            {APPOINTMENTS.detail.staff}
-          </dt>
+          <dt className="text-xs text-muted-foreground">{APPOINTMENTS.detail.staff}</dt>
           <dd>
-            {[
-              ...new Set(
-                appointment.services.map((s) => appointmentStaffName(s)),
-              ),
-            ].join(', ')}
+            {[...new Set(appointment.services.map((s) => appointmentStaffName(s)))].join(
+              ', ',
+            )}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">
-            {APPOINTMENTS.detail.price}
-          </dt>
+          <dt className="text-xs text-muted-foreground">{APPOINTMENTS.detail.price}</dt>
           <dd className="font-semibold text-gold-deep">{formatINR(price)}</dd>
         </div>
         {appointment.notes ? (
           <div>
-            <dt className="text-xs text-muted-foreground">
-              {APPOINTMENTS.detail.notes}
-            </dt>
+            <dt className="text-xs text-muted-foreground">{APPOINTMENTS.detail.notes}</dt>
             <dd className="whitespace-pre-wrap">{appointment.notes}</dd>
           </div>
         ) : null}
       </dl>
 
       <div className="mt-auto flex flex-col gap-2 pt-4">
-        <Button type="button" onClick={() => onEdit(appointment)}>
-          {APPOINTMENTS.detail.edit}
-        </Button>
+        {canEdit ? (
+          <Button type="button" onClick={() => onEdit(appointment)}>
+            {APPOINTMENTS.detail.edit}
+          </Button>
+        ) : null}
         {canBill ? (
-          <Button asChild variant="outline">
+          <Button asChild variant={canEdit ? 'outline' : 'default'}>
             <Link to={`${ROUTES.billingNew}?appointmentId=${appointment._id}`}>
               {APPOINTMENTS.detail.collectPayment}
             </Link>
           </Button>
         ) : null}
-        {appointment.status === 'booked' ? (
+        {canNoShow ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={statusMutation.isPending}
+            onClick={async () => {
+              const updated = await statusMutation.mutateAsync({
+                id: appointment._id,
+                status: 'no_show',
+              })
+              onStatusChange?.(updated)
+            }}
+          >
+            {APPOINTMENTS.detail.markNoShow}
+          </Button>
+        ) : null}
+        {canCancel ? (
           <Button
             type="button"
             variant="outline"

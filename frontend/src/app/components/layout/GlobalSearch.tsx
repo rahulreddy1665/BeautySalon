@@ -4,12 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/app/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/app/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/app/components/ui/sheet'
 import { Input } from '@/app/components/ui/input'
 import { COMMON, ROUTES } from '@/app/constants'
 import { useHasPermission } from '@/app/hooks/useHasPermission'
@@ -76,18 +71,10 @@ async function runSearch(
   return hits.slice(0, 12)
 }
 
-function ResultsList({
-  hits,
-  onPick,
-}: {
-  hits: Hit[]
-  onPick: (hit: Hit) => void
-}) {
+function ResultsList({ hits, onPick }: { hits: Hit[]; onPick: (hit: Hit) => void }) {
   if (hits.length === 0) {
     return (
-      <p className="px-3 py-4 text-sm text-muted-foreground">
-        {COMMON.nav.searchEmpty}
-      </p>
+      <p className="px-3 py-4 text-sm text-muted-foreground">{COMMON.nav.searchEmpty}</p>
     )
   }
   return (
@@ -237,9 +224,7 @@ export function GlobalSearch({ className }: { className?: string }) {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="top" className="rounded-b-2xl pt-safe">
           <SheetHeader>
-            <SheetTitle className="text-sm">
-              {COMMON.nav.searchPlaceholder}
-            </SheetTitle>
+            <SheetTitle className="text-sm">{COMMON.nav.searchPlaceholder}</SheetTitle>
           </SheetHeader>
           <div className="mt-2 space-y-2">
             {field}

@@ -56,17 +56,11 @@ export function ProductDetailScreen() {
           <CardTitle>{product.name}</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
-          <p className="tabular-nums text-lg font-semibold">
-            {formatINR(product.price)}
-          </p>
+          <p className="tabular-nums text-lg font-semibold">{formatINR(product.price)}</p>
         </CardContent>
       </Card>
 
-      <ProductFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        product={product}
-      />
+      <ProductFormSheet open={sheetOpen} onOpenChange={setSheetOpen} product={product} />
     </div>
   )
 }

@@ -6,12 +6,7 @@ const indianPhoneRegex = /^(?:\+?91[\s-]?|0)?([6-9]\d{9})$/
 export const customerFormSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(80),
   lastName: z.string().trim().max(80).optional().or(z.literal('')),
-  email: z
-    .string()
-    .trim()
-    .email('Enter a valid email')
-    .optional()
-    .or(z.literal('')),
+  email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
   phone: z
     .string()
     .trim()

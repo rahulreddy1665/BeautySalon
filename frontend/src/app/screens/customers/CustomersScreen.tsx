@@ -1,6 +1,6 @@
-import { Plus, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
@@ -8,6 +8,7 @@ import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
+import { CUSTOMERS } from '@/app/constants'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import type { Customer } from '@/app/service/customers/customersApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
@@ -41,10 +42,25 @@ const columns: ColumnDef<Customer & { fullName: string; phoneLabel: string }>[] 
 
 export function CustomersScreen() {
   const { data, isLoading, isError, error, refetch } = useCustomersQuery()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
+  const wantsNew = searchParams.get('new') === '1'
+  const createOpen = sheetOpen || wantsNew
+
+  const clearNewParam = () => {
+    if (!wantsNew) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('new')
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -57,11 +73,7 @@ export function CustomersScreen() {
     if (!q) return rows
 
     return rows.filter((customer) => {
-      const haystack = [
-        customer.fullName,
-        customer.phoneLabel,
-        customer.email ?? '',
-      ]
+      const haystack = [customer.fullName, customer.phoneLabel, customer.email ?? '']
         .join(' ')
         .toLowerCase()
       return haystack.includes(q)
@@ -72,22 +84,9 @@ export function CustomersScreen() {
   const safePage = Math.min(page, pageCount - 1)
   const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
 
-  const openCreate = () => {
-    setEditing(null)
-    setSheetOpen(true)
-  }
-
   return (
     <div className="min-w-0 space-y-3">
-      <PageHeader
-        description="Search by name or phone. Add walk-ins before collecting payment."
-        actions={
-          <Button type="button" size="sm" className="min-touch h-9" onClick={openCreate}>
-            <Plus className="size-4" strokeWidth={1.75} />
-            Add customer
-          </Button>
-        }
-      />
+      <PageHeader description={CUSTOMERS.list.description} />
 
       <div className="relative max-w-md">
         <Search
@@ -100,9 +99,9 @@ export function CustomersScreen() {
             setSearch(event.target.value)
             setPage(0)
           }}
-          placeholder="Search name or phone"
+          placeholder={CUSTOMERS.list.searchPlaceholder}
           className="pl-8"
-          aria-label="Search customers"
+          aria-label={CUSTOMERS.list.searchPlaceholder}
         />
       </div>
 
@@ -163,8 +162,16 @@ export function CustomersScreen() {
 
           {/* Quick edit from list via detail; keep create sheet here */}
           <CustomerFormSheet
-            open={sheetOpen}
-            onOpenChange={setSheetOpen}
+            open={createOpen}
+            onOpenChange={(open) => {
+              setSheetOpen(open)
+              if (!open) {
+                setEditing(null)
+                clearNewParam()
+              } else {
+                setEditing(null)
+              }
+            }}
             customer={editing}
           />
         </>

@@ -19,13 +19,11 @@ function applyThemeClass(isDark: boolean) {
   root.classList.toggle('dark', isDark)
 
   const fromCss = getComputedStyle(root).getPropertyValue('--theme-color').trim()
-  const themeColor =
-    fromCss || (isDark ? theme.dark.background : theme.light.primary)
+  const themeColor = fromCss || (isDark ? theme.dark.card : theme.light.card)
 
-  const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) {
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
     meta.setAttribute('content', themeColor)
-  }
+  })
 }
 
 interface ThemeProviderProps {

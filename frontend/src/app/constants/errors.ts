@@ -21,6 +21,7 @@ export const ERRORS = {
   usernameTaken: 'That username is already taken.',
   emailTaken: 'That email is already in use.',
   designationRequired: 'Select a designation before enabling login.',
+  appointmentLocked: 'This appointment has passed and can no longer be edited.',
 } as const
 
 export const ERROR_CODE_MESSAGES: Record<string, string> = {
@@ -40,6 +41,7 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
   USERNAME_TAKEN: ERRORS.usernameTaken,
   EMAIL_TAKEN: ERRORS.emailTaken,
   DESIGNATION_REQUIRED: ERRORS.designationRequired,
+  APPOINTMENT_LOCKED: ERRORS.appointmentLocked,
 }
 
 export const ERROR_STATUS_MESSAGES: Record<number, string> = {
