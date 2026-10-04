@@ -157,7 +157,8 @@ export function AppointmentSidePanel({
         ) : null}
       </dl>
 
-      <div className="mt-auto flex flex-col gap-2 pt-4">
+      {/* Directly under details — avoid mt-auto so actions aren’t pushed below the fold */}
+      <div className="mt-4 flex flex-col gap-2">
         {canEdit ? (
           <Button type="button" onClick={() => onEdit(appointment)}>
             {APPOINTMENTS.detail.edit}

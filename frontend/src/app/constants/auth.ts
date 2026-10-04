@@ -1,13 +1,44 @@
 export const AUTH = {
+  welcomeTitle: 'Welcome back',
+  welcomeSubtitle: 'Sign in to manage bills, appointments and staff.',
   loginTitle: 'Sign in',
   identifier: 'Email or username',
   identifierPlaceholder: 'you@salon.com or username',
   password: 'Password',
   passwordPlaceholder: 'Your password',
+  showPassword: 'Show',
+  hidePassword: 'Hide',
   submit: 'Sign in',
   submitting: 'Signing in…',
   failed: 'Could not sign in',
-  forgotHint: 'Forgot your password? Ask your admin to reset it.',
+  invalidCredentials: 'Invalid username or password.',
+  networkError: 'Network error. Check your connection and try again.',
+  rateLimited: 'Too many attempts. Try again shortly.',
+  adminResetHint: "Can't sign in? Your salon admin can reset your password.",
+  secureSession: 'Secure sign-in. Sessions expire after 24 hours.',
+  panel: {
+    headline: 'Run your salon floor from one screen.',
+    mobileHeadline: 'Your salon floor, ready when you are.',
+    copyright: '© {year} {salon}',
+    features: [
+      {
+        title: 'Itemized billing',
+        body: 'Services, products, discounts, tips and UPI in one checkout',
+      },
+      {
+        title: 'Staff-wise tracking',
+        body: 'Every service and sale tagged to the staff member',
+      },
+      {
+        title: 'Appointments and walk-ins',
+        body: "See today's bookings the moment you sign in",
+      },
+    ],
+  },
+  validation: {
+    identifierRequired: 'Email or username is required',
+    passwordRequired: 'Password is required',
+  },
   setPassword: {
     title: 'Set a new password',
     description: 'You must choose a new password before continuing.',

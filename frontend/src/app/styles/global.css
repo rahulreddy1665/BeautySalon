@@ -56,6 +56,10 @@
   --color-danger-soft: var(--danger-soft);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-login-panel: var(--login-panel);
+  --color-login-panel-foreground: var(--login-panel-foreground);
+  --color-login-panel-muted: var(--login-panel-muted);
+  --color-login-ring: var(--login-ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -128,6 +132,12 @@
 
   --sidebar: #ffffff;
   --sidebar-foreground: #1a1a1a;
+
+  /* Login brand panel — near-black in both themes */
+  --login-panel: #0b0b0b;
+  --login-panel-foreground: #f2f2f2;
+  --login-panel-muted: #a0a0a8;
+  --login-ring: rgba(242, 242, 242, 0.12);
 
   --chart-1: #ffd700;
   --chart-2: #8a6d00;
@@ -207,6 +217,8 @@
 
   --sidebar: #141414;
   --sidebar-foreground: #f2f2f2;
+
+  /* Login tokens live on :root only — /login always renders light. */
 
   --chart-1: #ffd700;
   --chart-2: #fde68a;

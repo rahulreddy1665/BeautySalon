@@ -200,6 +200,11 @@ Appointments UI: day / week / month calendars; desktop right panel (`?appointmen
 
 Screens must not invent their own fake numbers. Prefer empty states. Legacy files under `service/mocks/` must not drive production UI.
 
+## Auth / login
+- Public branding: unauthenticated `GET /api/public/branding` returns only `{ salonName, logoUrl }` for the login screen (TanStack Query cached; falls back to `COMMON.appName` + default mark).
+- Login is a full-viewport split layout (dark brand panel + form card on `lg+`; mobile header sheet below). **Always light** on `/login` (FOUC script + `ThemeProvider` force light) — does not mutate Redux `themeMode`; after sign-in the saved theme applies. No theme toggle on login.
+- Decorative particles (`@tsparticles/slim` via lazy `LoginParticles`) fill the right half / mobile sheet only; tune counts/opacity/links in `LOGIN_PARTICLE_SETTINGS` inside `components/LoginParticles.tsx`. Skipped when `prefers-reduced-motion`. Auth token persists via redux-persist (`localStorage`); JWT expires in 24h (`JWT_EXPIRES_IN`). No forgot-password link — admin reset only. No login rate-limiting middleware in the repo yet.
+
 ## Auth & API client
 
 - Base URL: `VITE_API_BASE_URL` (`utils/env.ts`).
@@ -211,7 +216,9 @@ Screens must not invent their own fake numbers. Prefer empty states. Legacy file
 - Backend reloads designation/role permissions on each authenticated request (not stale JWT lists). Frontend `PermissionGuard` + nav filtering use the same keys.
 - Settings is a **hub** (`/settings`) with card links to `/settings/:section` (business, tax, invoice, appointments, loyalty, roles). Unsaved-changes guard + sticky Save on sub-pages. Cards hide when the user lacks permission; direct URLs show No access.
 - Invoice templates: Cream & Gold, Blush, Compact A5, Thermal. Palettes in `theme/invoice-themes.ts` (only allowed hex outside `theme/tokens`). Shared `InvoiceDocument` + snapshot on each invoice. Public share at `/i/:token` (no app shell, noindex). PDF via `html2pdf.js` (`utils/invoicePdf.ts`). WhatsApp share via `sendInvoiceToCustomer` (wa.me / native share); Cloud API stub on backend.
-- New bill: Services / Products section cards with one section discount each (no per-line discount UI). Line discount field stays 0 for API compatibility.
+- New bill (`/billing/new`): three numbered cards (Customer · Add services & products · Bill items) + sticky Bill summary. Per-line discounts; section discounts sent as 0. Drafts persist per device via `billingDrafts` (redux-persist); estimates are print-only. Tip allocations are computed on the server from distinct staff on the bill.
+- Billing line grid (≥768): shared tracks `minmax(0,1fr) | staff 140/160px | qty 96 | price 72 | total 80 | delete 36`, `gap-x-2`. Item uses `line-clamp-2` + `title`. `<768` keeps stacked cards.
+- Same-category suggestions: `CategorySuggestions` under Services search (not Products). Chips from loaded catalog, ordered by name (no billed-frequency on services API). Also used on New Appointment after a service is chosen.
 - See `docs/API_NOTES.md` and `docs/KNOWN_GAPS.md` (no email/SMTP/2FA).
 
 ## Quality

@@ -9,6 +9,10 @@ export const queryKeys = {
     all: ['auth'] as const,
     me: () => [...queryKeys.auth.all, 'me'] as const,
   },
+  publicBranding: {
+    all: ['publicBranding'] as const,
+    detail: () => [...queryKeys.publicBranding.all, 'detail'] as const,
+  },
   services: {
     all: ['services'] as const,
     lists: () => [...queryKeys.services.all, 'list'] as const,
@@ -54,6 +58,8 @@ export const queryKeys = {
       [...queryKeys.billing.lists(), filters ?? {}] as const,
     detail: (id: string) => [...queryKeys.billing.all, 'detail', id] as const,
     products: () => [...queryKeys.billing.all, 'products'] as const,
+    popular: (limit?: number) =>
+      [...queryKeys.billing.all, 'popular', limit ?? 12] as const,
   },
   inventory: {
     all: ['inventory'] as const,

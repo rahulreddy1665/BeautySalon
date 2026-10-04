@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Button } from '@/app/components/ui/button'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { COMMON, LOYALTY } from '@/app/constants'
 import {
   loyaltyAdjustSchema,
   type LoyaltyAdjustFormValues,
@@ -82,93 +84,95 @@ export function AdjustPointsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Adjust points</DialogTitle>
-          <DialogDescription>
-            Manual earn, redeem, or set balance. Record a reason for the ledger.
-          </DialogDescription>
+          <DialogTitle>{LOYALTY.adjust}</DialogTitle>
+          <DialogDescription>{LOYALTY.adjustHint}</DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-3" onSubmit={onSubmit} noValidate>
-          <div className="space-y-1.5">
-            <Label>Customer</Label>
-            <Select
-              value={form.watch('customerId')}
-              onValueChange={(value) =>
-                form.setValue('customerId', value, { shouldValidate: true })
-              }
-              disabled={Boolean(presetCustomerId)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer._id} value={customer._id}>
-                    {displayName(customer)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.customerId ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.customerId.message}
-              </p>
-            ) : null}
-          </div>
+        <form onSubmit={onSubmit} noValidate>
+          <DialogBody className="space-y-4">
+            <div className="space-y-2">
+              <Label>{LOYALTY.fields.customer}</Label>
+              <Select
+                value={form.watch('customerId')}
+                onValueChange={(value) =>
+                  form.setValue('customerId', value, { shouldValidate: true })
+                }
+                disabled={Boolean(presetCustomerId)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={LOYALTY.fields.chooseCustomer} />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer._id} value={customer._id}>
+                      {displayName(customer)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.customerId ? (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.customerId.message}
+                </p>
+              ) : null}
+            </div>
 
-          <div className="space-y-1.5">
-            <Label>Type</Label>
-            <Select
-              value={form.watch('type')}
-              onValueChange={(value) =>
-                form.setValue('type', value as LoyaltyAdjustFormValues['type'], {
-                  shouldValidate: true,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="earn">Earn (add)</SelectItem>
-                <SelectItem value="redeem">Redeem (subtract)</SelectItem>
-                <SelectItem value="adjust">Set balance</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label>{LOYALTY.fields.type}</Label>
+              <Select
+                value={form.watch('type')}
+                onValueChange={(value) =>
+                  form.setValue('type', value as LoyaltyAdjustFormValues['type'], {
+                    shouldValidate: true,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="earn">{LOYALTY.types.earn}</SelectItem>
+                  <SelectItem value="redeem">{LOYALTY.types.redeem}</SelectItem>
+                  <SelectItem value="adjust">{LOYALTY.types.set}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="loy-points">
-              {form.watch('type') === 'adjust' ? 'New balance' : 'Points'}
-            </Label>
-            <Input
-              id="loy-points"
-              type="number"
-              min={1}
-              step="1"
-              className="tabular-nums"
-              {...form.register('points', { valueAsNumber: true })}
-            />
-            {form.formState.errors.points ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.points.message}
-              </p>
-            ) : null}
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="loy-points">
+                {form.watch('type') === 'adjust'
+                  ? LOYALTY.fields.newBalance
+                  : LOYALTY.fields.points}
+              </Label>
+              <Input
+                id="loy-points"
+                type="number"
+                min={1}
+                step="1"
+                className="tabular-nums"
+                {...form.register('points', { valueAsNumber: true })}
+              />
+              {form.formState.errors.points ? (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.points.message}
+                </p>
+              ) : null}
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="loy-reason">Reason</Label>
-            <Input
-              id="loy-reason"
-              placeholder="Birthday bonus / correction…"
-              {...form.register('reason')}
-            />
-            {form.formState.errors.reason ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.reason.message}
-              </p>
-            ) : null}
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="loy-reason">{LOYALTY.fields.reason}</Label>
+              <Input
+                id="loy-reason"
+                placeholder={LOYALTY.fields.reasonPlaceholder}
+                {...form.register('reason')}
+              />
+              {form.formState.errors.reason ? (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.reason.message}
+                </p>
+              ) : null}
+            </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button
@@ -177,10 +181,10 @@ export function AdjustPointsDialog({
               onClick={() => onOpenChange(false)}
               disabled={mutation.isPending}
             >
-              Cancel
+              {COMMON.actions.cancel}
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Save'}
+              {mutation.isPending ? LOYALTY.saving : COMMON.actions.save}
             </Button>
           </DialogFooter>
         </form>

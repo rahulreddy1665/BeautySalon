@@ -1,4 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 
 import { useAppSelector } from '@/app/hooks/useRedux'
 import type { ThemeMode } from '@/app/state/redux/slices/settingsSlice'
@@ -14,12 +15,24 @@ function resolveDark(mode: ThemeMode): boolean {
   return getSystemDark()
 }
 
-function applyThemeClass(isDark: boolean) {
-  const root = document.documentElement
-  root.classList.toggle('dark', isDark)
+function isLoginPath(pathname: string): boolean {
+  return pathname === '/login' || pathname.startsWith('/login/')
+}
 
-  const fromCss = getComputedStyle(root).getPropertyValue('--theme-color').trim()
-  const themeColor = fromCss || (isDark ? theme.dark.card : theme.light.card)
+function readCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+function applyThemeClass(isDark: boolean, forceLoginLight: boolean) {
+  const root = document.documentElement
+  const effectiveDark = forceLoginLight ? false : isDark
+  root.classList.toggle('dark', effectiveDark)
+
+  // Login locks status-bar color (mobile dark header / desktop light page).
+  const locked = root.dataset.themeColorLock?.trim()
+  const fromCss = readCssVar('--theme-color')
+  const themeColor =
+    locked || fromCss || (effectiveDark ? theme.dark.card : theme.light.card)
 
   document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
     meta.setAttribute('content', themeColor)
@@ -32,25 +45,28 @@ interface ThemeProviderProps {
 
 /**
  * Applies `dark` on <html> from persisted settings + system preference.
+ * `/login` always forces light (does not mutate Redux themeMode).
  * FOUC is handled by the inline script in index.html before React mounts.
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const themeMode = useAppSelector((state) => state.settings.themeMode)
+  const { pathname } = useLocation()
+  const forceLoginLight = isLoginPath(pathname)
 
   const isDark = useMemo(() => resolveDark(themeMode), [themeMode])
 
   useEffect(() => {
-    applyThemeClass(isDark)
-  }, [isDark])
+    applyThemeClass(isDark, forceLoginLight)
+  }, [isDark, forceLoginLight])
 
   useEffect(() => {
-    if (themeMode !== 'system') return
+    if (forceLoginLight || themeMode !== 'system') return
 
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyThemeClass(mq.matches)
+    const onChange = () => applyThemeClass(mq.matches, false)
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
-  }, [themeMode])
+  }, [themeMode, forceLoginLight])
 
   return children
 }

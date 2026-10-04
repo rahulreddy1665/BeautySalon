@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import { BILLING } from '@/app/constants'
+
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
 import { billingApi, type CreateBillPayload } from '@/app/service/billing/billingApi'
+import { invoicesApi } from '@/app/service/invoices/invoicesApi'
 import { toErrorMessage } from '@/app/utils'
 
 export function useBillsQuery(params: Record<string, unknown> = {}) {
@@ -27,6 +30,13 @@ export function useBillingProductsQuery() {
   })
 }
 
+export function usePopularBillingItemsQuery(limit = 12) {
+  return useQuery({
+    queryKey: queryKeys.billing.popular(limit),
+    queryFn: () => invoicesApi.popular(limit),
+  })
+}
+
 export function useCreateBillMutation() {
   const queryClient = useQueryClient()
 
@@ -37,10 +47,10 @@ export function useCreateBillMutation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
-      toast.success('Bill collected')
+      toast.success(BILLING.toasts.created)
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, 'Could not save bill'))
+      toast.error(toErrorMessage(error, BILLING.toasts.createFailed))
     },
   })
 }

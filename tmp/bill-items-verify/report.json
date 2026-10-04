@@ -1,0 +1,334 @@
+[
+  {
+    "theme": "light",
+    "width": 360,
+    "metrics": {
+      "error": "no grid",
+      "display": [
+        "none",
+        "block",
+        "none",
+        "block",
+        "none"
+      ]
+    }
+  },
+  {
+    "theme": "light",
+    "width": 768,
+    "metrics": {
+      "hCols": "220px 104px 84px 170px 96px 36px",
+      "rCols": "220px 104px 84px 170px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        39,
+        271,
+        387,
+        483,
+        665,
+        773
+      ],
+      "rX": [
+        39,
+        271,
+        387,
+        483,
+        665,
+        773
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 220,
+      "cardW": 728,
+      "lastRight": 809,
+      "vw": 768,
+      "netVisible": false
+    }
+  },
+  {
+    "theme": "light",
+    "width": 1024,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 724,
+      "lastRight": 1149,
+      "vw": 1024,
+      "netVisible": false
+    }
+  },
+  {
+    "theme": "light",
+    "width": 1280,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 588,
+      "lastRight": 1149,
+      "vw": 1280,
+      "netVisible": true
+    }
+  },
+  {
+    "theme": "light",
+    "width": 1440,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 686,
+      "lastRight": 1149,
+      "vw": 1440,
+      "netVisible": true
+    }
+  },
+  {
+    "theme": "dark",
+    "width": 360,
+    "metrics": {
+      "error": "no grid",
+      "display": [
+        "none",
+        "block",
+        "none",
+        "block",
+        "none"
+      ]
+    }
+  },
+  {
+    "theme": "dark",
+    "width": 768,
+    "metrics": {
+      "hCols": "220px 104px 84px 170px 96px 36px",
+      "rCols": "220px 104px 84px 170px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        39,
+        271,
+        387,
+        483,
+        665,
+        773
+      ],
+      "rX": [
+        39,
+        271,
+        387,
+        483,
+        665,
+        773
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 220,
+      "cardW": 728,
+      "lastRight": 809,
+      "vw": 768,
+      "netVisible": false
+    }
+  },
+  {
+    "theme": "dark",
+    "width": 1024,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 724,
+      "lastRight": 1149,
+      "vw": 1024,
+      "netVisible": false
+    }
+  },
+  {
+    "theme": "dark",
+    "width": 1280,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 588,
+      "lastRight": 1149,
+      "vw": 1280,
+      "netVisible": true
+    }
+  },
+  {
+    "theme": "dark",
+    "width": 1440,
+    "metrics": {
+      "hCols": "280px 104px 84px 190px 96px 36px",
+      "rCols": "280px 104px 84px 190px 96px 36px",
+      "colsMatch": true,
+      "hX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "rX": [
+        299,
+        591,
+        707,
+        803,
+        1005,
+        1113
+      ],
+      "xMatch": true,
+      "gaps": [
+        12,
+        12,
+        12,
+        12,
+        12
+      ],
+      "itemW": 280,
+      "cardW": 686,
+      "lastRight": 1149,
+      "vw": 1440,
+      "netVisible": true
+    }
+  }
+]

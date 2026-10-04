@@ -226,6 +226,8 @@ function ContextualCta() {
   const canCustomer = useHasPermission('customer:create')
   const path = location.pathname
 
+  if (path === '/billing/new' || path.startsWith('/billing/new/')) return null
+
   let to: string | null = null
   let label: string | null = null
   if (path.startsWith('/appointments') && canAppt) {

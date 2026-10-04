@@ -1,10 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 
+import {
+  CategorySuggestions,
+  type SuggestableService,
+} from '@/app/components/CategorySuggestions'
 import { FormField } from '@/app/components/FormField'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
@@ -147,6 +151,24 @@ export function AppointmentFormPage() {
   const startTime = form.watch('startTime')
   const mode = form.watch('mode')
   const catalog = servicesQuery.data ?? []
+  const suggestCatalog = useMemo(
+    (): SuggestableService[] =>
+      catalog.map((s) => ({
+        id: s._id,
+        name: s.name,
+        price: s.price,
+        category: s.category,
+      })),
+    [catalog],
+  )
+  const [focusStaffIndex, setFocusStaffIndex] = useState<number | null>(null)
+  const staffFocusRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  useEffect(() => {
+    if (focusStaffIndex == null) return
+    staffFocusRefs.current[focusStaffIndex]?.focus()
+    setFocusStaffIndex(null)
+  }, [focusStaffIndex, fields.length])
 
   const duration = useMemo(
     () =>
@@ -384,7 +406,12 @@ export function AppointmentFormPage() {
                           form.setValue(`services.${index}.staffId`, v)
                         }
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger
+                          ref={(el) => {
+                            staffFocusRefs.current[index] = el
+                          }}
+                          className="w-full"
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -409,6 +436,24 @@ export function AppointmentFormPage() {
                   </div>
                 </div>
               ))}
+              <CategorySuggestions
+                selectedCatalogIds={(watchedServices ?? [])
+                  .map((l) => l.serviceId)
+                  .filter(Boolean)}
+                catalog={suggestCatalog}
+                onPick={(serviceId) => {
+                  const emptyIndex = (watchedServices ?? []).findIndex(
+                    (l) => !l.serviceId,
+                  )
+                  if (emptyIndex >= 0) {
+                    form.setValue(`services.${emptyIndex}.serviceId`, serviceId)
+                    setFocusStaffIndex(emptyIndex)
+                    return
+                  }
+                  append({ serviceId, staffId: prefillStaff ?? '' })
+                  setFocusStaffIndex(fields.length)
+                }}
+              />
               <p className="text-xs text-muted-foreground">
                 {APPOINTMENTS.form.duration}: {duration}{' '}
                 {APPOINTMENTS.form.estimatedMinutes}

@@ -16,6 +16,18 @@
     <script>
       ;(function () {
         try {
+          var path = window.location.pathname || ''
+          var isLogin = path === '/login' || path.indexOf('/login/') === 0
+          // Login is always light — ignore saved / system dark to avoid a dark flash.
+          if (isLogin) {
+            document.documentElement.classList.remove('dark')
+            var loginDesktop = window.matchMedia('(min-width: 1024px)').matches
+            var loginColor = loginDesktop ? '#FFFFFF' : '#0b0b0b'
+            document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
+              meta.setAttribute('content', loginColor)
+            })
+            return
+          }
           var key = 'persist:beauty-salon'
           var raw = localStorage.getItem(key)
           var mode = 'system'
