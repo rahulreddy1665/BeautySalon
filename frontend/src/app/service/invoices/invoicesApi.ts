@@ -193,6 +193,21 @@ export const invoicesApi = {
     )
     return data.data
   },
+
+  popular: async (
+    limit = 12,
+  ): Promise<{
+    services: Array<{ id: string; name: string; price: number; timesSold: number }>
+    products: Array<{ id: string; name: string; price: number; timesSold: number }>
+  }> => {
+    const { data } = await apiClient.get<
+      ApiSuccessResponse<{
+        services: Array<{ id: string; name: string; price: number; timesSold: number }>
+        products: Array<{ id: string; name: string; price: number; timesSold: number }>
+      }>
+    >('/invoice/popular', { params: { limit } })
+    return data.data
+  },
 }
 
 export interface PublicInvoicePayload {

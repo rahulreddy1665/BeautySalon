@@ -274,8 +274,10 @@ function UserMenu({ compact }: { compact?: boolean }) {
         <button
           type="button"
           className={cn(
-            'flex w-full items-center gap-2 rounded-xl border border-border bg-card p-2 text-left hover:bg-muted/60',
-            compact && 'size-9 justify-center rounded-full border-0 p-0',
+            'flex items-center gap-2 text-left hover:bg-muted/60',
+            compact
+              ? 'size-9 justify-center rounded-full'
+              : 'w-full rounded-xl border border-border bg-card p-2',
           )}
         >
           <Avatar className="size-9">
@@ -403,7 +405,12 @@ export function AppLayout() {
           />
         </nav>
 
-        <div className="border-t border-border p-2">
+        <div
+          className={cn(
+            'border-t border-border p-2',
+            collapsed && 'flex justify-center',
+          )}
+        >
           <UserMenu compact={collapsed} />
         </div>
       </aside>

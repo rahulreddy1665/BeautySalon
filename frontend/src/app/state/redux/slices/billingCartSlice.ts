@@ -206,6 +206,7 @@ const billingCartSlice = createSlice({
     setNotes: (state, action: PayloadAction<string>) => {
       state.notes = action.payload
     },
+    loadCart: (_state, action: PayloadAction<BillingCartState>) => action.payload,
   },
 })
 
@@ -229,6 +230,7 @@ export const {
   setPaymentMode,
   setCashReceived,
   setNotes,
+  loadCart,
 } = billingCartSlice.actions
 
 export default billingCartSlice.reducer
@@ -288,16 +290,54 @@ function applyRounding(amount: number, rule: DisplayTotalsInput['rounding']) {
   return { rounded, roundOff: round2(rounded - amount) }
 }
 
+/** Per-line gross / discount / net for bill item rows and summary breakdown. */
+export function lineDisplayAmounts(line: CartLine) {
+  const gross = round2(line.unitPrice * line.qty)
+  const disc = applyDiscount(gross, line.discount)
+  return { gross, disc, net: round2(gross - disc) }
+}
+
+/**
+ * Preview tip split matching backend: equal shares across distinct staff
+ * (services then products, first-seen). Remainder cents go to the first staff.
+ */
+export function previewTipAllocations(
+  tip: number,
+  lines: CartLine[],
+): Array<{ staffId: string; staffName: string; amount: number }> {
+  if (tip <= 0) return []
+  const seen = new Set<string>()
+  const staff: Array<{ staffId: string; staffName: string }> = []
+  const ordered = [
+    ...lines.filter((l) => l.kind === 'service'),
+    ...lines.filter((l) => l.kind === 'product'),
+  ]
+  for (const line of ordered) {
+    if (!line.staffId || seen.has(line.staffId)) continue
+    seen.add(line.staffId)
+    staff.push({
+      staffId: line.staffId,
+      staffName: line.staffName?.trim() || line.staffId,
+    })
+  }
+  if (staff.length === 0) return []
+  const n = staff.length
+  const baseCents = Math.floor(Math.round(tip * 100) / n)
+  const base = baseCents / 100
+  const allocations = staff.map((s) => ({ ...s, amount: base }))
+  const remainder = round2(tip - round2(base * n))
+  if (allocations[0]) {
+    allocations[0].amount = round2(allocations[0].amount + remainder)
+  }
+  return allocations
+}
+
 /** Display-only estimate matching server order. */
 export function selectCartTotals(cart: BillingCartState, tax?: DisplayTotalsInput) {
   const serviceLines = cart.lines.filter((l) => l.kind === 'service')
   const productLines = cart.lines.filter((l) => l.kind === 'product')
 
-  const lineNet = (line: CartLine) => {
-    const gross = round2(line.unitPrice * line.qty)
-    const disc = applyDiscount(gross, line.discount)
-    return { gross, disc, net: round2(gross - disc) }
-  }
+  const lineNet = (line: CartLine) => lineDisplayAmounts(line)
 
   let serviceGross = 0
   let serviceLineDisc = 0

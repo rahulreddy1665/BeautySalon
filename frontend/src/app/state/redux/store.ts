@@ -17,7 +17,7 @@ const persistConfig = {
   key: 'beauty-salon',
   storage: persistStorage,
   /** Persist only client session + preferences — never server caches. */
-  whitelist: ['auth', 'settings'],
+  whitelist: ['auth', 'settings', 'billingDrafts'],
 }
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

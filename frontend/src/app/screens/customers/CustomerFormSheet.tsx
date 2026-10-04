@@ -29,6 +29,7 @@ interface CustomerFormSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   customer?: Customer | null
+  onCreated?: (customer: Customer) => void
 }
 
 function toFormValues(customer?: Customer | null): CustomerFormValues {
@@ -59,6 +60,7 @@ export function CustomerFormSheet({
   open,
   onOpenChange,
   customer,
+  onCreated,
 }: CustomerFormSheetProps) {
   const isEdit = Boolean(customer)
   const createMutation = useCreateCustomerMutation()
@@ -81,7 +83,8 @@ export function CustomerFormSheet({
     if (isEdit && customer) {
       await updateMutation.mutateAsync({ id: customer._id, payload })
     } else {
-      await createMutation.mutateAsync(payload)
+      const created = await createMutation.mutateAsync(payload)
+      onCreated?.(created)
     }
     onOpenChange(false)
   })
