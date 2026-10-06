@@ -23,6 +23,7 @@ import {
   useCreateBillMutation,
   usePopularBillingItemsQuery,
 } from '@/app/hooks/queries/useBillingQuery'
+import { useCombosQuery } from '@/app/hooks/queries/useCombosQuery'
 import { useLoyaltyBalanceQuery } from '@/app/hooks/queries/useLoyaltyQuery'
 import { useServicesCatalogQuery } from '@/app/hooks/queries/useServicesQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
@@ -80,6 +81,7 @@ export function NewBillScreen() {
   const createBill = useCreateBillMutation()
   const appointmentQuery = useAppointmentQuery(appointmentIdParam)
   const settingsQuery = useSalonSettingsQuery()
+  const combosQuery = useCombosQuery(true)
   const popularQuery = usePopularBillingItemsQuery(12)
   const loyaltyBalanceQuery = useLoyaltyBalanceQuery(
     cart.walkIn ? undefined : (cart.customerId ?? undefined),
@@ -92,9 +94,65 @@ export function NewBillScreen() {
   const loyaltyRules = settingsQuery.data?.loyalty
   const taxSettings = settingsQuery.data?.tax
   const invoiceSettings = settingsQuery.data?.invoice
+  const allowNegativeStock = Boolean(
+    settingsQuery.data?.business?.allowNegativeStock,
+  )
   const loyaltyEnabled = Boolean(loyaltyRules?.enabled && cart.customerId && !cart.walkIn)
   const maxDiscountPercent =
     user?.role === 'admin' ? 100 : (user?.maxDiscountPercent ?? 0)
+
+  const cartQtyByProductId = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const line of cart.lines) {
+      if (line.kind !== 'product') continue
+      map.set(line.catalogId, (map.get(line.catalogId) ?? 0) + line.qty)
+    }
+    return map
+  }, [cart.lines])
+
+  const remainingStockByProductId = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of productsQuery.data ?? []) {
+      if (!p.trackStock || allowNegativeStock) continue
+      const onHand = p.stockQty ?? 0
+      const inCart = cartQtyByProductId.get(p.id) ?? 0
+      map.set(p.id, Math.max(0, onHand - inCart))
+    }
+    return map
+  }, [productsQuery.data, cartQtyByProductId, allowNegativeStock])
+
+  const maxQtyByLineId = useMemo(() => {
+    const result: Record<string, number | undefined> = {}
+    if (allowNegativeStock) return result
+    for (const line of cart.lines) {
+      if (line.kind !== 'product') continue
+      const product = (productsQuery.data ?? []).find((p) => p.id === line.catalogId)
+      if (!product?.trackStock) continue
+      const onHand = product.stockQty ?? 0
+      const others =
+        (cartQtyByProductId.get(line.catalogId) ?? 0) - line.qty
+      result[line.id] = Math.max(0, onHand - others)
+    }
+    return result
+  }, [cart.lines, productsQuery.data, cartQtyByProductId, allowNegativeStock])
+
+  const stockBlockedLines = useMemo(() => {
+    if (allowNegativeStock) return [] as Array<{ name: string; available: number }>
+    const blocked: Array<{ name: string; available: number }> = []
+    for (const line of cart.lines) {
+      if (line.kind !== 'product') continue
+      const product = (productsQuery.data ?? []).find((p) => p.id === line.catalogId)
+      if (!product?.trackStock) continue
+      const onHand = product.stockQty ?? 0
+      const others =
+        (cartQtyByProductId.get(line.catalogId) ?? 0) - line.qty
+      const maxForLine = Math.max(0, onHand - others)
+      if (line.qty > maxForLine) {
+        blocked.push({ name: line.name, available: maxForLine })
+      }
+    }
+    return blocked
+  }, [cart.lines, productsQuery.data, cartQtyByProductId, allowNegativeStock])
 
   const taxInput = useMemo(
     () => ({
@@ -115,6 +173,12 @@ export function NewBillScreen() {
   )
 
   const totals = selectCartTotals(cart, taxInput)
+  const availableLoyaltyPoints = loyaltyBalanceQuery.data?.points ?? 0
+  const minRedeemPoints = loyaltyRules?.minRedeemPoints ?? 0
+  const maxRedeemablePoints = Math.min(
+    availableLoyaltyPoints,
+    totals.maxRedeemPointsByBill,
+  )
   const staffOptions = staffQuery.data ?? []
   const fromAppointment = Boolean(cart.appointmentId)
   const draftWhen = format(new Date(), 'EEE, dd MMM yyyy, h:mm a')
@@ -124,6 +188,21 @@ export function NewBillScreen() {
       dispatch(setPointsValueRatio(loyaltyRules.redeemValuePerPoint))
     }
   }, [loyaltyRules?.redeemValuePerPoint, dispatch])
+
+  useEffect(() => {
+    if (!loyaltyEnabled) {
+      if (cart.loyaltyRedeemPoints > 0) dispatch(setLoyaltyRedeemPoints(0))
+      return
+    }
+    if (cart.loyaltyRedeemPoints > maxRedeemablePoints) {
+      dispatch(setLoyaltyRedeemPoints(maxRedeemablePoints))
+    }
+  }, [
+    loyaltyEnabled,
+    maxRedeemablePoints,
+    cart.loyaltyRedeemPoints,
+    dispatch,
+  ])
 
   const applyAppointment = (appt: Appointment) => {
     if (appt.status !== 'booked' || appt.invoice) {
@@ -152,8 +231,18 @@ export function NewBillScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per appointment id
   }, [appointmentQuery.data, servicesQuery.data])
 
-  const missingStaff = cart.lines.some((l) => !l.staffId)
-  const canCheckout = cart.lines.length > 0 && !missingStaff && Boolean(cart.paymentMode)
+  const missingStaff = cart.lines.some((l) => {
+    if (l.kind === 'combo') {
+      return !(l.components ?? []).length || (l.components ?? []).some((c) => !c.staffId)
+    }
+    return !l.staffId
+  })
+  const stockBlocked = stockBlockedLines.length > 0
+  const canCheckout =
+    cart.lines.length > 0 &&
+    !missingStaff &&
+    Boolean(cart.paymentMode) &&
+    !stockBlocked
   const checkoutReason =
     cart.lines.length === 0
       ? BILLING.new.needLines
@@ -161,7 +250,9 @@ export function NewBillScreen() {
         ? BILLING.new.needStaff
         : !cart.paymentMode
           ? BILLING.toasts.paymentRequired
-          : ''
+          : stockBlocked
+            ? BILLING.new.needStock
+            : ''
 
   const serviceCatalog = useMemo(
     (): SuggestableService[] =>
@@ -175,12 +266,40 @@ export function NewBillScreen() {
   )
   const productCatalog = useMemo(
     () =>
-      (productsQuery.data ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
+      (productsQuery.data ?? []).map((p) => {
+        const trackStock = Boolean(p.trackStock)
+        const onHand = p.stockQty ?? 0
+        const remaining = allowNegativeStock
+          ? onHand
+          : (remainingStockByProductId.get(p.id) ?? onHand)
+        const outOfStock = trackStock && !allowNegativeStock && remaining <= 0
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          trackStock,
+          stockQty: remaining,
+          stockLabel:
+            trackStock && !outOfStock
+              ? BILLING.new.stockLeft.replace('{qty}', String(remaining))
+              : undefined,
+          disabled: outOfStock,
+          disabledLabel: outOfStock ? BILLING.new.outOfStock : undefined,
+          kind: 'product' as const,
+        }
+      }),
+    [productsQuery.data, remainingStockByProductId, allowNegativeStock],
+  )
+
+  const comboCatalog = useMemo(
+    () =>
+      (combosQuery.data ?? []).map((c) => ({
+        id: c._id,
+        name: c.name,
+        price: c.comboPrice,
+        kind: 'combo' as const,
       })),
-    [productsQuery.data],
+    [combosQuery.data],
   )
   const popularServices = useMemo(
     () =>
@@ -203,6 +322,15 @@ export function NewBillScreen() {
     [popularQuery.data?.products],
   )
 
+  const coveredServiceIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const line of cart.lines) {
+      if (line.kind !== 'combo') continue
+      for (const c of line.components ?? []) ids.add(c.serviceId)
+    }
+    return [...ids]
+  }, [cart.lines])
+
   const addService = (id: string) => {
     const service = (servicesQuery.data ?? []).find((s) => s._id === id)
     if (!service) return
@@ -224,6 +352,17 @@ export function NewBillScreen() {
   const addProduct = (id: string) => {
     const product = (productsQuery.data ?? []).find((p) => p.id === id)
     if (!product) return
+    if (product.trackStock && !allowNegativeStock) {
+      const remaining = remainingStockByProductId.get(product.id) ?? (product.stockQty ?? 0)
+      if (remaining <= 0) {
+        toast.error(
+          BILLING.new.stockExceeded
+            .replace('{qty}', String(Math.max(0, product.stockQty ?? 0)))
+            .replace('{name}', product.name),
+        )
+        return
+      }
+    }
     const lineId = nanoid()
     dispatch(
       addLine({
@@ -239,8 +378,42 @@ export function NewBillScreen() {
     setFocusStaffLineId(lineId)
   }
 
+  const addCombo = (id: string) => {
+    const combo = (combosQuery.data ?? []).find((c) => c._id === id)
+    if (!combo) return
+    const lineId = nanoid()
+    dispatch(
+      addLine({
+        id: lineId,
+        catalogId: combo._id,
+        kind: 'combo',
+        name: combo.name,
+        unitPrice: combo.comboPrice,
+        qty: 1,
+        discount: { type: 'amount', value: 0 },
+        components: combo.services.map((s) => ({
+          serviceId: s.service._id,
+          name: s.service.name,
+          listPrice: s.service.price * (s.qty || 1),
+        })),
+      }),
+    )
+    setFocusStaffLineId(lineId)
+  }
+
   const submit = async () => {
     if (!canCheckout || !cart.paymentMode) return
+    const redeemPts = loyaltyEnabled ? cart.loyaltyRedeemPoints : 0
+    if (
+      redeemPts > 0 &&
+      minRedeemPoints > 0 &&
+      redeemPts < minRedeemPoints
+    ) {
+      toast.error(
+        BILLING.new.minRedeemPoints.replace('{qty}', String(minRedeemPoints)),
+      )
+      return
+    }
     try {
       const customerName = cart.walkIn
         ? cart.customerName.trim() || 'Walk-in'
@@ -260,6 +433,7 @@ export function NewBillScreen() {
           staffId: line.staffId,
           staffName: line.staffName,
           discount: line.discount,
+          components: line.components,
         })),
         serviceDiscount: { type: 'amount', value: 0 },
         productDiscount: { type: 'amount', value: 0 },
@@ -289,10 +463,26 @@ export function NewBillScreen() {
   const sgstRate = taxSettings?.services.sgstPercent ?? 0
   const showRoundOff = (invoiceSettings?.rounding ?? 'none') !== 'none'
 
+  const clampRedeemPoints = (raw: number) =>
+    Math.min(maxRedeemablePoints, Math.max(0, Math.floor(raw)))
+
   const summaryHandlers = {
-    onRedeem: (n: number) => dispatch(setLoyaltyRedeemPoints(n)),
-    onUseMax: () =>
-      dispatch(setLoyaltyRedeemPoints(loyaltyBalanceQuery.data?.points ?? 0)),
+    onRedeem: (n: number) =>
+      dispatch(setLoyaltyRedeemPoints(clampRedeemPoints(n))),
+    onUseMax: () => {
+      if (
+        maxRedeemablePoints > 0 &&
+        minRedeemPoints > 0 &&
+        maxRedeemablePoints < minRedeemPoints
+      ) {
+        toast.error(
+          BILLING.new.minRedeemPoints.replace('{qty}', String(minRedeemPoints)),
+        )
+        dispatch(setLoyaltyRedeemPoints(0))
+        return
+      }
+      dispatch(setLoyaltyRedeemPoints(maxRedeemablePoints))
+    },
     onTip: (n: number) => dispatch(setTip(n)),
     onPaymentMode: (m: 'cash' | 'upi' | 'card') => dispatch(setPaymentMode(m)),
     onCashReceived: (n: number) => dispatch(setCashReceived(n)),
@@ -396,20 +586,41 @@ export function NewBillScreen() {
           <CatalogCard
             serviceCatalog={serviceCatalog}
             productCatalog={productCatalog}
+            comboCatalog={comboCatalog}
             popularServices={popularServices}
             popularProducts={popularProducts}
             selectedServiceIds={cart.lines
               .filter((l) => l.kind === 'service')
               .map((l) => l.catalogId)}
+            coveredServiceIds={coveredServiceIds}
             onAddService={addService}
             onAddProduct={addProduct}
+            onAddCombo={addCombo}
           />
 
           <BillItemsCard
             lines={cart.lines}
             staffOptions={staffOptions}
             maxDiscountPercent={maxDiscountPercent}
-            onPatch={(id, patch) => dispatch(updateLine({ id, patch }))}
+            maxQtyByLineId={maxQtyByLineId}
+            onPatch={(id, patch) => {
+              const maxQty = maxQtyByLineId[id]
+              if (
+                patch.qty !== undefined &&
+                maxQty !== undefined &&
+                patch.qty > maxQty
+              ) {
+                const line = cart.lines.find((l) => l.id === id)
+                toast.error(
+                  BILLING.new.stockExceeded
+                    .replace('{qty}', String(maxQty))
+                    .replace('{name}', line?.name ?? ''),
+                )
+                dispatch(updateLine({ id, patch: { ...patch, qty: maxQty } }))
+                return
+              }
+              dispatch(updateLine({ id, patch }))
+            }}
             onRemove={(id) => dispatch(removeLine(id))}
             focusStaffLineId={focusStaffLineId}
             onFocusStaffHandled={() => setFocusStaffLineId(null)}
@@ -421,7 +632,8 @@ export function NewBillScreen() {
             totals={totals}
             cart={cart}
             loyaltyEnabled={loyaltyEnabled}
-            availablePoints={loyaltyBalanceQuery.data?.points ?? 0}
+            availablePoints={availableLoyaltyPoints}
+            maxRedeemPoints={maxRedeemablePoints}
             cgstRate={cgstRate}
             sgstRate={sgstRate}
             showRoundOff={showRoundOff}
@@ -471,7 +683,8 @@ export function NewBillScreen() {
               totals={totals}
               cart={cart}
               loyaltyEnabled={loyaltyEnabled}
-              availablePoints={loyaltyBalanceQuery.data?.points ?? 0}
+              availablePoints={availableLoyaltyPoints}
+              maxRedeemPoints={maxRedeemablePoints}
               cgstRate={cgstRate}
               sgstRate={sgstRate}
               showRoundOff={showRoundOff}

@@ -35,7 +35,13 @@ function StaffLinesPanel({
   to: string
 }) {
   const lines = useStaffLinesQuery(staffId, { from, to }, true)
-  if (lines.isLoading) return <LoadingSkeleton rows={3} />
+  if (lines.isLoading) {
+    return (
+      <div className="px-3 py-2">
+        <LoadingSkeleton rows={2} />
+      </div>
+    )
+  }
   if (lines.isError) {
     return (
       <ErrorState
@@ -54,7 +60,7 @@ function StaffLinesPanel({
     )
   }
   return (
-    <div className="space-y-1 border-t border-border bg-muted/30 px-3 py-2">
+    <div className="space-y-1 px-3 py-2">
       {items.map((line, idx) => (
         <div
           key={`${line.invoiceId}-${line.name}-${idx}`}
@@ -96,6 +102,7 @@ export function StaffSalesReportScreen() {
     {
       id: 'expand',
       header: '',
+      enableSorting: false,
       cell: ({ row }) => {
         const id = row.original.staffId
         const open = expanded === id
@@ -104,7 +111,7 @@ export function StaffSalesReportScreen() {
             type="button"
             size="sm"
             variant="ghost"
-            className="h-8 w-8 p-0"
+            className="size-8 shrink-0 p-0"
             aria-label={open ? REPORTS.staff.table.collapse : REPORTS.staff.table.expand}
             onClick={() => setExpanded(open ? null : id)}
           >
@@ -243,16 +250,18 @@ export function StaffSalesReportScreen() {
             />
           ) : (
             <Card>
-              <CardContent className="space-y-0 pt-4">
+              <CardContent className="pt-4">
                 <ResponsiveTable
                   data={data.table.items}
                   columns={columns}
                   mobileTitleKey="staffName"
                   emptyTitle={REPORTS.staff.emptyTitle}
+                  getRowId={(row) => row.staffId}
+                  expandedRowId={expanded}
+                  renderExpandedRow={(row) => (
+                    <StaffLinesPanel staffId={row.staffId} from={from} to={to} />
+                  )}
                 />
-                {expanded ? (
-                  <StaffLinesPanel staffId={expanded} from={from} to={to} />
-                ) : null}
                 <div className="pt-3">
                   <ReportPagination
                     page={page}

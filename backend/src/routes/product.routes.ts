@@ -4,12 +4,16 @@ import multer from "multer";
 import { authenticate } from "../middlewares/auth.middleware";
 import { requirePermission } from "../middlewares/permission.middleware";
 import {
+  addStockController,
+  adjustStockController,
   createProductController,
   deleteProductController,
   getProductByIdController,
   getProductsController,
   importProductsController,
+  listStockLedgerController,
   updateProductController,
+  useStockController,
 } from "../controller/product.controller";
 
 const upload = multer({
@@ -35,6 +39,35 @@ router.post(
 );
 
 router.get(
+  "/:id/stock/ledger",
+  authenticate,
+  requirePermission("product:read"),
+  listStockLedgerController,
+);
+
+router.post(
+  "/:id/stock/add",
+  authenticate,
+  requirePermission("product:create"),
+  addStockController,
+);
+
+router.post(
+  "/:id/stock/use",
+  authenticate,
+  requirePermission("product:create"),
+  useStockController,
+);
+
+/** Adjust stock requires Edit. */
+router.post(
+  "/:id/stock/adjust",
+  authenticate,
+  requirePermission("product:update"),
+  adjustStockController,
+);
+
+router.get(
   "/:id",
   authenticate,
   requirePermission("product:read"),
@@ -51,7 +84,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  requirePermission("product:create"),
+  requirePermission("product:update"),
   updateProductController,
 );
 

@@ -59,7 +59,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  requirePermission("service:create"),
+  requirePermission("service:update"),
   updateServiceController,
 );
 

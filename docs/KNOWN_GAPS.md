@@ -5,7 +5,11 @@
 | Area | Status | Notes |
 |------|--------|-------|
 | Profit / expenses module | Out of scope | No expense API — removed from reports hub |
-| Inventory valuation (qty/cost) | Out of scope | Products are catalog-only (name/price); no stock fields in reports |
+| Low-stock alerts / dashboard widgets | Out of scope | Product stock exists (ledger + badges); no alerts or notifications |
+| Purchase orders / suppliers | Out of scope | Manual Add stock only; no PO or supplier master |
+| Recipe-based consumable auto-usage | Out of scope | Consumables are manual Use stock only — not deducted per service |
+| Inventory valuation (COGS / cost) | Out of scope | `stockQty` + units sold on product report; no cost/valuation |
+| Invoice cancel / void / return | Gap | No void endpoint — sale stock is not restored |
 | Staff incentives / commissions | Gap | No incentive engine — staff report omits “incentive earned” |
 | Tip attribution to staff | Done | `tip.allocations[]` equal-split on create; staff report reads allocations (legacy tipStaff fallback) |
 | Customer birthdate / birthdays | Gap | Customer has phone + `createdAt`; no birthdate field |

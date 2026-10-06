@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -10,46 +11,69 @@ import { StatCard } from '@/app/components/StatCard'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { CUSTOMERS, COMMON } from '@/app/constants'
-import { useCustomerBookingsQuery } from '@/app/hooks/queries/useCustomerBookingsQuery'
+import { useCustomerVisitsQuery } from '@/app/hooks/queries/useCustomerVisitsQuery'
 import { useCustomerQuery } from '@/app/hooks/queries/useCustomersQuery'
 import { useLoyaltyBalanceQuery } from '@/app/hooks/queries/useLoyaltyQuery'
-import type { Booking } from '@/app/service/bookings/bookingsApi'
+import type { InvoiceRecord } from '@/app/service/invoices/invoicesApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
+import { formatINR } from '@/app/utils'
 
 type VisitRow = {
   id: string
   date: string
   service: string
   invoice: string
+  total: string
 }
 
 const visitColumns: ColumnDef<VisitRow>[] = [
-  { accessorKey: 'date', header: 'Date' },
-  { accessorKey: 'service', header: 'Service' },
-  { accessorKey: 'invoice', header: 'Invoice' },
+  { accessorKey: 'date', header: CUSTOMERS.detail.colDate },
+  { accessorKey: 'service', header: CUSTOMERS.detail.colServices },
+  { accessorKey: 'invoice', header: CUSTOMERS.detail.colInvoice },
+  { accessorKey: 'total', header: CUSTOMERS.detail.colTotal },
 ]
 
-function toVisitRows(bookings: Booking[]): VisitRow[] {
-  return bookings.map((booking) => ({
-    id: booking._id,
-    date: booking.date,
-    service: booking.service || '—',
-    invoice: booking.invoice || '—',
-  }))
+function invoiceServices(inv: InvoiceRecord): string {
+  const names = [
+    ...inv.serviceItems.map((s) => s.name),
+    ...inv.productItems.map((p) => p.name),
+  ].filter(Boolean)
+  return names.length > 0 ? names.join(', ') : '—'
+}
+
+function toVisitRows(invoices: InvoiceRecord[]): VisitRow[] {
+  return invoices.map((inv) => {
+    const when = inv.createdAt ? parseISO(inv.createdAt) : null
+    return {
+      id: inv._id,
+      date: when && !Number.isNaN(when.getTime()) ? format(when, 'dd MMM yyyy') : '—',
+      service: invoiceServices(inv),
+      invoice: inv.invoiceNumber || '—',
+      total: formatINR(inv.amountPayable ?? inv.grandTotal ?? 0),
+    }
+  })
 }
 
 export function CustomerDetailScreen() {
   const { id } = useParams<{ id: string }>()
   const customerQuery = useCustomerQuery(id)
-  const bookingsQuery = useCustomerBookingsQuery(id)
+  const visitsQuery = useCustomerVisitsQuery(id)
   const loyaltyQuery = useLoyaltyBalanceQuery(id)
   const [editOpen, setEditOpen] = useState(false)
 
   const visits = useMemo(
-    () => toVisitRows(bookingsQuery.data ?? []),
-    [bookingsQuery.data],
+    () => toVisitRows(visitsQuery.data ?? []),
+    [visitsQuery.data],
   )
   const loyaltyPoints = loyaltyQuery.data?.points ?? 0
+  const lifetimeSpend = useMemo(
+    () =>
+      (visitsQuery.data ?? []).reduce(
+        (sum, inv) => sum + (Number(inv.amountPayable ?? inv.grandTotal) || 0),
+        0,
+      ),
+    [visitsQuery.data],
+  )
 
   if (customerQuery.isLoading) {
     return (
@@ -64,7 +88,7 @@ export function CustomerDetailScreen() {
     return (
       <ErrorState
         error={customerQuery.error}
-        title="Customer not found"
+        title={CUSTOMERS.detail.notFound}
         onRetry={() => void customerQuery.refetch()}
       />
     )
@@ -79,7 +103,7 @@ export function CustomerDetailScreen() {
         <Button asChild type="button" size="sm" variant="outline" className="h-8">
           <Link to="/customers">
             <ArrowLeft className="size-4" strokeWidth={1.75} />
-            Back
+            {CUSTOMERS.detail.back}
           </Link>
         </Button>
       </div>
@@ -94,13 +118,18 @@ export function CustomerDetailScreen() {
             onClick={() => setEditOpen(true)}
           >
             <Pencil className="size-4" strokeWidth={1.75} />
-            Edit
+            {CUSTOMERS.detail.edit}
           </Button>
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-3">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
         <StatCard label={CUSTOMERS.detail.visits} value={visits.length} />
+        <StatCard
+          label={CUSTOMERS.detail.lifetimeSpend}
+          value={lifetimeSpend}
+          format="inr"
+        />
         <StatCard label={CUSTOMERS.detail.loyaltyPoints} value={loyaltyPoints} />
         <Card className="gap-0 rounded-md py-0 shadow-none">
           <CardContent className="px-3 py-3 sm:px-4">
@@ -116,19 +145,19 @@ export function CustomerDetailScreen() {
 
       <Card>
         <CardHeader className="pb-1">
-          <CardTitle>Profile</CardTitle>
+          <CardTitle>{CUSTOMERS.detail.profile}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <p className="text-xs text-muted-foreground">Email</p>
+            <p className="text-xs text-muted-foreground">{CUSTOMERS.detail.email}</p>
             <p>{customer.email || '—'}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Phone</p>
+            <p className="text-xs text-muted-foreground">{CUSTOMERS.detail.phone}</p>
             <p className="tabular-nums">{customer.phone}</p>
           </div>
           <div className="sm:col-span-2">
-            <p className="text-xs text-muted-foreground">Address</p>
+            <p className="text-xs text-muted-foreground">{CUSTOMERS.detail.address}</p>
             <p>
               {[customer.address, customer.address1, customer.pincode]
                 .filter(Boolean)
@@ -140,24 +169,24 @@ export function CustomerDetailScreen() {
 
       <Card>
         <CardHeader className="pb-1">
-          <CardTitle>Visit history</CardTitle>
+          <CardTitle>{CUSTOMERS.detail.visitHistory}</CardTitle>
         </CardHeader>
         <CardContent>
-          {bookingsQuery.isLoading ? <LoadingSkeleton rows={3} /> : null}
-          {bookingsQuery.isError ? (
+          {visitsQuery.isLoading ? <LoadingSkeleton rows={3} /> : null}
+          {visitsQuery.isError ? (
             <ErrorState
-              error={bookingsQuery.error}
-              title="Could not load visits"
-              onRetry={() => void bookingsQuery.refetch()}
+              error={visitsQuery.error}
+              title={CUSTOMERS.detail.loadVisitsFailed}
+              onRetry={() => void visitsQuery.refetch()}
             />
           ) : null}
-          {!bookingsQuery.isLoading && !bookingsQuery.isError ? (
+          {!visitsQuery.isLoading && !visitsQuery.isError ? (
             <ResponsiveTable
               data={visits}
               columns={visitColumns}
               mobileTitleKey="date"
-              emptyTitle="No visits yet"
-              emptyDescription="Bookings for this customer will show here."
+              emptyTitle={CUSTOMERS.detail.emptyVisits}
+              emptyDescription={CUSTOMERS.detail.emptyVisitsHint}
             />
           ) : null}
         </CardContent>

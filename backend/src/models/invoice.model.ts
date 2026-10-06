@@ -56,6 +56,25 @@ export interface IProductItem {
   lineTotal: number;
 }
 
+export interface IComboComponentSnapshot {
+  service: mongoose.Types.ObjectId;
+  name: string;
+  listPrice: number;
+  allocatedAmount: number;
+  staff: mongoose.Types.ObjectId;
+}
+
+export interface IComboItem {
+  combo: mongoose.Types.ObjectId;
+  name: string;
+  price: number;
+  qty: number;
+  discount: ILineDiscount;
+  lineTotal: number;
+  listTotal: number;
+  components: IComboComponentSnapshot[];
+}
+
 export interface ITaxSnapshot {
   gstEnabled: boolean;
   pricesIncludeGst: boolean;
@@ -84,6 +103,7 @@ export interface IInvoice extends Document {
   appointment?: mongoose.Types.ObjectId | null;
   serviceItems: IServiceItem[];
   productItems: IProductItem[];
+  comboItems: IComboItem[];
   serviceSubtotal: number;
   productSubtotal: number;
   serviceDiscountTotal: number;
@@ -149,6 +169,34 @@ const productItemSchema = new Schema<IProductItem>(
   { _id: false },
 );
 
+const comboComponentSchema = new Schema<IComboComponentSnapshot>(
+  {
+    service: { type: Schema.Types.ObjectId, ref: "Service", required: true },
+    name: { type: String, required: true },
+    listPrice: { type: Number, required: true },
+    allocatedAmount: { type: Number, required: true },
+    staff: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
+  },
+  { _id: false },
+);
+
+const comboItemSchema = new Schema<IComboItem>(
+  {
+    combo: { type: Schema.Types.ObjectId, ref: "Combo", required: true },
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    qty: { type: Number, required: true, min: 1 },
+    discount: {
+      type: discountSchema,
+      default: () => ({ type: "amount", value: 0 }),
+    },
+    lineTotal: { type: Number, required: true },
+    listTotal: { type: Number, required: true },
+    components: { type: [comboComponentSchema], default: [] },
+  },
+  { _id: false },
+);
+
 const taxSnapshotSchema = new Schema(
   {
     gstEnabled: { type: Boolean, default: false },
@@ -189,6 +237,7 @@ const invoiceSchema = new Schema<IInvoice>(
     },
     serviceItems: { type: [serviceItemSchema], default: [] },
     productItems: { type: [productItemSchema], default: [] },
+    comboItems: { type: [comboItemSchema], default: [] },
     serviceSubtotal: { type: Number, required: true },
     productSubtotal: { type: Number, required: true },
     serviceDiscountTotal: { type: Number, required: true },

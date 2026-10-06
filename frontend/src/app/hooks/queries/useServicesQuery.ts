@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import { SERVICES } from '@/app/constants'
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
 import {
   servicesApi,
@@ -45,10 +46,10 @@ export function useCreateServiceMutation() {
     mutationFn: (payload: ServiceInput) => servicesApi.create(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.services.all })
-      toast.success('Service added')
+      toast.success(SERVICES.toasts.created)
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, 'Could not add service'))
+      toast.error(toErrorMessage(error, SERVICES.toasts.created))
     },
   })
 }
@@ -60,10 +61,10 @@ export function useUpdateServiceMutation() {
       servicesApi.update(id, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.services.all })
-      toast.success('Service updated')
+      toast.success(SERVICES.toasts.updated)
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, 'Could not update service'))
+      toast.error(toErrorMessage(error, SERVICES.toasts.updated))
     },
   })
 }
@@ -74,10 +75,10 @@ export function useDeleteServiceMutation() {
     mutationFn: (id: string) => servicesApi.remove(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.services.all })
-      toast.success('Service deleted')
+      toast.success(SERVICES.toasts.deleted)
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, 'Could not delete service'))
+      toast.error(toErrorMessage(error, SERVICES.toasts.deleted))
     },
   })
 }
@@ -88,12 +89,15 @@ export function useImportServicesMutation() {
     mutationFn: (file: File) => servicesApi.importFile(file),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.services.all })
+      const cats = result.summary.categoriesCreated
+        ? ` · ${result.summary.categoriesCreated} categories created`
+        : ''
       toast.success(
-        `Import done · ${result.summary.created} created · ${result.summary.updated} updated · ${result.summary.error} errors`,
+        `${SERVICES.toasts.imported} · ${result.summary.created} created · ${result.summary.updated} updated · ${result.summary.error} errors${cats}`,
       )
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, 'Import failed'))
+      toast.error(toErrorMessage(error, SERVICES.toasts.imported))
     },
   })
 }

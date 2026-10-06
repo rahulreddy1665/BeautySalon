@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 
+import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { Appointment, type IAppointment } from "../models/appointment.model";
+import { Combo } from "../models/combo.model";
 import {
   Invoice,
   type DiscountType,
@@ -11,6 +13,7 @@ import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
+import { allocateComboAmount } from "./combo.service";
 import { applyInvoiceLoyalty } from "./loyalty.service";
 import {
   applyRounding,
@@ -18,6 +21,7 @@ import {
   formatInvoiceNumber,
   getOrCreateSettings,
 } from "./settings.service";
+import { applySaleDeduction } from "./stock.service";
 
 export interface LineDiscountInput {
   type?: DiscountType;
@@ -38,6 +42,19 @@ export interface ProductLineInput {
   discount?: LineDiscountInput;
 }
 
+export interface ComboComponentInput {
+  serviceId: string;
+  staffId: string;
+}
+
+export interface ComboLineInput {
+  comboId: string;
+  qty: number;
+  discount?: LineDiscountInput;
+  /** One staff assignment per combo component service. */
+  components: ComboComponentInput[];
+}
+
 export interface CreateInvoiceDto {
   customerId?: string | null;
   walkIn?: boolean;
@@ -46,6 +63,7 @@ export interface CreateInvoiceDto {
   appointmentId?: string | null;
   serviceItems?: ServiceLineInput[];
   productItems?: ProductLineInput[];
+  comboItems?: ComboLineInput[];
   /** Section-level discount applied after per-line discounts (lines usually 0). */
   serviceDiscount?: LineDiscountInput;
   productDiscount?: LineDiscountInput;
@@ -60,6 +78,7 @@ export interface InvoiceListQuery {
   to?: string;
   paymentMode?: string;
   search?: string;
+  customerId?: string;
   page?: number;
   limit?: number;
 }
@@ -134,11 +153,16 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
   try {
     const serviceInputs = data.serviceItems ?? [];
     const productInputs = data.productItems ?? [];
-    if (serviceInputs.length === 0 && productInputs.length === 0) {
+    const comboInputs = data.comboItems ?? [];
+    if (
+      serviceInputs.length === 0 &&
+      productInputs.length === 0 &&
+      comboInputs.length === 0
+    ) {
       return {
         statusCode: 400,
         data: null,
-        message: "At least one service or product line is required",
+        message: "At least one service, product, or combo line is required",
       };
     }
 
@@ -221,6 +245,112 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       });
     }
 
+    const comboItems = [];
+    for (const line of comboInputs) {
+      const qty = Math.floor(Number(line.qty));
+      if (!Number.isFinite(qty) || qty < 1) {
+        return { statusCode: 400, data: null, message: "Combo qty must be >= 1" };
+      }
+      const combo = await Combo.findOne({
+        _id: line.comboId,
+        isDeleted: false,
+        isActive: true,
+      });
+      if (!combo) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: `Combo not found: ${line.comboId}`,
+        };
+      }
+      const expectedIds = combo.services.map((s) => String(s.service));
+      const provided = Array.isArray(line.components) ? line.components : [];
+      if (provided.length !== expectedIds.length) {
+        return fail(
+          400,
+          ErrorMessages.COMBO_INVALID_COMPONENTS,
+          ErrorCodes.COMBO_INVALID_COMPONENTS,
+        );
+      }
+      const providedMap = new Map(
+        provided.map((c) => [String(c.serviceId), String(c.staffId)]),
+      );
+      for (const sid of expectedIds) {
+        if (!providedMap.has(sid)) {
+          return fail(
+            400,
+            ErrorMessages.COMBO_INVALID_COMPONENTS,
+            ErrorCodes.COMBO_INVALID_COMPONENTS,
+          );
+        }
+      }
+
+      const componentRows: Array<{
+        service: mongoose.Types.ObjectId;
+        name: string;
+        listPrice: number;
+        staff: mongoose.Types.ObjectId;
+      }> = [];
+      let listTotal = 0;
+      for (const row of combo.services) {
+        const service = await Service.findById(row.service);
+        if (!service) {
+          return {
+            statusCode: 400,
+            data: null,
+            message: `Service not found in combo: ${String(row.service)}`,
+          };
+        }
+        const staffId = providedMap.get(String(row.service))!;
+        const staff = await Staff.findById(staffId);
+        if (!staff) {
+          return {
+            statusCode: 400,
+            data: null,
+            message: `Staff not found: ${staffId}`,
+          };
+        }
+        const componentQty = Math.max(1, Math.floor(Number(row.qty) || 1));
+        const listPrice = round2(service.price * componentQty * qty);
+        listTotal = round2(listTotal + listPrice);
+        componentRows.push({
+          service: service._id as mongoose.Types.ObjectId,
+          name: service.name,
+          listPrice,
+          staff: staff._id as mongoose.Types.ObjectId,
+        });
+      }
+
+      const base = round2(combo.comboPrice * qty);
+      const { discountAmount, lineTotal } = applyDiscount(base, line.discount);
+      serviceSubtotal = round2(serviceSubtotal + base);
+      serviceDiscountTotal = round2(serviceDiscountTotal + discountAmount);
+
+      const allocations = allocateComboAmount(
+        lineTotal,
+        componentRows.map((c) => ({ listPrice: c.listPrice })),
+      );
+      comboItems.push({
+        combo: combo._id,
+        name: combo.name,
+        price: combo.comboPrice,
+        qty,
+        discount: {
+          type: line.discount?.type === "percent" ? "percent" : "amount",
+          value: Math.max(0, Number(line.discount?.value) || 0),
+        },
+        lineTotal,
+        listTotal,
+        components: componentRows.map((c, i) => ({
+          service: c.service,
+          name: c.name,
+          listPrice: c.listPrice,
+          allocatedAmount: allocations[i] ?? 0,
+          staff: c.staff,
+        })),
+      });
+    }
+
     const productItems = [];
     let productSubtotal = 0;
     let productDiscountTotal = 0;
@@ -237,6 +367,18 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           data: null,
           message: `Product not found: ${line.productId}`,
         };
+      }
+      if (product.type === "consumable") {
+        return fail(
+          400,
+          ErrorMessages.PRODUCT_NOT_BILLABLE,
+          ErrorCodes.PRODUCT_NOT_BILLABLE,
+          {
+            code: ErrorCodes.PRODUCT_NOT_BILLABLE,
+            productId: String(product._id),
+            productName: product.name,
+          },
+        );
       }
       const staff = await Staff.findById(line.staffId);
       if (!staff) {
@@ -420,6 +562,7 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       appointment: appointment?._id ?? null,
       serviceItems,
       productItems,
+      comboItems,
       serviceSubtotal,
       productSubtotal,
       serviceDiscountTotal,
@@ -497,10 +640,40 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       });
     }
 
+    // Deduct tracked retail stock after invoice exists; roll back invoice on failure.
+    for (const line of productItems) {
+      const deduct = await applySaleDeduction({
+        productId: String(line.product),
+        quantity: line.qty,
+        invoiceId: String(invoice._id),
+        createdBy: data.createdBy,
+      });
+      if (deduct.statusCode !== 200) {
+        await Invoice.findByIdAndDelete(invoice._id);
+        if (appointment) {
+          await Appointment.findByIdAndUpdate(appointment._id, {
+            $unset: { invoice: 1 },
+            $set: { status: "booked" },
+          });
+        }
+        return {
+          statusCode: deduct.statusCode,
+          data: null,
+          message:
+            (deduct as { message?: string }).message ??
+            ErrorMessages.INSUFFICIENT_STOCK,
+          errors: (deduct as { errors?: unknown }).errors ?? {
+            code: ErrorCodes.INSUFFICIENT_STOCK,
+          },
+        };
+      }
+    }
+
     const populated = await Invoice.findById(invoice._id)
       .populate("customer", "name lastName phone")
       .populate("serviceItems.staff", "name")
-      .populate("productItems.staff", "name");
+      .populate("productItems.staff", "name")
+      .populate("comboItems.components.staff", "name");
 
     return { statusCode: 200, data: populated ?? invoice };
   } catch (error) {
@@ -520,6 +693,9 @@ export const getInvoices = async (query: InvoiceListQuery = {}) => {
     const filter: Record<string, unknown> = {};
 
     if (query.paymentMode) filter.paymentMode = query.paymentMode;
+    if (query.customerId && mongoose.Types.ObjectId.isValid(query.customerId)) {
+      filter.customer = new mongoose.Types.ObjectId(query.customerId);
+    }
     if (query.from || query.to) {
       filter.createdAt = {};
       if (query.from) {
@@ -577,6 +753,7 @@ export const getInvoiceById = async (id: string) => {
       .populate("customer", "name lastName phone email")
       .populate("serviceItems.staff", "name")
       .populate("productItems.staff", "name")
+      .populate("comboItems.components.staff", "name")
       .populate("appointment");
     if (!invoice) {
       return { statusCode: 404, data: null, message: "Invoice not found" };
@@ -625,6 +802,11 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
       for (const line of inv.serviceItems ?? []) {
         bump(String(line.staff), "service", line.lineTotal);
       }
+      for (const combo of inv.comboItems ?? []) {
+        for (const comp of combo.components ?? []) {
+          bump(String(comp.staff), "service", Number(comp.allocatedAmount) || 0);
+        }
+      }
       for (const line of inv.productItems ?? []) {
         bump(String(line.staff), "product", line.lineTotal);
       }
@@ -647,5 +829,86 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
     return { statusCode: 200, data: rows };
   } catch (error) {
     return { statusCode: 500, data: error };
+  }
+};
+
+export const getPopularBillingItems = async (limitRaw?: unknown) => {
+  try {
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(limitRaw) || 12)));
+
+    const invoices = await Invoice.find({ status: "paid" })
+      .select("serviceItems productItems")
+      .lean();
+
+    const serviceQty = new Map<string, number>();
+    const productQty = new Map<string, number>();
+
+    for (const inv of invoices) {
+      for (const line of inv.serviceItems ?? []) {
+        if (!line.service) continue;
+        const id = String(line.service);
+        serviceQty.set(id, (serviceQty.get(id) ?? 0) + Number(line.qty ?? 1));
+      }
+      for (const line of inv.productItems ?? []) {
+        if (!line.product) continue;
+        const id = String(line.product);
+        productQty.set(id, (productQty.get(id) ?? 0) + Number(line.qty ?? 1));
+      }
+    }
+
+    const topServiceIds = [...serviceQty.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => id);
+    const topProductIds = [...productQty.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => id);
+
+    const [serviceDocs, productDocs] = await Promise.all([
+      Service.find({ _id: { $in: topServiceIds } })
+        .select("name price")
+        .lean(),
+      Product.find({ _id: { $in: topProductIds } })
+        .select("name price")
+        .lean(),
+    ]);
+
+    const serviceById = new Map(
+      serviceDocs.map((s) => [String(s._id), s]),
+    );
+    const productById = new Map(
+      productDocs.map((p) => [String(p._id), p]),
+    );
+
+    const services = topServiceIds
+      .map((id) => {
+        const doc = serviceById.get(id);
+        if (!doc) return null;
+        return {
+          id,
+          name: doc.name,
+          price: Number(doc.price ?? 0),
+          timesSold: serviceQty.get(id) ?? 0,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null);
+
+    const products = topProductIds
+      .map((id) => {
+        const doc = productById.get(id);
+        if (!doc) return null;
+        return {
+          id,
+          name: doc.name,
+          price: Number(doc.price ?? 0),
+          timesSold: productQty.get(id) ?? 0,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null);
+
+    return { statusCode: 200, data: { services, products } };
+  } catch (error) {
+    return { statusCode: 500, data: null, message: "Popular items failed", errors: error };
   }
 };

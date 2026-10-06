@@ -9,13 +9,16 @@ import { productsApi } from '@/app/service/products/productsApi'
 
 export type { PaymentMode }
 export type BillStatus = string
-export type LineKind = 'service' | 'product'
+export type LineKind = 'service' | 'product' | 'combo'
 
 export interface CatalogItem {
   id: string
   name: string
   kind: LineKind
   price: number
+  trackStock?: boolean
+  stockQty?: number
+  allowNegative?: boolean
 }
 
 export interface BillLineInput {
@@ -27,6 +30,13 @@ export interface BillLineInput {
   staffId?: string
   staffName?: string
   discount?: { type: 'percent' | 'amount'; value: number }
+  components?: Array<{
+    serviceId: string
+    name: string
+    listPrice: number
+    staffId?: string
+    staffName?: string
+  }>
 }
 
 export interface PaymentSplit {
@@ -135,6 +145,17 @@ export const billingApi = {
           qty: line.qty,
           discount: line.discount ?? { type: 'amount' as const, value: 0 },
         })),
+      comboItems: payload.lines
+        .filter((line) => line.kind === 'combo')
+        .map((line) => ({
+          comboId: line.catalogId,
+          qty: line.qty,
+          discount: line.discount ?? { type: 'amount' as const, value: 0 },
+          components: (line.components ?? []).map((c) => ({
+            serviceId: c.serviceId,
+            staffId: c.staffId!,
+          })),
+        })),
       serviceDiscount: payload.serviceDiscount,
       productDiscount: payload.productDiscount,
       paymentMode,
@@ -145,12 +166,14 @@ export const billingApi = {
   },
 
   products: async (): Promise<CatalogItem[]> => {
-    const items = await productsApi.getAll()
-    return items.map((p) => ({
+    const page = await productsApi.list({ page: 1, limit: 100, retailOnly: true })
+    return page.items.map((p) => ({
       id: p._id,
       name: p.name,
       kind: 'product' as const,
       price: p.price,
+      trackStock: p.trackStock,
+      stockQty: p.stockQty,
     }))
   },
 }

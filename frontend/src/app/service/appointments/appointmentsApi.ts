@@ -29,7 +29,9 @@ export interface Appointment {
 }
 
 export interface AppointmentServiceInput {
-  serviceId: string
+  serviceId?: string
+  /** Expands to component services on the server. */
+  comboId?: string
   staffId: string
 }
 

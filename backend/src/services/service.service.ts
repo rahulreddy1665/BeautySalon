@@ -1,14 +1,17 @@
+import mongoose from "mongoose";
+
 import {
   CreateServiceDto,
   ServiceListQuery,
   UpdateServiceDto,
 } from "../dto/service.dto";
+import { Category } from "../models/category.model";
 import { Service } from "../models/service.model";
+import { ensureCategoryByName } from "./category.service";
 
 function normalizeDuration(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 5) return 30;
-  // Snap to nearest step of 5
   return Math.max(5, Math.round(n / 5) * 5);
 }
 
@@ -18,21 +21,48 @@ function normalizePrice(value: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function resolveCategory(input: {
+  categoryId?: string;
+  category?: string;
+}): Promise<{ categoryId: mongoose.Types.ObjectId; category: string } | null> {
+  if (input.categoryId && mongoose.Types.ObjectId.isValid(input.categoryId)) {
+    const doc = await Category.findById(input.categoryId);
+    if (!doc || !doc.isActive) return null;
+    return { categoryId: doc._id as mongoose.Types.ObjectId, category: doc.name };
+  }
+  const name = String(input.category ?? "").trim();
+  if (!name) return null;
+  const doc = await ensureCategoryByName(name);
+  if (!doc) return null;
+  return { categoryId: doc._id as mongoose.Types.ObjectId, category: doc.name };
+}
+
 export const createService = async (data: CreateServiceDto) => {
   try {
     const name = String(data.name ?? "").trim();
-    const category = String(data.category ?? "").trim();
     const price = normalizePrice(data.price);
-    if (!name || !category) {
+    if (!name) {
       return { statusCode: 400, data: null, message: "Name and category are required" };
     }
     if (price === null) {
       return { statusCode: 400, data: null, message: "Price must be a non-negative number" };
     }
 
+    const resolved = await resolveCategory({
+      categoryId: data.categoryId,
+      category: data.category,
+    });
+    if (!resolved) {
+      return { statusCode: 400, data: null, message: "Name and category are required" };
+    }
+
     const existing = await Service.findOne({
       name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
-      category: { $regex: new RegExp(`^${escapeRegex(category)}$`, "i") },
+      category: { $regex: new RegExp(`^${escapeRegex(resolved.category)}$`, "i") },
     });
     if (existing) {
       return {
@@ -44,7 +74,8 @@ export const createService = async (data: CreateServiceDto) => {
 
     const service = await Service.create({
       name,
-      category,
+      category: resolved.category,
+      categoryId: resolved.categoryId,
       price,
       durationMinutes: normalizeDuration(data.durationMinutes),
     });
@@ -60,7 +91,9 @@ export const getServices = async (query: ServiceListQuery = {}) => {
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const filter: Record<string, unknown> = {};
 
-    if (query.category?.trim()) {
+    if (query.categoryId && mongoose.Types.ObjectId.isValid(query.categoryId)) {
+      filter.categoryId = new mongoose.Types.ObjectId(query.categoryId);
+    } else if (query.category?.trim()) {
       filter.category = {
         $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i"),
       };
@@ -75,6 +108,7 @@ export const getServices = async (query: ServiceListQuery = {}) => {
 
     const [items, total] = await Promise.all([
       Service.find(filter)
+        .populate("categoryId", "name isActive")
         .sort({ category: 1, name: 1 })
         .skip((page - 1) * limit)
         .limit(limit),
@@ -96,12 +130,22 @@ export const getServices = async (query: ServiceListQuery = {}) => {
   }
 };
 
+/** Active category names from the master (falls back to distinct strings). */
 export const getServiceCategories = async () => {
   try {
+    const master = await Category.find({ isActive: true }).sort({ name: 1 });
+    if (master.length > 0) {
+      return {
+        statusCode: 200,
+        data: master.map((c) => c.name),
+      };
+    }
     const categories = await Service.distinct("category");
     return {
       statusCode: 200,
-      data: (categories as string[]).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+      data: (categories as string[])
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
     };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -110,7 +154,7 @@ export const getServiceCategories = async () => {
 
 export const getServiceById = async (id: string) => {
   try {
-    const service = await Service.findById(id);
+    const service = await Service.findById(id).populate("categoryId", "name isActive");
     if (!service) return { statusCode: 404, data: null, message: "Service not found" };
     return { statusCode: 200, data: service };
   } catch (error) {
@@ -124,8 +168,20 @@ export const updateService = async (id: string, data: UpdateServiceDto) => {
     if (!current) return { statusCode: 404, data: null, message: "Service not found" };
 
     const nextName = data.name !== undefined ? String(data.name).trim() : current.name;
-    const nextCategory =
-      data.category !== undefined ? String(data.category).trim() : current.category;
+    let nextCategory = current.category;
+    let nextCategoryId = current.categoryId ?? null;
+
+    if (data.categoryId !== undefined || data.category !== undefined) {
+      const resolved = await resolveCategory({
+        categoryId: data.categoryId,
+        category: data.category,
+      });
+      if (!resolved) {
+        return { statusCode: 400, data: null, message: "Name and category are required" };
+      }
+      nextCategory = resolved.category;
+      nextCategoryId = resolved.categoryId;
+    }
 
     if (!nextName || !nextCategory) {
       return { statusCode: 400, data: null, message: "Name and category are required" };
@@ -147,6 +203,7 @@ export const updateService = async (id: string, data: UpdateServiceDto) => {
     const update: Record<string, unknown> = {
       name: nextName,
       category: nextCategory,
+      categoryId: nextCategoryId,
     };
     if (data.price !== undefined) {
       const price = normalizePrice(data.price);
@@ -162,7 +219,7 @@ export const updateService = async (id: string, data: UpdateServiceDto) => {
     const service = await Service.findByIdAndUpdate(id, update, {
       new: true,
       runValidators: true,
-    });
+    }).populate("categoryId", "name isActive");
     return { statusCode: 200, data: service };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -185,9 +242,10 @@ export type ImportRowResult = {
   reason?: string;
   name?: string;
   category?: string;
+  categoryCreated?: boolean;
 };
 
-/** Upsert by name + category. Never fails the whole file for one bad row. */
+/** Upsert by name + category. Unknown category names create a new master. */
 export const importServices = async (
   rows: Array<{
     name?: string;
@@ -197,12 +255,13 @@ export const importServices = async (
   }>,
 ) => {
   const results: ImportRowResult[] = [];
+  const categoriesCreated = new Set<string>();
 
   for (let i = 0; i < rows.length; i += 1) {
-    const rowNum = i + 2; // +2 accounts for header row in spreadsheet
+    const rowNum = i + 2;
     const raw = rows[i] ?? {};
     const name = String(raw.name ?? "").trim();
-    const category = String(raw.category ?? "").trim();
+    const categoryName = String(raw.category ?? "").trim();
     const price = normalizePrice(raw.price);
     const durationRaw = raw.durationMinutes;
     const durationBlank =
@@ -210,13 +269,13 @@ export const importServices = async (
       durationRaw === null ||
       String(durationRaw).trim() === "";
 
-    if (!name || !category) {
+    if (!name || !categoryName) {
       results.push({
         row: rowNum,
         status: "error",
         reason: "Name and category are required",
         name,
-        category,
+        category: categoryName,
       });
       continue;
     }
@@ -226,15 +285,31 @@ export const importServices = async (
         status: "error",
         reason: "Price must be a positive number",
         name,
-        category,
+        category: categoryName,
       });
       continue;
     }
 
     try {
+      const nameKey = categoryName.toLowerCase();
+      const existedBefore = await Category.findOne({ nameKey });
+      const cat = await ensureCategoryByName(categoryName);
+      if (!cat) {
+        results.push({
+          row: rowNum,
+          status: "error",
+          reason: "Could not resolve category",
+          name,
+          category: categoryName,
+        });
+        continue;
+      }
+      const categoryCreated = !existedBefore;
+      if (categoryCreated) categoriesCreated.add(cat.name);
+
       const existing = await Service.findOne({
         name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
-        category: { $regex: new RegExp(`^${escapeRegex(category)}$`, "i") },
+        category: { $regex: new RegExp(`^${escapeRegex(cat.name)}$`, "i") },
       });
 
       const durationMinutes = durationBlank
@@ -246,27 +321,54 @@ export const importServices = async (
           existing.price === price &&
           existing.durationMinutes === durationMinutes &&
           existing.name === name &&
-          existing.category === category;
+          existing.category === cat.name &&
+          String(existing.categoryId ?? "") === String(cat._id);
         if (same) {
-          results.push({ row: rowNum, status: "skipped", name, category, reason: "No changes" });
+          results.push({
+            row: rowNum,
+            status: "skipped",
+            name,
+            category: cat.name,
+            reason: "No changes",
+            categoryCreated,
+          });
           continue;
         }
         existing.name = name;
-        existing.category = category;
+        existing.category = cat.name;
+        existing.categoryId = cat._id as mongoose.Types.ObjectId;
         existing.price = price;
         existing.durationMinutes = durationMinutes;
         await existing.save();
-        results.push({ row: rowNum, status: "updated", name, category });
+        results.push({
+          row: rowNum,
+          status: "updated",
+          name,
+          category: cat.name,
+          categoryCreated,
+        });
       } else {
-        await Service.create({ name, category, price, durationMinutes });
-        results.push({ row: rowNum, status: "created", name, category });
+        await Service.create({
+          name,
+          category: cat.name,
+          categoryId: cat._id,
+          price,
+          durationMinutes,
+        });
+        results.push({
+          row: rowNum,
+          status: "created",
+          name,
+          category: cat.name,
+          categoryCreated,
+        });
       }
     } catch (error) {
       results.push({
         row: rowNum,
         status: "error",
         name,
-        category,
+        category: categoryName,
         reason: error instanceof Error ? error.message : "Import failed",
       });
     }
@@ -281,11 +383,9 @@ export const importServices = async (
         updated: results.filter((r) => r.status === "updated").length,
         skipped: results.filter((r) => r.status === "skipped").length,
         error: results.filter((r) => r.status === "error").length,
+        categoriesCreated: categoriesCreated.size,
+        newCategories: [...categoriesCreated],
       },
     },
   };
 };
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

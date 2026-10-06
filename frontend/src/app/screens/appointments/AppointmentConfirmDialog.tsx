@@ -106,7 +106,7 @@ export function AppointmentConfirmDialog({
           <p className="text-sm text-muted-foreground">{APPOINTMENTS.confirm.subtitle}</p>
         </DialogHeader>
 
-        <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+        <div className="border border-border bg-muted/30 p-3 text-sm">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {APPOINTMENTS.confirm.summary}
           </p>

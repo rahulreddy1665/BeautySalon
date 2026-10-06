@@ -37,6 +37,10 @@ export const getServicesController = async (req: Request, res: Response) => {
       search: typeof req.query.search === "string" ? req.query.search : undefined,
       category:
         typeof req.query.category === "string" ? req.query.category : undefined,
+      categoryId:
+        typeof req.query.categoryId === "string"
+          ? req.query.categoryId
+          : undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     });

@@ -54,6 +54,7 @@ export function BusinessSettingsSection({
       workingDays: initial.workingDays?.length
         ? initial.workingDays
         : [...WEEKDAYS.filter((d) => d !== 'sunday')],
+      allowNegativeStock: Boolean(initial.allowNegativeStock),
     },
   })
 
@@ -73,6 +74,7 @@ export function BusinessSettingsSection({
       workingDays: initial.workingDays?.length
         ? initial.workingDays
         : [...WEEKDAYS.filter((d) => d !== 'sunday')],
+      allowNegativeStock: Boolean(initial.allowNegativeStock),
     })
   }, [initial, form])
 
@@ -267,6 +269,28 @@ export function BusinessSettingsSection({
               )}
             />
           </FormField>
+
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-primary"
+              disabled={!canUpdate}
+              checked={Boolean(form.watch('allowNegativeStock'))}
+              onChange={(e) =>
+                form.setValue('allowNegativeStock', e.target.checked, {
+                  shouldDirty: true,
+                })
+              }
+            />
+            <span>
+              <span className="font-medium">
+                {SETTINGS.business.allowNegativeStock}
+              </span>
+              <span className="mt-0.5 block text-muted-foreground">
+                {SETTINGS.business.allowNegativeStockHint}
+              </span>
+            </span>
+          </label>
 
           <SettingsSaveBar
             dirty={dirty}

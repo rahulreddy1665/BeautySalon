@@ -4,6 +4,7 @@ import {
   createInvoice,
   getInvoiceById,
   getInvoices,
+  getPopularBillingItems,
   getStaffSalesSummary,
 } from "../services/invoice.service";
 import { sendResponse } from "../middlewares/response.middleware";
@@ -21,6 +22,7 @@ export const createInvoiceController = async (req: Request, res: Response) => {
         data.message ??
         (data.statusCode == 200 ? "Invoice created" : "Invoice created failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -42,6 +44,10 @@ export const getInvoicesController = async (req: Request, res: Response) => {
           : undefined,
       search:
         typeof req.query.search === "string" ? req.query.search : undefined,
+      customerId:
+        typeof req.query.customerId === "string"
+          ? req.query.customerId
+          : undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
@@ -78,6 +84,28 @@ export const getInvoiceByIdController = async (
     return sendResponse(res, {
       statusCode: 500,
       message: "Invoice get failed",
+      errors: error,
+    });
+  }
+};
+
+export const getPopularBillingItemsController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await getPopularBillingItems(req.query.limit);
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        data.statusCode === 200 ? "Popular billing items" : "Popular items failed",
+      data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Popular items failed",
       errors: error,
     });
   }

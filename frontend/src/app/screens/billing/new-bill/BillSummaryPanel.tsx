@@ -35,9 +35,21 @@ function discountLabel(line: CartLine): string | null {
   return `${formatINR(disc)} off`
 }
 
+function lineStaffSummary(line: CartLine): string | null {
+  if (line.kind === 'combo') {
+    const names = (line.components ?? [])
+      .map((c) => c.staffName?.trim())
+      .filter(Boolean)
+      .map((name) => shortStaffName(name!))
+    if (names.length === 0) return null
+    return [...new Set(names)].join(', ')
+  }
+  return line.staffName ? shortStaffName(line.staffName) : null
+}
+
 function LineSummaryRow({ line }: { line: CartLine }) {
   const { net, disc } = lineDisplayAmounts(line)
-  const staff = line.staffName ? shortStaffName(line.staffName) : null
+  const staff = lineStaffSummary(line)
   const discText = discountLabel(line)
   const meta = [staff, discText].filter(Boolean).join(' · ')
 
@@ -79,6 +91,7 @@ export function BillSummaryBody({
   cart,
   loyaltyEnabled,
   availablePoints,
+  maxRedeemPoints,
   cgstRate,
   sgstRate,
   showRoundOff,
@@ -88,6 +101,8 @@ export function BillSummaryBody({
   cart: BillingCartState
   loyaltyEnabled: boolean
   availablePoints: number
+  /** Cap from balance + max redeem % of bill. */
+  maxRedeemPoints: number
   cgstRate: number
   sgstRate: number
   showRoundOff: boolean
@@ -97,6 +112,7 @@ export function BillSummaryBody({
   )
 
   const serviceLines = cart.lines.filter((l) => l.kind === 'service')
+  const comboLines = cart.lines.filter((l) => l.kind === 'combo')
   const productLines = cart.lines.filter((l) => l.kind === 'product')
   const tipAllocations = useMemo(
     () => previewTipAllocations(cart.tip, cart.lines),
@@ -135,6 +151,19 @@ export function BillSummaryBody({
           </p>
           <div className="space-y-2">
             {serviceLines.map((line) => (
+              <LineSummaryRow key={line.id} line={line} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {comboLines.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            {BILLING.new.combosCount.replace('{count}', String(comboLines.length))}
+          </p>
+          <div className="space-y-2">
+            {comboLines.map((line) => (
               <LineSummaryRow key={line.id} line={line} />
             ))}
           </div>
@@ -199,6 +228,11 @@ export function BillSummaryBody({
             <Label htmlFor="redeem">{BILLING.new.loyaltyRedeem}</Label>
             <span className="text-xs text-muted-foreground">
               {BILLING.new.availablePoints} {availablePoints}
+              {' · '}
+              {BILLING.new.maxRedeemPoints.replace(
+                '{qty}',
+                String(maxRedeemPoints),
+              )}
             </span>
           </div>
           <div className="flex gap-2">
@@ -206,6 +240,7 @@ export function BillSummaryBody({
               id="redeem"
               type="number"
               min={0}
+              max={maxRedeemPoints}
               className="h-10"
               value={cart.loyaltyRedeemPoints || ''}
               onChange={(e) => handlers.onRedeem(Number(e.target.value) || 0)}
@@ -215,6 +250,7 @@ export function BillSummaryBody({
               type="button"
               variant="outline"
               className="h-10"
+              disabled={maxRedeemPoints <= 0}
               onClick={handlers.onUseMax}
             >
               {BILLING.new.useMax}
@@ -365,6 +401,7 @@ export function BillSummaryPanel({
   cart,
   loyaltyEnabled,
   availablePoints,
+  maxRedeemPoints,
   cgstRate,
   sgstRate,
   showRoundOff,
@@ -379,6 +416,7 @@ export function BillSummaryPanel({
   cart: BillingCartState
   loyaltyEnabled: boolean
   availablePoints: number
+  maxRedeemPoints: number
   cgstRate: number
   sgstRate: number
   showRoundOff: boolean
@@ -399,6 +437,7 @@ export function BillSummaryPanel({
           cart={cart}
           loyaltyEnabled={loyaltyEnabled}
           availablePoints={availablePoints}
+          maxRedeemPoints={maxRedeemPoints}
           cgstRate={cgstRate}
           sgstRate={sgstRate}
           showRoundOff={showRoundOff}

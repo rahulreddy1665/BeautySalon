@@ -157,11 +157,8 @@ function LoginParticlesCanvas() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? isMobileViewport() : false,
   )
-  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // Defer options until CSS tokens are available on :root.
-    setReady(true)
     const mq = window.matchMedia('(max-width: 767px)')
     const sync = () => setIsMobile(mq.matches)
     sync()
@@ -169,10 +166,7 @@ function LoginParticlesCanvas() {
     return () => mq.removeEventListener('change', sync)
   }, [])
 
-  const options = useMemo(() => {
-    if (!ready) return null
-    return buildOptions(isMobile)
-  }, [isMobile, ready])
+  const options = useMemo(() => buildOptions(isMobile), [isMobile])
 
   useEffect(() => {
     const onVisibility = () => {

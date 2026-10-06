@@ -234,6 +234,9 @@ export const updateBusinessSettings = async (
       }
       doc.business.workingDays = days;
     }
+    if (data.allowNegativeStock !== undefined) {
+      doc.business.allowNegativeStock = Boolean(data.allowNegativeStock);
+    }
     await doc.save();
     return { statusCode: 200, data: publicSettings(doc).business };
   } catch (error) {

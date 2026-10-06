@@ -101,19 +101,42 @@ Fields: `name`, `age` (14–80), `gender` (`Male`\|`Female`\|`Other`), `designat
 `loginStatus`: `no_login` \| `login_enabled` \| `login_off` \| `must_change_password`.  
 Username: 4–20 lowercase `[a-z0-9._]`, unique case-insensitive. Temp password hashed with bcrypt; never stored/returned in plain after the enable/reset response.
 
+### Categories (`/api/category`) — **new**
+
+Managed service category master. Reuses `service:*` permissions.
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/api/category` | `service:read` | `activeOnly`; includes `activeServiceCount` |
+| POST | `/api/category` | `service:create` | Unique name (case-insensitive `nameKey`) |
+| PATCH | `/api/category/:id` | `service:update` | Rename / activate / deactivate |
+| POST | `/api/category/migrate` | `service:create` | One-time: create from distinct service.category strings |
+
+Deactivate blocked while any service references the category (`CATEGORY_IN_USE`).
+
+### Combos (`/api/combo`) — **new**
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/api/combo` | `service:read` | `activeOnly`; computed `listTotal`, `saving`, `totalDuration` |
+| GET | `/api/combo/:id` | `service:read` | |
+| POST | `/api/combo` | `service:create` | ≥2 services, no duplicates; `confirmPriceAboveList` if price ≥ list |
+| PATCH | `/api/combo/:id` | `service:update` | |
+| DELETE | `/api/combo/:id` | `service:delete` | Soft delete (`isDeleted`) |
+
 ### Services (`/api/service`) — **updated**
 
 | Method | Path | Permission | Notes |
 |--------|------|------------|-------|
-| GET | `/api/service` | `service:read` | Pagination + `search`, `category` |
-| GET | `/api/service/categories` | `service:read` | Distinct categories |
-| POST | `/api/service/import` | `service:create` | multipart `file` (.xlsx/.csv) |
+| GET | `/api/service` | `service:read` | Pagination + `search`, `category`, `categoryId` |
+| GET | `/api/service/categories` | `service:read` | Distinct category strings (legacy helper) |
+| POST | `/api/service/import` | `service:create` | multipart `file` (.xlsx/.csv); unknown categories created |
 | GET | `/api/service/:id` | `service:read` | |
-| POST | `/api/service` | `service:create` | |
-| PATCH | `/api/service/:id` | `service:create` | |
+| POST | `/api/service` | `service:create` | Prefer `categoryId`; denormalized `category` kept |
+| PATCH | `/api/service/:id` | `service:update` | |
 | DELETE | `/api/service/:id` | `service:delete` | Hard delete |
 
-Fields: `name`, `category`, `price`, `durationMinutes` (default 30, min 5, step 5).  
+Fields: `name`, `category`, `categoryId`, `price`, `durationMinutes` (default 30, min 5, step 5).  
 Unique: name + category (case-insensitive).  
 Import: per-row created/updated/skipped/error; blank duration → 30.
 
@@ -123,7 +146,7 @@ Import: per-row created/updated/skipped/error; blank duration → 30.
 |--------|------|------------|-------|
 | GET | `/api/appointment` | `appointment:read` | `date` / `from`+`to`, `staffId`, `status`, pagination |
 | GET | `/api/appointment/:id` | `appointment:read` | |
-| POST | `/api/appointment` | `appointment:create` | Guest or customer; services[] with staff |
+| POST | `/api/appointment` | `appointment:create` | Guest or customer; services[] with `{ serviceId, staffId }` or `{ comboId, staffId }` (combo expands to component services) |
 | PATCH | `/api/appointment/:id` | `appointment:update` | Reschedule / edit |
 | PATCH | `/api/appointment/:id/status` | `appointment:update` | `{ status }` |
 | POST | `/api/appointment/:id/cancel` | `appointment:update` | → cancelled |
@@ -139,7 +162,7 @@ Legacy `/api/booking` still exists (old model) — prefer `/api/appointment`.
 | GET | `/api/invoice` | `invoice:read` | `from`/`to`, `paymentMode`, `search`, pagination |
 | GET | `/api/invoice/staff-sales` | `invoice:read` | Staff-wise sales from line items |
 | GET | `/api/invoice/:id` | `invoice:read` | |
-| POST | `/api/invoice` | `invoice:create` | Collect payment; optional `appointmentId` |
+| POST | `/api/invoice` | `invoice:create` | Collect payment; optional `appointmentId`; optional `comboItems[]` |
 | POST | `/api/invoice/:id/share-link` | `invoice:read` | Create or reuse public share link. Body `{ renew?: boolean }`. Returns `{ url, reused, expiresAt }`. Token plaintext only on first create (`url` null when reused — hash-only storage). |
 | POST | `/api/invoice/:id/revoke-share-link` | `invoice:read` | Revoke all active links for the invoice |
 
@@ -155,7 +178,10 @@ Invoice numbers: `INV-YYYY-#####` (atomic counter; syncs past existing numbers).
 Totals computed server-side from Settings (tax, rounding, template, loyalty). Tip is never taxed.  
 `paymentMode`: `upi` \| `cash` \| `card`. Optional `tip`, `loyaltyRedeemPoints`.  
 Billing an appointment sets `status=completed` + `invoice` ref; double-bill returns 409.  
-Each invoice stores `templateSnapshot` + `businessSnapshot` at creation so presentation never changes with later settings.
+Each invoice stores `templateSnapshot` + `businessSnapshot` at creation so presentation never changes with later settings.  
+`comboItems[]`: one line per combo with component staff + allocated amounts (net after line discount split by list price; remainder on largest component). Combos tax as services.  
+Retail tracked products deduct stock on create (`sale` ledger); insufficient stock rolls back the invoice (`INSUFFICIENT_STOCK`). Consumables are not billable.  
+**No cancel/void/return endpoint** — stock is not restored after sale.
 
 **Worked tax example** (exclusive GST, nearest rounding, tip ₹20):
 
@@ -168,18 +194,23 @@ Each invoice stores `templateSnapshot` + `businessSnapshot` at creation so prese
 | Tip (untaxed) | ₹20 | | |
 | **Payable** | | | **₹1,113** |
 
-### Products (`/api/product`) — **new**
+### Products (`/api/product`) — **updated (stock)**
 
 | Method | Path | Permission | Notes |
 |--------|------|------------|-------|
-| GET | `/api/product` | `product:read` | Search + pagination |
+| GET | `/api/product` | `product:read` | Search + pagination; `type`, `retailOnly` |
 | GET | `/api/product/:id` | `product:read` | |
-| POST | `/api/product` | `product:create` | `name`, `price` |
-| PATCH | `/api/product/:id` | `product:create` | |
+| POST | `/api/product` | `product:create` | `name`, `price`, `type`, `unit`, `trackStock`, `openingStock` |
+| PATCH | `/api/product/:id` | `product:update` | |
 | DELETE | `/api/product/:id` | `product:delete` | Hard delete |
-| POST | `/api/product/import` | `product:create` | Excel/CSV upsert by name |
+| POST | `/api/product/import` | `product:create` | Excel/CSV: Name, Price, Type, Unit, Opening Stock |
+| POST | `/api/product/:id/stock/add` | `product:create` | Purchase/add qty |
+| POST | `/api/product/:id/stock/use` | `product:create` | Consumable usage (reason required) |
+| POST | `/api/product/:id/stock/adjust` | `product:update` | Set counted qty (Edit); reason required |
+| GET | `/api/product/:id/stock/ledger` | `product:read` | Ledger history |
 
-No stock fields — catalog only.
+Fields: `type` (`retail`\|`consumable`), `trackStock`, `stockQty` (ledger-derived), `unit`.  
+Existing products default `retail` / `trackStock=false`. Atomic conditional `$inc` prevents oversell when `business.allowNegativeStock` is false.
 
 ### Settings (`/api/settings`) — **new**
 

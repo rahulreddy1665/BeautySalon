@@ -245,7 +245,7 @@ export function ServicesReportScreen() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-hidden px-2 pb-4 sm:px-4">
               <TopItemsBarChart data={chartData} valueAsMoney={chartMode === 'revenue'} />
             </CardContent>
           </Card>

@@ -23,19 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
-import {
-  useDeleteServiceMutation,
-  useServiceCategoriesQuery,
-  useServicesQuery,
-} from '@/app/hooks/queries/useServicesQuery'
+import { COMMON, SERVICES } from '@/app/constants'
+import { useCategoriesQuery } from '@/app/hooks/queries/useCategoriesQuery'
+import { useDeleteServiceMutation, useServicesQuery } from '@/app/hooks/queries/useServicesQuery'
 import type { SalonService } from '@/app/service/services/servicesApi'
+import { CategoriesPanel } from '@/app/screens/services/CategoriesPanel'
+import { CombosPanel } from '@/app/screens/services/CombosPanel'
 import { ServiceFormSheet } from '@/app/screens/services/ServiceFormSheet'
 import { ServiceImportDialog } from '@/app/screens/services/ServiceImportDialog'
-import { formatINR } from '@/app/utils'
+import { cn, formatINR } from '@/app/utils'
+
+type Tab = 'services' | 'categories' | 'combos'
 
 export function ServicesScreen() {
+  const [tab, setTab] = useState<Tab>('services')
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('all')
+  const [categoryId, setCategoryId] = useState('all')
   const [page, setPage] = useState(1)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<SalonService | null>(null)
@@ -44,11 +47,11 @@ export function ServicesScreen() {
 
   const listQuery = useServicesQuery({
     search: search.trim() || undefined,
-    category: category === 'all' ? undefined : category,
+    categoryId: categoryId === 'all' ? undefined : categoryId,
     page,
     limit: 20,
   })
-  const categoriesQuery = useServiceCategoriesQuery()
+  const categoriesQuery = useCategoriesQuery(true)
   const deleteMutation = useDeleteServiceMutation()
 
   const items = listQuery.data?.items ?? []
@@ -57,7 +60,7 @@ export function ServicesScreen() {
   const columns: ColumnDef<SalonService>[] = [
     {
       accessorKey: 'name',
-      header: 'Service',
+      header: SERVICES.form.name,
       cell: ({ row }) => (
         <div className="min-w-0">
           <p className="font-medium">{row.original.name}</p>
@@ -67,14 +70,14 @@ export function ServicesScreen() {
     },
     {
       accessorKey: 'durationMinutes',
-      header: 'Duration',
+      header: SERVICES.form.duration,
       cell: ({ getValue }) => (
         <span className="tabular-nums">{Number(getValue())} min</span>
       ),
     },
     {
       accessorKey: 'price',
-      header: 'Price',
+      header: SERVICES.form.price,
       cell: ({ getValue }) => formatINR(Number(getValue())),
     },
     {
@@ -93,7 +96,7 @@ export function ServicesScreen() {
             }}
           >
             <Pencil className="size-3.5" strokeWidth={1.75} />
-            Edit
+            {COMMON.actions.edit}
           </Button>
           <Button
             type="button"
@@ -103,7 +106,7 @@ export function ServicesScreen() {
             onClick={() => setDeleteTarget(row.original)}
           >
             <Trash2 className="size-3.5" strokeWidth={1.75} />
-            Delete
+            {COMMON.actions.delete}
           </Button>
         </div>
       ),
@@ -113,116 +116,149 @@ export function ServicesScreen() {
   return (
     <div className="min-w-0 space-y-3">
       <PageHeader
-        description="Salon services with price and duration."
+        description={SERVICES.list.description}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="min-touch h-9"
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload className="size-4" strokeWidth={1.75} />
-              Import
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="min-touch h-9"
-              onClick={() => {
-                setEditing(null)
-                setSheetOpen(true)
-              }}
-            >
-              <Plus className="size-4" strokeWidth={1.75} />
-              Add service
-            </Button>
-          </div>
+          tab === 'services' ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-touch h-9"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload className="size-4" strokeWidth={1.75} />
+                {SERVICES.list.import}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="min-touch h-9"
+                onClick={() => {
+                  setEditing(null)
+                  setSheetOpen(true)
+                }}
+              >
+                <Plus className="size-4" strokeWidth={1.75} />
+                {SERVICES.list.add}
+              </Button>
+            </div>
+          ) : null
         }
       />
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            strokeWidth={1.75}
-          />
-          <Input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            placeholder="Search services"
-            className="pl-8"
-          />
-        </div>
-        <Select
-          value={category}
-          onValueChange={(value) => {
-            setCategory(value)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {(categoriesQuery.data ?? []).map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            ['services', SERVICES.list.tabServices],
+            ['categories', SERVICES.list.tabCategories],
+            ['combos', SERVICES.list.tabCombos],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={cn(
+              'px-3 py-2 text-sm font-medium transition-colors',
+              tab === id
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {listQuery.isLoading ? <LoadingSkeleton rows={5} /> : null}
-      {listQuery.isError ? (
-        <ErrorState
-          error={listQuery.error}
-          title="Could not load services"
-          onRetry={() => void listQuery.refetch()}
-        />
-      ) : null}
+      {tab === 'categories' ? <CategoriesPanel /> : null}
+      {tab === 'combos' ? <CombosPanel /> : null}
 
-      {!listQuery.isLoading && !listQuery.isError ? (
+      {tab === 'services' ? (
         <>
-          <ResponsiveTable
-            data={items}
-            columns={columns}
-            mobileTitleKey="name"
-            emptyTitle="No services yet"
-            emptyDescription="Add a service or import from Excel."
-          />
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>
-                {listQuery.data?.total ?? 0} services · page {page} / {totalPages}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:max-w-xs">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                strokeWidth={1.75}
+              />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+                placeholder={SERVICES.list.searchPlaceholder}
+                className="pl-8"
+              />
             </div>
+            <Select
+              value={categoryId}
+              onValueChange={(value) => {
+                setCategoryId(value)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder={SERVICES.form.category} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{SERVICES.list.allCategories}</SelectItem>
+                {(categoriesQuery.data ?? []).map((cat) => (
+                  <SelectItem key={cat._id} value={cat._id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {listQuery.isLoading ? <LoadingSkeleton rows={5} /> : null}
+          {listQuery.isError ? (
+            <ErrorState
+              error={listQuery.error}
+              title={SERVICES.list.emptyTitle}
+              onRetry={() => void listQuery.refetch()}
+            />
+          ) : null}
+
+          {!listQuery.isLoading && !listQuery.isError ? (
+            <>
+              <ResponsiveTable
+                data={items}
+                columns={columns}
+                mobileTitleKey="name"
+                emptyTitle={SERVICES.list.emptyTitle}
+                emptyDescription={SERVICES.list.emptyHint}
+              />
+              {totalPages > 1 ? (
+                <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <span>
+                    {listQuery.data?.total ?? 0} · {page} / {totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      {COMMON.actions.previous}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      {COMMON.actions.next}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : null}
@@ -238,11 +274,11 @@ export function ServicesScreen() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete service?</DialogTitle>
+            <DialogTitle>{COMMON.actions.delete}?</DialogTitle>
             <DialogDescription>
               {deleteTarget
                 ? `Remove “${deleteTarget.name}” from the catalog. This cannot be undone.`
-                : 'Remove this service.'}
+                : COMMON.actions.delete}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="hidden" />
@@ -253,7 +289,7 @@ export function ServicesScreen() {
               className="w-full sm:w-auto"
               onClick={() => setDeleteTarget(null)}
             >
-              Cancel
+              {COMMON.actions.cancel}
             </Button>
             <Button
               type="button"
@@ -266,7 +302,7 @@ export function ServicesScreen() {
                 setDeleteTarget(null)
               }}
             >
-              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+              {deleteMutation.isPending ? COMMON.labels.loading : COMMON.actions.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

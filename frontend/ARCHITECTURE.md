@@ -170,11 +170,11 @@ Missing APIs are centralized under `src/app/service/mocks/`:
 | File | Used by |
 |------|---------|
 | `billingMock.ts` | Walk-in bills list (localStorage) until Billing FE fully switches |
-| `inventoryMock.ts` | Products, stock adjust, history (localStorage) |
+| `inventoryMock.ts` | Legacy only — live Products API + stock ledger supersede this |
 | `loyaltyMock.ts` | Points rules, balances, ledger (localStorage) |
 | `customerExtrasMock.ts` | Lifetime spend; points delegated to loyaltyMock |
 
-**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Reports (`/api/reports/*`), Staff, Designations, Services, Products (catalog), Appointments (`/api/appointment`), Invoices (+ share link), Settings, Loyalty rules/balances, Auth.
+**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Reports (`/api/reports/*`), Staff, Designations, Services, Categories, Combos, Products (+ stock ledger), Appointments (`/api/appointment`), Invoices (+ share link + combo lines), Settings, Loyalty rules/balances, Auth.
 
 Appointments UI: day / week / month calendars; desktop right panel (`?appointment=id`, auto-select next upcoming); mobile bottom sheet; lock rules (past end / final status) via Asia/Kolkata; past slots disabled; edit URL of locked appointments is view-only. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
 
@@ -186,7 +186,8 @@ Appointments UI: day / week / month calendars; desktop right panel (`?appointmen
 - Money omitted when `canViewRevenue` is false; CSV export needs `canExport` or `report:export`.
 - CSV via server export payload + `utils/csv.ts` (`downloadCsv` with UTF-8 BOM for Excel ₹).
 - Definitions popover text lives in `constants/reports.ts`.
-- **No** inventory valuation, profit, discount, loyalty, tax, or daily-closing reports.
+- Product report includes current `stockQty` and units sold (no low-stock alerts).
+- **No** inventory valuation/COGS, profit, discount, loyalty, tax, or daily-closing reports.
 
 ### How to add a report
 
@@ -218,7 +219,9 @@ Screens must not invent their own fake numbers. Prefer empty states. Legacy file
 - Invoice templates: Cream & Gold, Blush, Compact A5, Thermal. Palettes in `theme/invoice-themes.ts` (only allowed hex outside `theme/tokens`). Shared `InvoiceDocument` + snapshot on each invoice. Public share at `/i/:token` (no app shell, noindex). PDF via `html2pdf.js` (`utils/invoicePdf.ts`). WhatsApp share via `sendInvoiceToCustomer` (wa.me / native share); Cloud API stub on backend.
 - New bill (`/billing/new`): three numbered cards (Customer · Add services & products · Bill items) + sticky Bill summary. Per-line discounts; section discounts sent as 0. Drafts persist per device via `billingDrafts` (redux-persist); estimates are print-only. Tip allocations are computed on the server from distinct staff on the bill.
 - Billing line grid (≥768): shared tracks `minmax(0,1fr) | staff 140/160px | qty 96 | price 72 | total 80 | delete 36`, `gap-x-2`. Item uses `line-clamp-2` + `title`. `<768` keeps stacked cards.
-- Same-category suggestions: `CategorySuggestions` under Services search (not Products). Chips from loaded catalog, ordered by name (no billed-frequency on services API). Also used on New Appointment after a service is chosen.
+- Same-category suggestions: `CategorySuggestions` under Services search (not Products). Chips from loaded catalog, ordered by name (no billed-frequency on services API). Services already covered by an added combo are excluded. Also used on New Appointment after a service is chosen.
+- Services page tabs: Services · Categories · Combos. Combos appear in billing quick-add with a COMBO badge; one bill line expands to per-component staff.
+- Products: retail | consumable, optional stock tracking + ledger; billing shows retail only. Settings → Business: Allow negative stock.
 - See `docs/API_NOTES.md` and `docs/KNOWN_GAPS.md` (no email/SMTP/2FA).
 
 ## Quality

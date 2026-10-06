@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { BILLING } from '@/app/constants'
-
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
 import { billingApi, type CreateBillPayload } from '@/app/service/billing/billingApi'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
@@ -47,10 +45,10 @@ export function useCreateBillMutation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
-      toast.success(BILLING.toasts.created)
+      toast.success('Bill collected')
     },
     onError: (error) => {
-      toast.error(toErrorMessage(error, BILLING.toasts.createFailed))
+      toast.error(toErrorMessage(error, 'Could not save bill'))
     },
   })
 }

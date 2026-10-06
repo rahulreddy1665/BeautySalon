@@ -22,6 +22,13 @@ export interface CreateInvoiceProductLine {
   discount?: InvoiceLineDiscount
 }
 
+export interface CreateInvoiceComboLine {
+  comboId: string
+  qty: number
+  discount?: InvoiceLineDiscount
+  components: Array<{ serviceId: string; staffId: string }>
+}
+
 export interface CreateInvoiceInput {
   customerId?: string | null
   walkIn?: boolean
@@ -30,6 +37,7 @@ export interface CreateInvoiceInput {
   appointmentId?: string | null
   serviceItems?: CreateInvoiceServiceLine[]
   productItems?: CreateInvoiceProductLine[]
+  comboItems?: CreateInvoiceComboLine[]
   serviceDiscount?: InvoiceLineDiscount
   productDiscount?: InvoiceLineDiscount
   paymentMode: PaymentMode
@@ -81,6 +89,22 @@ export interface InvoiceRecord {
     staff: string | { _id: string; name?: string }
     discount: InvoiceLineDiscount
     lineTotal: number
+  }>
+  comboItems?: Array<{
+    combo: string
+    name: string
+    price: number
+    qty: number
+    discount: InvoiceLineDiscount
+    lineTotal: number
+    listTotal: number
+    components: Array<{
+      service: string
+      name: string
+      listPrice: number
+      allocatedAmount: number
+      staff: string | { _id: string; name?: string }
+    }>
   }>
   serviceSubtotal: number
   productSubtotal: number

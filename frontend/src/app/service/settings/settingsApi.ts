@@ -25,6 +25,7 @@ export interface BusinessSettings {
   openingTime?: string
   closingTime?: string
   workingDays?: Weekday[]
+  allowNegativeStock?: boolean
 }
 
 export interface TaxRatePair {

@@ -286,6 +286,16 @@
       font-size: 14px;
     }
   }
+
+  /* Native date/time picker glyphs — tint to brand gold so they stay visible in dark mode */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 1;
+    /* Approximates --gold (#FFD700) from the default black indicator */
+    filter: invert(82%) sepia(70%) saturate(1600%) hue-rotate(359deg) brightness(104%)
+      contrast(104%);
+  }
 }
 
 @layer components {

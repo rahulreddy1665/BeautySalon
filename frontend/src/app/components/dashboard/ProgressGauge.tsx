@@ -11,20 +11,20 @@ export function ProgressGauge({ percent, label, detail }: Props) {
   const r = 54
   const cx = 70
   const cy = 70
+  // Semicircle: left (π) → right (0). Span is always ≤ 180°, so large-arc stays 0.
   const start = Math.PI
-  const end = Math.PI - (Math.PI * p) / 100
+  const end = Math.PI * (1 - p / 100)
   const polar = (ang: number) => ({
     x: cx + r * Math.cos(ang),
     y: cy - r * Math.sin(ang),
   })
   const s = polar(start)
   const e = polar(end)
-  const large = p > 50 ? 1 : 0
-  const arc = p <= 0 ? '' : `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+  const arc = p <= 0 ? '' : `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`
 
   return (
     <div className="flex flex-col items-center">
-      <svg viewBox="0 0 140 86" className="h-28 w-full max-w-[200px]">
+      <svg viewBox="0 0 140 86" className="h-28 w-full max-w-[200px]" aria-hidden>
         <path
           d={`M ${polar(Math.PI).x} ${polar(Math.PI).y} A ${r} ${r} 0 0 1 ${polar(0).x} ${polar(0).y}`}
           fill="none"

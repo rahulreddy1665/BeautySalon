@@ -17,7 +17,7 @@ export type Gender = (typeof GENDERS)[number]
 export const DISCOUNT_TYPES = ['percent', 'amount'] as const
 export type DiscountType = (typeof DISCOUNT_TYPES)[number]
 
-export const LINE_KINDS = ['service', 'product'] as const
+export const LINE_KINDS = ['service', 'product', 'combo'] as const
 export type LineKind = (typeof LINE_KINDS)[number]
 
 export const ROUNDING_RULES = ['none', 'nearest', 'up', 'down'] as const

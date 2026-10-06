@@ -5,13 +5,21 @@ export interface SalonProduct {
   _id: string
   name: string
   price: number
+  type?: 'retail' | 'consumable'
+  trackStock?: boolean
+  stockQty?: number
+  unit?: string
   createdAt?: string
   updatedAt?: string
 }
 
 export interface ProductInput {
   name: string
-  price: number
+  price?: number
+  type?: 'retail' | 'consumable'
+  unit?: string
+  trackStock?: boolean
+  openingStock?: number
 }
 
 export interface PaginatedProducts {
@@ -26,6 +34,8 @@ export interface ProductListParams {
   search?: string
   page?: number
   limit?: number
+  type?: 'retail' | 'consumable' | 'all'
+  retailOnly?: boolean
 }
 
 export interface ProductImportRowResult {
@@ -100,6 +110,62 @@ export const productsApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
       },
     )
+    return data.data
+  },
+
+  addStock: async (
+    id: string,
+    payload: { quantity: number; note?: string },
+  ): Promise<SalonProduct> => {
+    const { data } = await apiClient.post<
+      ApiSuccessResponse<{ product: SalonProduct }>
+    >(`/product/${id}/stock/add`, payload)
+    return data.data.product
+  },
+
+  useStock: async (
+    id: string,
+    payload: { quantity: number; reason: string; staffId?: string },
+  ): Promise<SalonProduct> => {
+    const { data } = await apiClient.post<
+      ApiSuccessResponse<{ product: SalonProduct }>
+    >(`/product/${id}/stock/use`, payload)
+    return data.data.product
+  },
+
+  adjustStock: async (
+    id: string,
+    payload: { countedQty: number; reason: string },
+  ): Promise<SalonProduct> => {
+    const { data } = await apiClient.post<
+      ApiSuccessResponse<{ product: SalonProduct }>
+    >(`/product/${id}/stock/adjust`, payload)
+    return data.data.product
+  },
+
+  ledger: async (
+    id: string,
+    params: { page?: number; limit?: number } = {},
+  ) => {
+    const { data } = await apiClient.get<
+      ApiSuccessResponse<{
+        items: Array<{
+          _id: string
+          type: string
+          quantity: number
+          balanceAfter: number
+          reason?: string
+          note?: string
+          createdAt: string
+          createdBy?: { name?: string; email?: string } | null
+          reference?: { _id: string; invoiceNumber?: string } | null
+        }>
+        total: number
+        page: number
+        limit: number
+        totalPages: number
+      }>
+    >(`/product/${id}/stock/ledger`, { params })
     return data.data
   },
 }

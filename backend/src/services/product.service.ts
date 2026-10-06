@@ -1,5 +1,11 @@
-import { CreateProductDto, ProductListQuery, UpdateProductDto } from "../dto/product.dto";
+import {
+  CreateProductDto,
+  ProductListQuery,
+  UpdateProductDto,
+  type ProductType,
+} from "../dto/product.dto";
 import { Product } from "../models/product.model";
+import { enableTrackingWithOpening } from "./stock.service";
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -11,10 +17,24 @@ function normalizePrice(value: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
-export const createProduct = async (data: CreateProductDto) => {
+function normalizeType(value: unknown): ProductType {
+  const t = String(value ?? "retail").trim().toLowerCase();
+  return t === "consumable" ? "consumable" : "retail";
+}
+
+export const createProduct = async (
+  data: CreateProductDto,
+  opts: { createdBy?: string | null } = {},
+) => {
   try {
     const name = String(data.name ?? "").trim();
-    const price = normalizePrice(data.price);
+    const type = normalizeType(data.type);
+    const price =
+      data.price !== undefined
+        ? normalizePrice(data.price)
+        : type === "consumable"
+          ? 0
+          : null;
     if (!name) {
       return { statusCode: 400, data: null, message: "Name is required" };
     }
@@ -37,7 +57,33 @@ export const createProduct = async (data: CreateProductDto) => {
       };
     }
 
-    const product = await Product.create({ name, price });
+    const trackStock = Boolean(data.trackStock);
+    const unit = String(data.unit ?? "").trim();
+    const product = await Product.create({
+      name,
+      price,
+      type,
+      trackStock: false,
+      stockQty: 0,
+      unit,
+    });
+
+    if (trackStock || data.openingStock !== undefined) {
+      const opening =
+        data.openingStock !== undefined ? Number(data.openingStock) : 0;
+      const tracked = await enableTrackingWithOpening({
+        productId: String(product._id),
+        openingQty: opening,
+        createdBy: opts.createdBy,
+      });
+      if (tracked.statusCode !== 200) {
+        await Product.findByIdAndDelete(product._id);
+        return tracked;
+      }
+      const refreshed = await Product.findById(product._id);
+      return { statusCode: 200, data: refreshed ?? product };
+    }
+
     return { statusCode: 200, data: product };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -55,6 +101,16 @@ export const getProducts = async (query: ProductListQuery = {}) => {
         $regex: escapeRegex(query.search.trim()),
         $options: "i",
       };
+    }
+
+    const retailOnly =
+      query.retailOnly === true ||
+      query.retailOnly === "true" ||
+      query.retailOnly === "1";
+    if (retailOnly) {
+      filter.type = "retail";
+    } else if (query.type && query.type !== "all") {
+      filter.type = normalizeType(query.type);
     }
 
     const [items, total] = await Promise.all([
@@ -92,7 +148,11 @@ export const getProductById = async (id: string) => {
   }
 };
 
-export const updateProduct = async (id: string, data: UpdateProductDto) => {
+export const updateProduct = async (
+  id: string,
+  data: UpdateProductDto,
+  opts: { createdBy?: string | null } = {},
+) => {
   try {
     const current = await Product.findById(id);
     if (!current) {
@@ -117,7 +177,13 @@ export const updateProduct = async (id: string, data: UpdateProductDto) => {
       };
     }
 
-    const update: Record<string, unknown> = { name: nextName };
+    current.name = nextName;
+    if (data.type !== undefined) {
+      current.type = normalizeType(data.type);
+    }
+    if (data.unit !== undefined) {
+      current.unit = String(data.unit ?? "").trim();
+    }
     if (data.price !== undefined) {
       const price = normalizePrice(data.price);
       if (price === null) {
@@ -127,13 +193,30 @@ export const updateProduct = async (id: string, data: UpdateProductDto) => {
           message: "Price must be a non-negative number",
         };
       }
-      update.price = price;
+      current.price = price;
+    } else if (current.type === "consumable" && data.type === "consumable") {
+      // keep price; consumables may be 0
     }
 
-    const product = await Product.findByIdAndUpdate(id, update, {
-      new: true,
-      runValidators: true,
-    });
+    await current.save();
+
+    if (data.trackStock === true || data.openingStock !== undefined) {
+      const opening =
+        data.openingStock !== undefined
+          ? Number(data.openingStock)
+          : current.stockQty;
+      const tracked = await enableTrackingWithOpening({
+        productId: id,
+        openingQty: Number.isFinite(opening) ? opening : 0,
+        createdBy: opts.createdBy,
+      });
+      if (tracked.statusCode !== 200) return tracked;
+    } else if (data.trackStock === false) {
+      current.trackStock = false;
+      await current.save();
+    }
+
+    const product = await Product.findById(id);
     return { statusCode: 200, data: product };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -161,7 +244,14 @@ export type ProductImportRowResult = {
 
 /** Upsert by name. Never fails the whole file for one bad row. */
 export const importProducts = async (
-  rows: Array<{ name?: string; price?: unknown }>,
+  rows: Array<{
+    name?: string;
+    price?: unknown;
+    type?: unknown;
+    unit?: unknown;
+    openingStock?: unknown;
+  }>,
+  opts: { createdBy?: string | null } = {},
 ) => {
   const results: ProductImportRowResult[] = [];
   let created = 0;
@@ -172,9 +262,25 @@ export const importProducts = async (
   for (let i = 0; i < rows.length; i += 1) {
     const rowNum = i + 2; // header is row 1
     const name = String(rows[i]?.name ?? "").trim();
-    const price = normalizePrice(rows[i]?.price);
+    const type = normalizeType(rows[i]?.type);
+    const unit = String(rows[i]?.unit ?? "").trim();
+    const openingRaw = rows[i]?.openingStock;
+    const openingBlank =
+      openingRaw === undefined ||
+      openingRaw === null ||
+      String(openingRaw).trim() === "";
+    const price =
+      rows[i]?.price === undefined || rows[i]?.price === ""
+        ? type === "consumable"
+          ? 0
+          : null
+        : normalizePrice(rows[i]?.price);
 
-    if (!name && (rows[i]?.price === undefined || rows[i]?.price === "")) {
+    if (
+      !name &&
+      (rows[i]?.price === undefined || rows[i]?.price === "") &&
+      openingBlank
+    ) {
       results.push({ row: rowNum, status: "skipped", reason: "Empty row" });
       skipped += 1;
       continue;
@@ -203,15 +309,58 @@ export const importProducts = async (
       const existing = await Product.findOne({
         name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
       });
+      const trackStock = !openingBlank;
+      const openingStock = openingBlank ? undefined : Number(openingRaw);
+
       if (existing) {
-        existing.price = price;
-        await existing.save();
-        results.push({ row: rowNum, status: "updated", name });
-        updated += 1;
+        const result = await updateProduct(
+          String(existing._id),
+          {
+            name,
+            price,
+            type,
+            unit,
+            trackStock: trackStock || existing.trackStock,
+            openingStock,
+          },
+          opts,
+        );
+        if (result.statusCode !== 200) {
+          results.push({
+            row: rowNum,
+            status: "error",
+            name,
+            reason: (result as { message?: string }).message ?? "Update failed",
+          });
+          error += 1;
+        } else {
+          results.push({ row: rowNum, status: "updated", name });
+          updated += 1;
+        }
       } else {
-        await Product.create({ name, price });
-        results.push({ row: rowNum, status: "created", name });
-        created += 1;
+        const result = await createProduct(
+          {
+            name,
+            price,
+            type,
+            unit,
+            trackStock,
+            openingStock,
+          },
+          opts,
+        );
+        if (result.statusCode !== 200) {
+          results.push({
+            row: rowNum,
+            status: "error",
+            name,
+            reason: (result as { message?: string }).message ?? "Create failed",
+          });
+          error += 1;
+        } else {
+          results.push({ row: rowNum, status: "created", name });
+          created += 1;
+        }
       }
     } catch (err) {
       results.push({

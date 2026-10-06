@@ -52,6 +52,21 @@ type LeanInvoice = {
     staff: mongoose.Types.ObjectId;
     lineTotal: number;
   }>;
+  comboItems?: Array<{
+    combo: mongoose.Types.ObjectId;
+    name: string;
+    price: number;
+    qty: number;
+    lineTotal: number;
+    listTotal?: number;
+    components?: Array<{
+      service: mongoose.Types.ObjectId;
+      name: string;
+      listPrice: number;
+      allocatedAmount: number;
+      staff: mongoose.Types.ObjectId;
+    }>;
+  }>;
   serviceSubtotal?: number;
   productSubtotal?: number;
   serviceDiscountTotal?: number;
@@ -178,10 +193,30 @@ function productNet(inv: LeanInvoice): number {
 
 /**
  * Allocate section discount proportionally across lines:
- * attributed = lineTotal * (sectionNet / sumLines) when sumLines > 0
+ * attributed = lineTotal * (sectionNet / sumLines) when sumLines > 0.
+ * Combo components participate via allocatedAmount (already after line discount).
  */
 function attributedServiceLines(inv: LeanInvoice) {
-  const lines = inv.serviceItems ?? [];
+  const lines = [
+    ...(inv.serviceItems ?? []).map((l) => ({
+      service: l.service,
+      name: l.name,
+      price: l.price,
+      qty: l.qty,
+      staff: l.staff,
+      lineTotal: Number(l.lineTotal ?? 0),
+    })),
+    ...(inv.comboItems ?? []).flatMap((combo) =>
+      (combo.components ?? []).map((c) => ({
+        service: c.service,
+        name: c.name,
+        price: c.listPrice,
+        qty: 1,
+        staff: c.staff,
+        lineTotal: Number(c.allocatedAmount ?? 0),
+      })),
+    ),
+  ];
   const sumLines = round2(lines.reduce((s, l) => s + Number(l.lineTotal ?? 0), 0));
   const net = serviceNet(inv);
   const factor = sumLines > 0 ? net / sumLines : 0;
@@ -189,6 +224,10 @@ function attributedServiceLines(inv: LeanInvoice) {
     ...l,
     attributed: round2(Number(l.lineTotal ?? 0) * factor),
   }));
+}
+
+function combosSoldCount(inv: LeanInvoice): number {
+  return (inv.comboItems ?? []).reduce((s, l) => s + Number(l.qty ?? 1), 0);
 }
 
 function attributedProductLines(inv: LeanInvoice) {
@@ -413,6 +452,10 @@ function salesTableRows(invoices: LeanInvoice[]) {
       (s, l) => s + Number(l.qty ?? 1),
       0,
     );
+    const comboComponentQty = (inv.comboItems ?? []).reduce(
+      (s, combo) => s + (combo.components?.length ?? 0) * Number(combo.qty ?? 1),
+      0,
+    );
     const productQty = (inv.productItems ?? []).reduce(
       (s, l) => s + Number(l.qty ?? 1),
       0,
@@ -424,7 +467,7 @@ function salesTableRows(invoices: LeanInvoice[]) {
       createdAt: created ? created.toISOString() : "",
       customerName: customerDisplayName(cust, inv.walkInName),
       walkIn: Boolean(inv.walkIn),
-      itemsCount: serviceQty + productQty,
+      itemsCount: serviceQty + comboComponentQty + productQty,
       revenue: invoiceRevenue(inv),
       tip: round2(Number(inv.tip ?? 0)),
       amountPayable: round2(Number(inv.amountPayable ?? inv.grandTotal ?? 0)),
@@ -460,6 +503,7 @@ export const getReportsSales = async (
     order?: unknown;
     q?: unknown;
     chartSeries?: unknown;
+    allBills?: unknown;
   },
   opts: ReportOpts,
 ) => {
@@ -532,7 +576,18 @@ export const getReportsSales = async (
 
     let rows = filterSalesByQ(salesTableRows(curr), q);
     rows = sortByKey(rows as unknown as Record<string, unknown>[], sort, order) as typeof rows;
-    const table = paginate(rows, page, limit);
+    const allBills =
+      query.allBills === true ||
+      query.allBills === "true" ||
+      query.allBills === "1";
+    const table = allBills
+      ? {
+          items: rows,
+          total: rows.length,
+          page: 1,
+          limit: rows.length || 1,
+        }
+      : paginate(rows, page, limit);
 
     const kpis = opts.canViewRevenue
       ? kpisRaw
@@ -1819,6 +1874,7 @@ export const getReportsServices = async (
 
     const soldCount = [...agg.values()].reduce((s, r) => s + r.qty, 0);
     const distinctCount = agg.size;
+    const combosSold = invoices.reduce((s, inv) => s + combosSoldCount(inv), 0);
     const avgDiscountPct =
       totalServiceSubtotal > 0
         ? round2((totalServiceDiscount / totalServiceSubtotal) * 100)
@@ -1829,6 +1885,7 @@ export const getReportsServices = async (
       revenue: opts.canViewRevenue ? totalRevenue : null,
       distinctCount,
       avgDiscountPct: opts.canViewRevenue ? avgDiscountPct : null,
+      combosSold,
     };
 
     const byRevenue = [...rows]
@@ -1992,6 +2049,7 @@ export const getReportsProducts = async (
         "avgPriceCharged",
         "discountPctEffect",
         "revenueShare",
+        "stockQty",
       ],
       "revenue",
     );
@@ -2036,7 +2094,7 @@ export const getReportsProducts = async (
     }
 
     const productIds = [...agg.keys()];
-    const catalog = await Product.find({ _id: { $in: productIds } }).lean();
+    const catalog = await Product.find().lean();
     const catalogById = new Map(catalog.map((p) => [String(p._id), p]));
 
     const allStaffIds = [
@@ -2076,6 +2134,7 @@ export const getReportsProducts = async (
         productId: id,
         name: current?.name ?? r.snapshotName,
         timesSold: r.qty,
+        unitsSold: r.qty,
         revenue: r.revenue,
         listPrice,
         avgPriceCharged,
@@ -2085,6 +2144,10 @@ export const getReportsProducts = async (
         topSellerStaffId,
         topSellerStaffName,
         topSellerSales,
+        stockQty: current?.trackStock ? Number(current.stockQty ?? 0) : null,
+        unit: current?.unit ?? "",
+        trackStock: Boolean(current?.trackStock),
+        type: current?.type ?? "retail",
       };
     });
 

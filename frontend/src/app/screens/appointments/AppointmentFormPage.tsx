@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 
@@ -12,7 +12,13 @@ import {
 import { FormField } from '@/app/components/FormField'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
 import {
   Select,
@@ -29,6 +35,7 @@ import {
 } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
+import { useCombosQuery } from '@/app/hooks/queries/useCombosQuery'
 import { useServicesCatalogQuery } from '@/app/hooks/queries/useServicesQuery'
 import { useActiveStaffQuery } from '@/app/hooks/queries/useStaffQuery'
 import {
@@ -46,6 +53,7 @@ import { isAppointmentLocked } from '@/app/utils/salonTime'
 import { AppointmentSidePanel } from '@/app/screens/appointments/AppointmentSidePanel'
 
 const lineSchema = z.object({
+  /** Service ObjectId, or `combo:<id>` for package selection. */
   serviceId: z.string().min(1, 'Pick a service'),
   staffId: z.string().min(1, 'Pick staff'),
 })
@@ -88,6 +96,7 @@ export function AppointmentFormPage() {
   const appointmentQuery = useAppointmentQuery(id)
   const customersQuery = useCustomersQuery()
   const servicesQuery = useServicesCatalogQuery()
+  const combosQuery = useCombosQuery(true)
   const staffQuery = useActiveStaffQuery()
   const settingsQuery = useSalonSettingsQuery()
   const createMutation = useCreateAppointmentMutation()
@@ -147,9 +156,9 @@ export function AppointmentFormPage() {
     })
   }, [appointmentQuery.data, form])
 
-  const watchedServices = form.watch('services')
-  const startTime = form.watch('startTime')
-  const mode = form.watch('mode')
+  const watchedServices = useWatch({ control: form.control, name: 'services' })
+  const startTime = useWatch({ control: form.control, name: 'startTime' })
+  const mode = useWatch({ control: form.control, name: 'mode' })
   const catalog = servicesQuery.data ?? []
   const suggestCatalog = useMemo(
     (): SuggestableService[] =>
@@ -170,13 +179,19 @@ export function AppointmentFormPage() {
     setFocusStaffIndex(null)
   }, [focusStaffIndex, fields.length])
 
+  const combos = combosQuery.data ?? []
+
   const duration = useMemo(
     () =>
       (watchedServices ?? []).reduce((sum, line) => {
+        if (line.serviceId.startsWith('combo:')) {
+          const combo = combos.find((c) => c._id === line.serviceId.slice(6))
+          return sum + (combo?.totalDuration ?? 0)
+        }
         const svc = catalog.find((s) => s._id === line.serviceId)
         return sum + (svc?.durationMinutes ?? 0)
       }, 0),
-    [watchedServices, catalog],
+    [watchedServices, catalog, combos],
   )
 
   const endTimePreview =
@@ -185,10 +200,14 @@ export function AppointmentFormPage() {
   const priceTotal = useMemo(
     () =>
       (watchedServices ?? []).reduce((sum, line) => {
+        if (line.serviceId.startsWith('combo:')) {
+          const combo = combos.find((c) => c._id === line.serviceId.slice(6))
+          return sum + (combo?.comboPrice ?? 0)
+        }
         const svc = catalog.find((s) => s._id === line.serviceId)
         return sum + (svc?.price ?? 0)
       }, 0),
-    [watchedServices, catalog],
+    [watchedServices, catalog, combos],
   )
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -196,7 +215,11 @@ export function AppointmentFormPage() {
       date: values.date,
       startTime: values.startTime,
       notes: values.notes?.trim() || undefined,
-      services: values.services,
+      services: values.services.map((line) =>
+        line.serviceId.startsWith('combo:')
+          ? { comboId: line.serviceId.slice(6), staffId: line.staffId }
+          : { serviceId: line.serviceId, staffId: line.staffId },
+      ),
       ...(values.mode === 'customer'
         ? {
             customerId: values.customerId,
@@ -353,38 +376,58 @@ export function AppointmentFormPage() {
           </Card>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader>
               <CardTitle>{APPOINTMENTS.form.sectionServices}</CardTitle>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => append({ serviceId: '', staffId: prefillStaff ?? '' })}
-              >
-                <Plus className="size-3.5" strokeWidth={1.75} />
-                {APPOINTMENTS.form.addService}
-              </Button>
+              <CardAction>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    append({ serviceId: '', staffId: prefillStaff ?? '' })
+                  }
+                >
+                  <Plus className="size-3.5" strokeWidth={1.75} />
+                  {APPOINTMENTS.form.addService}
+                </Button>
+              </CardAction>
             </CardHeader>
             <CardContent className="space-y-3">
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="space-y-2 rounded-xl border border-border p-3"
+                  className="flex items-end gap-2 rounded-xl border border-border p-3"
                 >
                   <FormField
                     label={APPOINTMENTS.form.services}
-                    error={form.formState.errors.services?.[index]?.serviceId?.message}
+                    className="min-w-0 flex-1 basis-0"
+                    error={
+                      form.formState.errors.services?.[index]?.serviceId?.message
+                    }
                   >
                     <Select
                       value={form.watch(`services.${index}.serviceId`) || undefined}
                       onValueChange={(v) =>
-                        form.setValue(`services.${index}.serviceId`, v)
+                        form.setValue(`services.${index}.serviceId`, v, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        })
                       }
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {combos.map((combo) => (
+                          <SelectItem
+                            key={`combo-${combo._id}`}
+                            value={`combo:${combo._id}`}
+                          >
+                            {combo.name} · {combo.totalDuration}{' '}
+                            {APPOINTMENTS.form.estimatedMinutes}
+                          </SelectItem>
+                        ))}
                         {catalog.map((svc) => (
                           <SelectItem key={svc._id} value={svc._id}>
                             {svc.name} · {svc.durationMinutes}{' '}
@@ -394,46 +437,51 @@ export function AppointmentFormPage() {
                       </SelectContent>
                     </Select>
                   </FormField>
-                  <div className="flex items-end gap-2">
-                    <FormField
-                      label={APPOINTMENTS.form.assignStaff}
-                      className="min-w-0 flex-1"
-                      error={form.formState.errors.services?.[index]?.staffId?.message}
+                  <FormField
+                    label={APPOINTMENTS.form.assignStaff}
+                    className="min-w-0 flex-1 basis-0"
+                    error={
+                      form.formState.errors.services?.[index]?.staffId?.message
+                    }
+                  >
+                    <Select
+                      value={form.watch(`services.${index}.staffId`) || undefined}
+                      onValueChange={(v) =>
+                        form.setValue(`services.${index}.staffId`, v, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        })
+                      }
                     >
-                      <Select
-                        value={form.watch(`services.${index}.staffId`) || undefined}
-                        onValueChange={(v) =>
-                          form.setValue(`services.${index}.staffId`, v)
-                        }
+                      <SelectTrigger
+                        ref={(el) => {
+                          staffFocusRefs.current[index] = el
+                        }}
+                        className="w-full"
                       >
-                        <SelectTrigger
-                          ref={(el) => {
-                            staffFocusRefs.current[index] = el
-                          }}
-                          className="w-full"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(staffQuery.data ?? []).map((s) => (
-                            <SelectItem key={s._id} value={s._id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormField>
-                    {fields.length > 1 ? (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="size-4" strokeWidth={1.75} />
-                      </Button>
-                    ) : null}
-                  </div>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(staffQuery.data ?? []).map((s) => (
+                          <SelectItem key={s._id} value={s._id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  {fields.length > 1 ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 self-end"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="size-4" strokeWidth={1.75} />
+                    </Button>
+                  ) : null}
                 </div>
               ))}
               <CategorySuggestions
@@ -446,7 +494,11 @@ export function AppointmentFormPage() {
                     (l) => !l.serviceId,
                   )
                   if (emptyIndex >= 0) {
-                    form.setValue(`services.${emptyIndex}.serviceId`, serviceId)
+                    form.setValue(`services.${emptyIndex}.serviceId`, serviceId, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    })
                     setFocusStaffIndex(emptyIndex)
                     return
                   }
@@ -510,6 +562,20 @@ export function AppointmentFormPage() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Desktop: actions sit under pricing so the right column is usable without scrolling */}
+          <div className="hidden gap-2 lg:grid lg:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(ROUTES.appointments)}
+            >
+              {APPOINTMENTS.form.cancel}
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? COMMON.labels.loading : APPOINTMENTS.form.save}
+            </Button>
+          </div>
         </div>
 
         {form.formState.errors.root ? (
@@ -518,8 +584,9 @@ export function AppointmentFormPage() {
           </p>
         ) : null}
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 p-3 pb-safe lg:static lg:col-span-3 lg:border-0 lg:bg-transparent lg:p-0">
-          <div className="mx-auto flex max-w-5xl justify-end gap-2">
+        {/* Mobile: sticky bottom bar */}
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 p-3 pb-safe lg:hidden">
+          <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"

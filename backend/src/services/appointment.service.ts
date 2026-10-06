@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import { Appointment } from "../models/appointment.model";
+import { Combo } from "../models/combo.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
@@ -75,7 +76,10 @@ function formatAmPm(totalMinutes: number): string {
 }
 
 export interface AppointmentServiceInput {
-  serviceId: string;
+  /** Regular service line. Omit when expanding a combo. */
+  serviceId?: string;
+  /** Expand combo into component services (same staff). */
+  comboId?: string;
   staffId: string;
 }
 
@@ -143,12 +147,6 @@ async function buildServiceLines(services: AppointmentServiceInput[]) {
 
   const lines = [];
   for (const item of services) {
-    const service = await Service.findById(item.serviceId);
-    if (!service) {
-      throw Object.assign(new Error(`Service not found: ${item.serviceId}`), {
-        statusCode: 400,
-      });
-    }
     const staff = await Staff.findById(item.staffId);
     if (!staff) {
       throw Object.assign(new Error(`Staff not found: ${item.staffId}`), {
@@ -160,6 +158,50 @@ async function buildServiceLines(services: AppointmentServiceInput[]) {
         new Error(`Staff "${staff.name}" is inactive and cannot be booked`),
         { statusCode: 400 },
       );
+    }
+
+    if (item.comboId) {
+      const combo = await Combo.findOne({
+        _id: item.comboId,
+        isDeleted: false,
+        isActive: true,
+      });
+      if (!combo) {
+        throw Object.assign(new Error(`Combo not found: ${item.comboId}`), {
+          statusCode: 400,
+        });
+      }
+      for (const row of combo.services) {
+        const service = await Service.findById(row.service);
+        if (!service) {
+          throw Object.assign(
+            new Error(`Service not found in combo: ${String(row.service)}`),
+            { statusCode: 400 },
+          );
+        }
+        const qty = Math.max(1, Math.floor(Number(row.qty) || 1));
+        for (let i = 0; i < qty; i += 1) {
+          lines.push({
+            service: service._id as mongoose.Types.ObjectId,
+            name: service.name,
+            durationMinutes: service.durationMinutes ?? 30,
+            staff: staff._id as mongoose.Types.ObjectId,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (!item.serviceId) {
+      throw Object.assign(new Error("serviceId or comboId is required"), {
+        statusCode: 400,
+      });
+    }
+    const service = await Service.findById(item.serviceId);
+    if (!service) {
+      throw Object.assign(new Error(`Service not found: ${item.serviceId}`), {
+        statusCode: 400,
+      });
     }
     lines.push({
       service: service._id as mongoose.Types.ObjectId,

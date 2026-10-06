@@ -103,6 +103,9 @@ export const REPORTS = {
       status: 'Status',
     },
     searchPlaceholder: 'Search invoice or customer',
+    filters: {
+      paymentAll: 'All payments',
+    },
   },
   staff: {
     title: 'Staff performance',
