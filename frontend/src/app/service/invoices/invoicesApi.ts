@@ -207,7 +207,10 @@ export const invoicesApi = {
         expiresAt: string
         hasActiveLink: boolean
       }>
-    >(`/invoice/${id}/share-link`, opts)
+    >(`/invoice/${id}/share-link`, {
+      ...opts,
+      origin: window.location.origin,
+    })
     return data.data
   },
 

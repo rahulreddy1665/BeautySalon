@@ -19,9 +19,20 @@ function cacheUrl(invoiceId: string, url: string) {
   }
 }
 
+/** Keep the token path, but always prefix the frontend the staff is using. */
+function withFrontendOrigin(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return url
+  }
+}
+
 function readCachedUrl(invoiceId: string): string | null {
   try {
-    return sessionStorage.getItem(`${CACHE_PREFIX}${invoiceId}`)
+    const cached = sessionStorage.getItem(`${CACHE_PREFIX}${invoiceId}`)
+    return cached ? withFrontendOrigin(cached) : null
   } catch {
     return null
   }
@@ -39,8 +50,9 @@ async function ensureShareUrl(invoiceId: string): Promise<string> {
   const cached = readCachedUrl(invoiceId)
   const result = await invoicesApi.createShareLink(invoiceId)
   if (result.url) {
-    cacheUrl(invoiceId, result.url)
-    return result.url
+    const url = withFrontendOrigin(result.url)
+    cacheUrl(invoiceId, url)
+    return url
   }
   if (result.reused && cached) return cached
   // Active link exists but plaintext was lost — renew once.
@@ -48,8 +60,9 @@ async function ensureShareUrl(invoiceId: string): Promise<string> {
   if (!renewed.url) {
     throw new Error(BILLING.invoice.shareFailed)
   }
-  cacheUrl(invoiceId, renewed.url)
-  return renewed.url
+  const url = withFrontendOrigin(renewed.url)
+  cacheUrl(invoiceId, url)
+  return url
 }
 
 export type SendInvoiceInput = {

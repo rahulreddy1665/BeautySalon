@@ -13,16 +13,31 @@ function mintToken(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-function publicBaseUrl(): string {
+function publicBaseUrl(requestOrigin?: string): string {
+  const fromRequest = sanitizeOrigin(requestOrigin);
   const base =
+    fromRequest ||
     process.env.PUBLIC_APP_URL ||
     process.env.FRONTEND_URL ||
-    "http://localhost:5173";
+    "https://beauty5salon.netlify.app/";
   return base.replace(/\/$/, "");
 }
 
-function buildPublicUrl(token: string): string {
-  return `${publicBaseUrl()}/i/${token}`;
+/** Browser origin only. Rejects paths, credentials, and non-http schemes. */
+function sanitizeOrigin(value?: string): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.username || url.password) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function buildPublicUrl(token: string, requestOrigin?: string): string {
+  return `${publicBaseUrl(requestOrigin)}/i/${token}`;
 }
 
 /** Active = not revoked and not expired. */
@@ -36,7 +51,7 @@ async function findActiveLink(invoiceId: string) {
 
 export const createOrReuseShareLink = async (
   invoiceId: string,
-  opts: { renew?: boolean } = {},
+  opts: { renew?: boolean; origin?: string } = {},
 ) => {
   try {
     const invoice = await Invoice.findById(invoiceId).select("_id");
@@ -84,7 +99,7 @@ export const createOrReuseShareLink = async (
       message: "Share link created",
       data: {
         reused: false,
-        url: buildPublicUrl(token),
+        url: buildPublicUrl(token, opts.origin),
         expiresAt,
         hasActiveLink: true,
       },
