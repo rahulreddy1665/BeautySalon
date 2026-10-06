@@ -231,6 +231,20 @@ export function NewBillScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per appointment id
   }, [appointmentQuery.data, servicesQuery.data])
 
+  useEffect(() => {
+    const onFocusIn = (event: FocusEvent) => {
+      if (!window.matchMedia('(max-width: 1023px)').matches) return
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return
+      window.setTimeout(() => {
+        target.scrollIntoView({ block: 'center', inline: 'nearest' })
+      }, 300)
+    }
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [])
+
   const missingStaff = cart.lines.some((l) => {
     if (l.kind === 'combo') {
       return !(l.components ?? []).length || (l.components ?? []).some((c) => !c.staffId)
@@ -458,6 +472,10 @@ export function NewBillScreen() {
         .replace('{amount}', formatINR(totals.payable))
         .replace('{mode}', COMMON.paymentMode[cart.paymentMode])
     : BILLING.new.checkout
+  const collectShort = BILLING.new.collectAmount.replace(
+    '{amount}',
+    formatINR(totals.payable),
+  )
 
   const cgstRate = taxSettings?.services.cgstPercent ?? 0
   const sgstRate = taxSettings?.services.sgstPercent ?? 0
@@ -625,6 +643,26 @@ export function NewBillScreen() {
             focusStaffLineId={focusStaffLineId}
             onFocusStaffHandled={() => setFocusStaffLineId(null)}
           />
+
+          <div className="lg:hidden">
+            <BillSummaryPanel
+              totals={totals}
+              cart={cart}
+              loyaltyEnabled={loyaltyEnabled}
+              availablePoints={availableLoyaltyPoints}
+              maxRedeemPoints={maxRedeemablePoints}
+              cgstRate={cgstRate}
+              sgstRate={sgstRate}
+              showRoundOff={showRoundOff}
+              canCheckout={canCheckout}
+              checkoutReason={checkoutReason}
+              collectLabel={collectLabel}
+              saving={createBill.isPending}
+              onCollect={() => void submit()}
+              idPrefix="m-"
+              {...summaryHandlers}
+            />
+          </div>
         </div>
 
         <div className="hidden min-w-0 xl:sticky xl:top-14 xl:block xl:self-start">
@@ -647,7 +685,7 @@ export function NewBillScreen() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card p-3 pb-safe xl:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 hidden border-t border-border bg-card p-3 pb-safe lg:block xl:hidden">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -673,8 +711,45 @@ export function NewBillScreen() {
         ) : null}
       </div>
 
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+        {!canCheckout ? (
+          <p className="px-3 pt-1 text-center text-[11px] leading-tight text-muted-foreground">
+            {checkoutReason}
+          </p>
+        ) : null}
+        <div className="flex h-16 items-center gap-2 px-3">
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={() => setSummaryOpen(true)}
+          >
+            <p className="text-xs text-muted-foreground">{BILLING.new.payable}</p>
+            <p className="text-xl font-semibold tabular-nums leading-none">
+              {formatINR(totals.payable)}
+            </p>
+          </button>
+          <Button
+            type="button"
+            className="h-10 shrink-0 px-3 whitespace-nowrap"
+            disabled={!canCheckout || createBill.isPending}
+            onClick={() => void submit()}
+          >
+            <span className="max-[400px]:hidden">
+              {createBill.isPending ? BILLING.new.saving : collectLabel}
+            </span>
+            <span className="hidden max-[400px]:inline">
+              {createBill.isPending ? BILLING.new.saving : collectShort}
+            </span>
+          </Button>
+        </div>
+      </div>
+
       <Sheet open={summaryOpen} onOpenChange={setSummaryOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85dvh] overflow-y-auto rounded-t-2xl"
+        >
+          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-muted lg:hidden" />
           <SheetHeader>
             <SheetTitle>{BILLING.new.summaryTitle}</SheetTitle>
           </SheetHeader>
@@ -688,6 +763,7 @@ export function NewBillScreen() {
               cgstRate={cgstRate}
               sgstRate={sgstRate}
               showRoundOff={showRoundOff}
+              idPrefix="sheet-"
               {...summaryHandlers}
             />
             <Button

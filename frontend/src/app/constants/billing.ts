@@ -118,6 +118,7 @@ export const BILLING = {
     amountReceived: 'Amount received',
     changeToReturn: 'Change to return',
     collectVia: 'Collect {amount} via {mode}',
+    collectAmount: 'Collect {amount}',
     checkout: 'Checkout',
     reset: 'Reset',
     saving: 'Saving…',

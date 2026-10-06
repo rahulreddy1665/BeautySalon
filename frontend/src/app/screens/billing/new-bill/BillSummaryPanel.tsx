@@ -95,6 +95,7 @@ export function BillSummaryBody({
   cgstRate,
   sgstRate,
   showRoundOff,
+  idPrefix = '',
   ...handlers
 }: {
   totals: ReturnType<typeof selectCartTotals>
@@ -106,6 +107,7 @@ export function BillSummaryBody({
   cgstRate: number
   sgstRate: number
   showRoundOff: boolean
+  idPrefix?: string
 } & BillSummaryHandlers) {
   const [customTip, setCustomTip] = useState(
     () => cart.tip > 0 && !TIP_CHIP_AMOUNTS.includes(cart.tip as (typeof TIP_CHIP_AMOUNTS)[number]),
@@ -342,9 +344,9 @@ export function BillSummaryBody({
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="bill-notes">{BILLING.new.notes}</Label>
+        <Label htmlFor={`${idPrefix}bill-notes`}>{BILLING.new.notes}</Label>
         <Input
-          id="bill-notes"
+          id={`${idPrefix}bill-notes`}
           value={cart.notes}
           placeholder={BILLING.new.notesPlaceholder}
           className="h-10"
@@ -371,9 +373,9 @@ export function BillSummaryBody({
         {cart.paymentMode === 'cash' ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="cash-recv">{BILLING.new.amountReceived}</Label>
+              <Label htmlFor={`${idPrefix}cash-recv`}>{BILLING.new.amountReceived}</Label>
               <Input
-                id="cash-recv"
+                id={`${idPrefix}cash-recv`}
                 type="number"
                 min={0}
                 className="h-10"
@@ -410,6 +412,7 @@ export function BillSummaryPanel({
   collectLabel,
   saving,
   onCollect,
+  idPrefix = '',
   ...handlers
 }: {
   totals: ReturnType<typeof selectCartTotals>
@@ -425,6 +428,7 @@ export function BillSummaryPanel({
   collectLabel: string
   saving: boolean
   onCollect: () => void
+  idPrefix?: string
 } & BillSummaryHandlers) {
   return (
     <Card className="min-w-0">
@@ -441,6 +445,7 @@ export function BillSummaryPanel({
           cgstRate={cgstRate}
           sgstRate={sgstRate}
           showRoundOff={showRoundOff}
+          idPrefix={idPrefix}
           {...handlers}
         />
         <Button

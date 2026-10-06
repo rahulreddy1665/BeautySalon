@@ -63,7 +63,11 @@ export const COMMON = {
     noAccessHint: 'Ask an admin if you need permission.',
     notFound: 'Page not found',
     notFoundHint: 'That screen does not exist.',
+    tryAgain: 'Try again',
+    reload: 'Reload',
     goHome: 'Go to dashboard',
+    newVersion: 'A new version is available',
+    serverUnreachable: "Can't reach the server, retrying",
   },
   toasts: {
     saved: 'Saved',

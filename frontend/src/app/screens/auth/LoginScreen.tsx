@@ -87,9 +87,14 @@ export function LoginScreen() {
   const passwordInputRef = useRef<HTMLInputElement | null>(null)
   const formId = useId()
 
-  const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ??
-    ROUTES.home
+  const fromState = (
+    location.state as {
+      from?: { pathname?: string; search?: string; hash?: string }
+    } | null
+  )?.from
+  const from = fromState?.pathname
+    ? `${fromState.pathname}${fromState.search ?? ''}${fromState.hash ?? ''}`
+    : ROUTES.home
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

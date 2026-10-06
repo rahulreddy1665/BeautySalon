@@ -103,8 +103,8 @@ ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens fo
 
 - **Full-bleed:** no outer page gap, radius, or frame. Sidebar flush left/top/bottom; top bar flush top/right; content fills the rest (`h-dvh`, content scrolls).
 - **lg+:** collapsible sidebar (`w-[260px]` / `72px`); logo row and top bar share **64px** height and one continuous bottom border; sidebar has a right border only.
-- **&lt; lg:** mobile top bar = **56px + safe-area-inset-top**; bottom nav adds **safe-area-inset-bottom**.
-- Sticky top bar: search | theme + calendar `IconButton`s (40×40) | contextual CTA (New bill / New appointment / Add customer — icon-only under `sm`).
+- **&lt; lg:** mobile top bar = **56px + safe-area-inset-top**. Left to right: logo mark, truncated page title, search icon, one labeled primary button (plus icon + “New bill” / “New appointment” / “Add customer”; label drops only under 340px). Theme and today’s appointments live in the More sheet. Bottom nav is Dashboard, Appointments, Billing, Customers, More. `/billing/new` hides that nav and shows a header back control so the checkout bar sits on the bottom edge.
+- **lg+:** collapsible sidebar and the existing header (search field, theme, calendar, text CTA) are unchanged.
 - Content padding: 16px mobile / 20px desktop. Page headers must **not** duplicate top-bar primary CTAs.
 - Safe areas: `pt-safe` / `pb-safe` / `env(safe-area-inset-*)`.
 - `min-h-dvh` / `h-dvh`, inputs ≥ 16px on mobile, touch targets ≥ 44px (`.min-touch`).
@@ -117,6 +117,14 @@ ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens fo
 - Dual `<meta name="theme-color">` (light/dark) + runtime sync to card/sidebar white / `#141414`.
 - `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style=default`, `apple-touch-icon`.
 - Installed PWAs cache the manifest — users must remove/re-add the home-screen app after theme changes. HTTPS required outside localhost.
+
+## Routing
+
+`BrowserRouter` is the only navigation source. Each screen is a URL (`/`, `/appointments?date=&appointment=`, `/billing`, `/billing/new`, `/billing/:id`, `/customers`, `/reports/*`, `/settings/*`). Reload, back, and forward stay on that URL. `PersistGate` keeps the splash up until redux-persist rehydrates; route guards run after that. Login returns to `from.pathname + search + hash`. Unknown URLs render the 404 page; missing permission renders `/forbidden`. `frontend/public/_redirects` (`/* /index.html 200`) is copied into `dist` for Netlify. The service worker `navigateFallback` is `/index.html` and denylists `/api/` and `/assets/`. Axios logs out only on HTTP 401. Network errors and 5xx show the retry banner and retry with backoff. `GET /settings` uses a 60s timeout. A class `ErrorBoundary` wraps the app and each route outlet (Try again, Reload, Go to dashboard). Chunk or MIME load failures show “A new version is available”, unregister the service worker once (`sessionStorage` guard), and reload.
+
+## New bill on a phone
+
+Below `lg` the page is one column: customer, catalog, line cards, then an inline bill summary (same fields as the desktop panel, including notes, tax, loyalty, tip, and payment). A 64px bar is fixed to the bottom, above the safe area: Payable opens the summary sheet; Collect follows the payment mode and shortens to “Collect {amount}” under 400px. The bar is `lg:hidden`. From `lg` to just under `xl` the previous checkout bar stays; at `xl+` the right-hand sticky summary stays. Content padding uses `dvh` and the bar height plus the safe area. Focusing an input scrolls it above the bar.
 
 ## How to add a new responsive screen
 

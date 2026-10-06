@@ -11,7 +11,25 @@ import type { AppError } from '@/app/types/api'
 import { env } from '@/app/utils/env'
 import { createAppError } from '@/app/utils/errors'
 
-type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+type RetriableConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean
+  _netRetry?: number
+}
+
+const listeners = new Set<(offline: boolean) => void>()
+
+export function subscribeServerStatus(listener: (offline: boolean) => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function setServerOffline(offline: boolean) {
+  listeners.forEach((listener) => listener(offline))
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 class ApiClient {
   private readonly instance: AxiosInstance
@@ -39,7 +57,10 @@ class ApiClient {
     })
 
     this.instance.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        setServerOffline(false)
+        return response
+      },
       (error: AxiosError) => this.handleResponseError(error),
     )
   }
@@ -178,9 +199,22 @@ class ApiClient {
     })
   }
 
-  private async handleResponseError(error: AxiosError): Promise<never> {
+  private async handleResponseError(error: AxiosError): Promise<unknown> {
     const status = error.response?.status
     const originalRequest = error.config as RetriableConfig | undefined
+    const retriable = !error.response || (typeof status === 'number' && status >= 500)
+
+    if (retriable && originalRequest && (originalRequest._netRetry ?? 0) < 3) {
+      originalRequest._netRetry = (originalRequest._netRetry ?? 0) + 1
+      setServerOffline(true)
+      await sleep(1000 * 2 ** (originalRequest._netRetry - 1))
+      return this.instance.request(originalRequest)
+    }
+
+    if (retriable) {
+      setServerOffline(true)
+      return Promise.reject(this.normalizeError(error))
+    }
 
     if (status === 401 && originalRequest) {
       // Don't try to "refresh" the login call itself.

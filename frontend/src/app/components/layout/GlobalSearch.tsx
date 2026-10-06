@@ -191,7 +191,7 @@ export function GlobalSearch({ className }: { className?: string }) {
 
   return (
     <>
-      <div ref={wrapRef} className={cn('relative hidden min-w-0 md:block', className)}>
+      <div ref={wrapRef} className={cn('relative hidden min-w-0 lg:block', className)}>
         {field}
         {showResults ? (
           <div
@@ -214,7 +214,7 @@ export function GlobalSearch({ className }: { className?: string }) {
         type="button"
         variant="outline"
         size="icon-sm"
-        className="min-touch size-9 rounded-full md:hidden"
+        className="size-10 shrink-0 rounded-full lg:hidden"
         aria-label={COMMON.nav.searchPlaceholder}
         onClick={() => setSheetOpen(true)}
       >

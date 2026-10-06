@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  ArrowLeft,
   BarChart3,
   CalendarDays,
   ChevronRight,
@@ -12,6 +13,7 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Receipt,
   Scissors,
   Settings,
@@ -19,6 +21,7 @@ import {
   Users,
 } from 'lucide-react'
 
+import { ErrorBoundary } from '@/app/components/ErrorBoundary'
 import { GlobalSearch } from '@/app/components/layout/GlobalSearch'
 import { Logo } from '@/app/components/Logo'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
@@ -98,8 +101,8 @@ const managementNav: NavItem[] = [
 const mobilePrimary: NavItem[] = [
   { to: '/', label: COMMON.nav.dashboard, icon: LayoutDashboard, end: true },
   { to: '/appointments', label: COMMON.nav.appointments, icon: CalendarDays },
-  { to: '/customers', label: COMMON.nav.customers, icon: Users },
   { to: '/billing', label: COMMON.nav.billing, icon: Receipt },
+  { to: '/customers', label: COMMON.nav.customers, icon: Users },
 ]
 
 const mobileMore: NavItem[] = [
@@ -107,6 +110,22 @@ const mobileMore: NavItem[] = [
   ...financeNav.filter((i) => i.to !== '/billing'),
   ...managementNav,
 ]
+
+function pageTitle(pathname: string): string {
+  if (pathname === '/' || pathname === '') return COMMON.nav.dashboard
+  if (pathname.startsWith('/appointments')) return COMMON.nav.appointments
+  if (pathname.startsWith('/customers')) return COMMON.nav.customers
+  if (pathname.startsWith('/billing/new')) return COMMON.nav.newBill
+  if (pathname.startsWith('/billing')) return COMMON.nav.billing
+  if (pathname.startsWith('/staff')) return COMMON.nav.staff
+  if (pathname.startsWith('/services')) return COMMON.nav.services
+  if (pathname.startsWith('/inventory')) return COMMON.nav.products
+  if (pathname.startsWith('/loyalty')) return COMMON.nav.loyalty
+  if (pathname.startsWith('/reports')) return COMMON.nav.reports
+  if (pathname.startsWith('/settings')) return COMMON.nav.settings
+  if (pathname.startsWith('/account')) return COMMON.nav.account
+  return COMMON.appName
+}
 
 function initials(name?: string | null): string {
   if (!name) return '?'
@@ -244,20 +263,19 @@ function ContextualCta() {
 
   return (
     <>
-      <Button asChild size="sm" className="hidden h-10 rounded-full px-4 sm:inline-flex">
+      <Button asChild size="sm" className="hidden h-10 rounded-full px-4 lg:inline-flex">
         <Link to={to}>{label}</Link>
       </Button>
-      <IconButton asChild className="sm:hidden" aria-label={label}>
-        <Link to={to}>
-          {path.startsWith('/appointments') ? (
-            <CalendarDays strokeWidth={1.75} />
-          ) : path.startsWith('/customers') ? (
-            <Users strokeWidth={1.75} />
-          ) : (
-            <Receipt strokeWidth={1.75} />
-          )}
+      <Button
+        asChild
+        size="sm"
+        className="inline-flex h-10 shrink-0 rounded-full px-3 whitespace-nowrap lg:hidden"
+      >
+        <Link to={to} aria-label={label}>
+          <Plus className="size-4 shrink-0" strokeWidth={1.75} />
+          <span className="max-[340px]:sr-only">{label}</span>
         </Link>
-      </IconButton>
+      </Button>
     </>
   )
 }
@@ -338,6 +356,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
 export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const [moreOpen, setMoreOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -358,6 +377,8 @@ export function AppLayout() {
   const visibleManagement = useVisibleNav(managementNav)
   const visiblePrimary = useVisibleNav(mobilePrimary)
   const visibleMore = useVisibleNav(mobileMore)
+  const isNewBill = location.pathname === ROUTES.billingNew
+  const themeMode = useAppSelector((s) => s.settings.themeMode)
 
   useEffect(() => {
     try {
@@ -429,15 +450,32 @@ export function AppLayout() {
             )}
           </IconButton>
 
+          {isNewBill ? (
+            <IconButton
+              className="lg:hidden"
+              aria-label={COMMON.actions.back}
+              onClick={() => navigate(ROUTES.billing)}
+            >
+              <ArrowLeft strokeWidth={1.75} />
+            </IconButton>
+          ) : null}
+
           <div className="lg:hidden">
             <Logo size="sm" showText={false} />
           </div>
 
-          <GlobalSearch className="max-w-md flex-1" />
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold lg:hidden">
+            {pageTitle(location.pathname)}
+          </p>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <ThemeToggle />
+          <GlobalSearch className="max-w-md lg:flex-1" />
+
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:ml-auto">
+            <div className="hidden lg:contents">
+              <ThemeToggle />
+            </div>
             <IconButton
+              className="hidden lg:inline-flex"
               aria-label={COMMON.nav.todayCalendar}
               onClick={() =>
                 navigate(`${ROUTES.appointments}?date=${getSalonNow().dateKey}`)
@@ -452,13 +490,25 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)] md:px-5 md:py-5 lg:pb-5">
-          <Outlet />
+        <main
+          className={cn(
+            'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 md:px-5 md:py-5 lg:pb-5',
+            isNewBill
+              ? 'pb-[calc(4rem+1.5rem+env(safe-area-inset-bottom,0px))]'
+              : 'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)]',
+          )}
+        >
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden',
+          isNewBill && 'hidden',
+        )}
         aria-label="Mobile navigation"
       >
         {visiblePrimary.map((item) => (
@@ -503,6 +553,40 @@ export function AppLayout() {
               </SheetTitle>
             </SheetHeader>
             <div className="mt-2 space-y-0.5">
+              <button
+                type="button"
+                className="flex h-10 w-full items-center gap-2 rounded-full px-3 text-left text-sm hover:bg-muted/70"
+                onClick={() => {
+                  setMoreOpen(false)
+                  navigate(`${ROUTES.appointments}?date=${getSalonNow().dateKey}`)
+                }}
+              >
+                <CalendarDays className="size-4" strokeWidth={1.75} />
+                {COMMON.nav.todayCalendar}
+              </button>
+              <p className="px-3 pt-2 text-xs text-muted-foreground">
+                {COMMON.nav.theme}
+              </p>
+              <div className="flex gap-1.5 px-3 pb-1">
+                {(['light', 'dark', 'system'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={cn(
+                      'h-10 flex-1 rounded-full border border-border text-xs',
+                      themeMode === mode &&
+                        'border-primary bg-gold-soft font-medium text-gold-deep',
+                    )}
+                    onClick={() => dispatch(setThemeMode(mode))}
+                  >
+                    {mode === 'light'
+                      ? COMMON.nav.themeLight
+                      : mode === 'dark'
+                        ? COMMON.nav.themeDark
+                        : COMMON.nav.themeSystem}
+                  </button>
+                ))}
+              </div>
               {visibleMore.map((item) => (
                 <NavLink
                   key={item.to}
