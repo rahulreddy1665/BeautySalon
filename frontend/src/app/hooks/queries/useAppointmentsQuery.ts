@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
@@ -13,8 +13,17 @@ import { toErrorMessage } from '@/app/utils'
 
 export function useAppointmentsQuery(params: AppointmentListParams) {
   return useQuery({
-    queryKey: queryKeys.appointments.list(params as Record<string, unknown>),
+    queryKey: queryKeys.appointments.list({
+      from: params.from ?? '',
+      to: params.to ?? '',
+      date: params.date ?? '',
+      staffId: params.staffId ?? '',
+      status: params.status ?? '',
+      page: params.page ?? 1,
+      limit: params.limit ?? 50,
+    }),
     queryFn: () => appointmentsApi.list(params),
+    placeholderData: keepPreviousData,
   })
 }
 

@@ -217,7 +217,15 @@ export function AppointmentFormSheet({
             <FormField label="Customer type">
               <Select
                 value={mode}
-                onValueChange={(v) => form.setValue('mode', v as 'customer' | 'guest')}
+                onValueChange={(v) => {
+                  const next = v as 'customer' | 'guest'
+                  if (next === 'guest') {
+                    form.setValue('customerId', '')
+                    form.setValue('guestName', '')
+                    form.setValue('guestPhone', '')
+                  }
+                  form.setValue('mode', next)
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />

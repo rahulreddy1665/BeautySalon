@@ -14,6 +14,16 @@ import { DatePicker } from '@/app/components/ui/date-picker'
 import { Button } from '@/app/components/ui/button'
 import { REPORTS } from '@/app/constants'
 import { cn } from '@/app/utils'
+import { getSalonNow } from '@/app/utils/salonTime'
+
+function salonToday(): Date {
+  const [year, month, day] = getSalonNow().dateKey.split('-').map(Number)
+  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1)
+}
+
+function clampToToday(date: Date, today = salonToday()): Date {
+  return date.getTime() > today.getTime() ? today : date
+}
 
 export interface DateRange {
   from: Date
@@ -30,7 +40,7 @@ const PRESETS: { id: Exclude<PresetId, 'custom'>; label: string }[] = [
   { id: 'lastMonth', label: REPORTS.presets.lastMonth },
 ]
 
-function rangeForPreset(id: Exclude<PresetId, 'custom'>, now = new Date()): DateRange {
+function rangeForPreset(id: Exclude<PresetId, 'custom'>, now = salonToday()): DateRange {
   if (id === 'today') {
     return { from: startOfDay(now), to: endOfDay(now) }
   }
@@ -49,7 +59,7 @@ function rangeForPreset(id: Exclude<PresetId, 'custom'>, now = new Date()): Date
   return { from: startOfMonth(now), to: endOfDay(now) }
 }
 
-function detectPreset(value: DateRange, now = new Date()): PresetId {
+function detectPreset(value: DateRange, now = salonToday()): PresetId {
   for (const item of PRESETS) {
     const p = rangeForPreset(item.id, now)
     if (isSameDay(p.from, value.from) && isSameDay(p.to, value.to)) {
@@ -91,8 +101,14 @@ export function DateRangeFilter({ value, onChange, className }: DateRangeFilterP
 
   const applyCustom = () => {
     if (!customFrom || !customTo) return
+    const today = salonToday()
+    const from = clampToToday(startOfDay(customFrom), today)
+    let to = clampToToday(startOfDay(customTo), today)
+    if (from.getTime() > to.getTime()) to = from
+    setCustomFrom(from)
+    setCustomTo(to)
     setPickingCustom(false)
-    onChange({ from: startOfDay(customFrom), to: endOfDay(customTo) })
+    onChange({ from: startOfDay(from), to: endOfDay(to) })
   }
 
   return (
@@ -125,13 +141,15 @@ export function DateRangeFilter({ value, onChange, className }: DateRangeFilterP
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <DatePicker
             value={customFrom}
-            onChange={setCustomFrom}
+            onChange={(date) => setCustomFrom(date ? clampToToday(date) : date)}
             placeholder={REPORTS.presets.from}
+            disabled={{ after: salonToday() }}
           />
           <DatePicker
             value={customTo}
-            onChange={setCustomTo}
+            onChange={(date) => setCustomTo(date ? clampToToday(date) : date)}
             placeholder={REPORTS.presets.to}
+            disabled={{ after: salonToday() }}
           />
           <Button type="button" className="min-touch" onClick={applyCustom}>
             {REPORTS.presets.apply}

@@ -57,6 +57,7 @@ import {
   setPointsValueRatio,
   setTip,
   setWalkIn,
+  clearLines,
   setWalkInDetails,
   updateLine,
 } from '@/app/state/redux/slices/billingCartSlice'
@@ -586,6 +587,7 @@ export function NewBillScreen() {
             cart={cart}
             fromAppointment={fromAppointment}
             onWalkIn={() => dispatch(setWalkIn())}
+            onClearLines={() => dispatch(clearLines())}
             onSelectCustomer={(id, name) => dispatch(setCustomer({ id, name }))}
             onWalkInDetails={(patch) => {
               if (!cart.walkIn || cart.customerId) {

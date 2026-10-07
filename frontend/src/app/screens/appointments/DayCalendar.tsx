@@ -11,6 +11,7 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
+  formatCompactTimeRange,
   formatHourLabel,
   isTimeWithinHours,
   minutesToTime,
@@ -72,7 +73,7 @@ export function DayCalendar({
           {slots.map((mins) => (
             <div
               key={mins}
-              className="border-b border-border px-1 text-[10px] text-muted-foreground tabular-nums"
+              className="border-b border-r border-border px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums"
               style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
             >
               {mins % 60 === 0 ? formatHourLabel(mins) : ''}
@@ -83,6 +84,7 @@ export function DayCalendar({
         {staff.map((member) => {
           const columnAppts = appointments.filter(
             (appt) =>
+              appt.date === date &&
               appointmentOverlapsHours(appt.startTime, appt.endTime, hours) &&
               appt.services.some((line) => appointmentStaffId(line) === member._id),
           )
@@ -138,21 +140,31 @@ export function DayCalendar({
                       past && 'opacity-60',
                       !past && 'hover:brightness-[0.98]',
                     )}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTimeRange(appt.startTime, appt.endTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onAppointmentClick(appt)
                     }}
                   >
-                    <p className="truncate text-[11px] font-semibold leading-tight">
-                      {appointmentCustomerLabel(appt)}
-                    </p>
-                    <p className="truncate text-[10px] tabular-nums opacity-80">
-                      {appt.startTime}–{appt.endTime}
-                    </p>
-                    <p className="truncate text-[10px] opacity-70">
-                      {appt.services.map((s) => s.name).join(', ')}
-                    </p>
+                    {height < 40 ? (
+                      <p className="truncate text-[11px] leading-tight">
+                        {appointmentCustomerLabel(appt)}{' '}
+                        {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="truncate text-[11px] font-semibold leading-tight">
+                          {appointmentCustomerLabel(appt)}
+                        </p>
+                        <p className="truncate text-[10px] tabular-nums opacity-80">
+                          {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                        </p>
+                        <p className="truncate text-[10px] opacity-70">
+                          {appt.services.map((s) => s.name).join(', ')}
+                        </p>
+                      </>
+                    )}
                   </button>
                 )
               })}

@@ -1,4 +1,4 @@
-import { apiClient } from '@/app/service/apiClient'
+import { apiClient, publicGet } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type PaymentMode = 'upi' | 'cash' | 'card'
@@ -281,8 +281,8 @@ export interface PublicInvoicePayload {
 
 export const publicInvoiceApi = {
   getByToken: async (token: string): Promise<PublicInvoicePayload> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<PublicInvoicePayload>>(
-      `/public/invoice/${token}`,
+    const { data } = await publicGet<ApiSuccessResponse<PublicInvoicePayload>>(
+      `/public/invoice/${encodeURIComponent(token)}`,
     )
     return data.data
   },

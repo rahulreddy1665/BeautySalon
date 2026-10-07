@@ -310,7 +310,15 @@ export function AppointmentFormPage() {
               <FormField label={APPOINTMENTS.form.customer}>
                 <Select
                   value={mode}
-                  onValueChange={(v) => form.setValue('mode', v as 'customer' | 'guest')}
+                  onValueChange={(v) => {
+                    const next = v as 'customer' | 'guest'
+                    if (next === 'guest') {
+                      form.setValue('customerId', '')
+                      form.setValue('guestName', '')
+                      form.setValue('guestPhone', '')
+                    }
+                    form.setValue('mode', next)
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -536,13 +544,13 @@ export function AppointmentFormPage() {
                 label={APPOINTMENTS.form.date}
                 error={form.formState.errors.date?.message}
               >
-                <Input type="date" {...form.register('date')} />
+                <Input type="date" className="min-w-0 max-w-full" {...form.register('date')} />
               </FormField>
               <FormField
                 label={APPOINTMENTS.form.startTime}
                 error={form.formState.errors.startTime?.message}
               >
-                <Input type="time" step={1800} {...form.register('startTime')} />
+                <Input type="time" step={1800} className="min-w-0 max-w-full" {...form.register('startTime')} />
               </FormField>
               <FormField label={APPOINTMENTS.form.endTime}>
                 <Input value={endTimePreview} readOnly />

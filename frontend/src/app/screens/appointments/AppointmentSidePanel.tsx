@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns'
 import { Link } from 'react-router-dom'
 
 import { Avatar, AvatarFallback } from '@/app/components/ui/avatar'
@@ -14,6 +15,7 @@ import {
   appointmentStaffName,
   type Appointment,
 } from '@/app/service/appointments/appointmentsApi'
+import { formatCompactTimeRange } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusChipClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { formatINR } from '@/app/utils'
 import { isAppointmentLocked, isFinalAppointmentStatus } from '@/app/utils/salonTime'
@@ -133,8 +135,9 @@ export function AppointmentSidePanel({
           <dt className="text-xs text-muted-foreground">
             {APPOINTMENTS.detail.timeSlot}
           </dt>
-          <dd className="tabular-nums">
-            {appointment.date} · {appointment.startTime}–{appointment.endTime}
+          <dd className="min-w-0 break-words tabular-nums">
+            {format(parseISO(`${appointment.date}T12:00:00`), 'd MMM yyyy')}{' '}
+            {formatCompactTimeRange(appointment.startTime, appointment.endTime)}
           </dd>
         </div>
         <div>

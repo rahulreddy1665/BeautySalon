@@ -108,6 +108,7 @@ const billingCartSlice = createSlice({
       state.customerName = action.payload.name
       state.walkInPhone = ''
       state.appointmentId = null
+      state.loyaltyRedeemPoints = 0
     },
     beginCustomerSearch: (state) => {
       state.walkIn = false
@@ -184,6 +185,11 @@ const billingCartSlice = createSlice({
       const line = state.lines.find((item) => item.id === action.payload.id)
       if (line) Object.assign(line, action.payload.patch)
     },
+    clearLines: (state) => {
+      state.lines = []
+      state.loyaltyRedeemPoints = 0
+      state.tip = 0
+    },
     removeLine: (state, action: PayloadAction<string>) => {
       state.lines = state.lines.filter((item) => item.id !== action.payload)
     },
@@ -231,6 +237,7 @@ export const {
   addLine,
   updateLine,
   removeLine,
+  clearLines,
   setServiceDiscount,
   setProductDiscount,
   setLoyaltyRedeemPoints,

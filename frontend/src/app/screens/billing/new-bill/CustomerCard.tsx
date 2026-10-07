@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/ca
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { BILLING, COMMON, DASHBOARD } from '@/app/constants'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/dialog'
 import { useAppointmentsQuery } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import { useLoyaltyBalancesQuery } from '@/app/hooks/queries/useLoyaltyQuery'
@@ -37,6 +45,7 @@ export function CustomerCard({
   cart,
   fromAppointment,
   onWalkIn,
+  onClearLines,
   onSelectCustomer,
   onWalkInDetails,
   onLoadAppointment,
@@ -45,6 +54,7 @@ export function CustomerCard({
   cart: BillingCartState
   fromAppointment: boolean
   onWalkIn: () => void
+  onClearLines: () => void
   onSelectCustomer: (id: string, name: string) => void
   onWalkInDetails: (patch: { name?: string; phone?: string }) => void
   onLoadAppointment: (appt: Appointment) => void
@@ -55,6 +65,7 @@ export function CustomerCard({
   )
   const [customerSearch, setCustomerSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  const [confirmWalkIn, setConfirmWalkIn] = useState(false)
   const todayKey = getSalonNow().dateKey
 
   const customersQuery = useCustomersQuery()
@@ -103,12 +114,29 @@ export function CustomerCard({
     [bookedAppointments, cart.appointmentId],
   )
 
-  const switchMode = (next: 'walk-in' | 'appointment') => {
-    setMode(next)
-    if (next === 'walk-in' && cart.appointmentId) {
-      onClearAppointment()
-      onWalkIn()
+  const applyWalkIn = (clearItems: boolean) => {
+    onWalkIn()
+    if (clearItems) onClearLines()
+    setMode('walk-in')
+    setCustomerSearch('')
+    setConfirmWalkIn(false)
+  }
+
+  const requestWalkIn = () => {
+    const prefilled = Boolean(cart.appointmentId) && cart.lines.length > 0
+    if (prefilled) {
+      setConfirmWalkIn(true)
+      return
     }
+    applyWalkIn(false)
+  }
+
+  const switchMode = (next: 'walk-in' | 'appointment') => {
+    if (next === 'walk-in') {
+      requestWalkIn()
+      return
+    }
+    setMode(next)
   }
 
   return (
@@ -212,10 +240,7 @@ export function CustomerCard({
               size="sm"
               variant="outline"
               className="h-8"
-              onClick={() => {
-                onWalkIn()
-                setCustomerSearch('')
-              }}
+              onClick={() => requestWalkIn()}
             >
               {BILLING.new.changeCustomer}
             </Button>
@@ -298,6 +323,22 @@ export function CustomerCard({
         )}
       </CardContent>
 
+      <Dialog open={confirmWalkIn} onOpenChange={setConfirmWalkIn}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{BILLING.new.keepItemsTitle}</DialogTitle>
+            <DialogDescription>{BILLING.new.keepItemsTitle}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => applyWalkIn(false)}>
+              {BILLING.new.keepItems}
+            </Button>
+            <Button type="button" onClick={() => applyWalkIn(true)}>
+              {BILLING.new.clearItems}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CustomerFormSheet
         open={addOpen}
         onOpenChange={setAddOpen}

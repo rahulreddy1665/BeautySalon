@@ -11,3 +11,11 @@ To change the install icon:
 3. Rebuild and deploy (`npm run build`).
 
 Installed apps keep the old home-screen icon until the app is removed and installed again. The manifest and `sw.js` are served with `Cache-Control: no-cache` (`netlify.toml`) so a new install fetches the new files.
+
+## Invoice links
+
+WhatsApp invoice links use the frontend origin (`window.location.origin` sent with `POST /api/invoice/:id/share-link`). Set `PUBLIC_APP_URL` on Render to the Netlify or custom domain so a link created without that origin still points at the public site. The public page calls `GET /api/public/invoice/:token` with `VITE_API_BASE_URL` and no auth header. Rebuild the frontend after changing `VITE_API_BASE_URL`.
+
+## Appointments URL
+
+`/appointments?view=day|week|month|list&date=YYYY-MM-DD&staff=` is the source of truth. The list query key includes `from`, `to`, staff, and status for that range in the salon calendar.

@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { Download, Printer } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -6,8 +7,6 @@ import { toast } from 'sonner'
 
 import { InvoiceDocument } from '@/app/components/invoice/InvoiceDocument'
 import { buildPublicInvoiceViewModel } from '@/app/components/invoice/publicInvoiceViewModel'
-import { ErrorState } from '@/app/components/ErrorState'
-import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
 import { BILLING, COMMON } from '@/app/constants'
 import { publicInvoiceApi } from '@/app/service/invoices/invoicesApi'
@@ -22,8 +21,13 @@ export function PublicInvoiceScreen() {
     queryKey: ['public-invoice', token],
     queryFn: () => publicInvoiceApi.getByToken(token!),
     enabled: Boolean(token),
-    retry: false,
+    retry: 1,
+    retryDelay: 1500,
   })
+
+  const unavailable =
+    axios.isAxiosError(query.error) &&
+    (query.error.response?.status === 404 || query.error.response?.status === 410)
 
   useEffect(() => {
     document.title = query.data?.invoiceNumber
@@ -41,14 +45,28 @@ export function PublicInvoiceScreen() {
     }
   }, [query.data?.invoiceNumber])
 
-  if (query.isLoading) return <LoadingSkeleton rows={6} />
-  if (query.isError || !query.data) {
+  if (query.isPending) {
     return (
-      <ErrorState
-        error={query.error}
-        title={COMMON.errors.loadFailed}
-        onRetry={() => void query.refetch()}
-      />
+      <div className="flex min-h-dvh items-center justify-center px-4 text-center text-sm text-muted-foreground">
+        {BILLING.invoice.loadingSlow}
+      </div>
+    )
+  }
+  if (query.isError && !unavailable) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
+        <p className="text-sm">{BILLING.invoice.loadFailed}</p>
+        <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+          {COMMON.actions.retry}
+        </Button>
+      </div>
+    )
+  }
+  if (unavailable || !query.data) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
+        <p className="text-sm">{BILLING.invoice.unavailable}</p>
+      </div>
     )
   }
 

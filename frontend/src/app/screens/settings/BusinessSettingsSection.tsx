@@ -207,8 +207,9 @@ export function BusinessSettingsSection({
             />
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <FormField
+              className="min-w-0"
               label={SETTINGS.business.openingTime}
               htmlFor="openingTime"
               error={form.formState.errors.openingTime?.message}
@@ -217,10 +218,12 @@ export function BusinessSettingsSection({
                 id="openingTime"
                 type="time"
                 disabled={!canUpdate}
+                className="box-border block w-full min-w-0 max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                 {...form.register('openingTime')}
               />
             </FormField>
             <FormField
+              className="min-w-0"
               label={SETTINGS.business.closingTime}
               htmlFor="closingTime"
               error={form.formState.errors.closingTime?.message}
@@ -229,6 +232,7 @@ export function BusinessSettingsSection({
                 id="closingTime"
                 type="time"
                 disabled={!canUpdate}
+                className="box-border block w-full min-w-0 max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                 {...form.register('closingTime')}
               />
             </FormField>
@@ -251,7 +255,7 @@ export function BusinessSettingsSection({
                         type="button"
                         size="sm"
                         variant={selected ? 'default' : 'outline'}
-                        className="h-9"
+                        className="min-h-11 min-w-11"
                         disabled={!canUpdate}
                         onClick={() => {
                           if (selected) {

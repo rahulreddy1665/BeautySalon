@@ -12,6 +12,7 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
+  formatCompactTimeRange,
   formatHourLabel,
   minutesToTime,
   type CalendarHours,
@@ -76,7 +77,7 @@ export function WeekCalendar({
                 closed && 'bg-muted/50',
               )}
             >
-              <p className="text-[10px] uppercase text-muted-foreground">
+              <p className="truncate text-[10px] uppercase text-muted-foreground">
                 {format(day, 'EEE')}
               </p>
               <p
@@ -95,7 +96,7 @@ export function WeekCalendar({
           {slots.map((mins) => (
             <div
               key={mins}
-              className="border-b border-border px-1 text-[10px] text-muted-foreground tabular-nums"
+              className="border-b border-r border-border px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums"
               style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
             >
               {mins % 60 === 0 ? formatHourLabel(mins) : ''}
@@ -161,19 +162,31 @@ export function WeekCalendar({
                       appointmentStatusClasses(appt.status, selectedId === appt._id),
                       past && 'opacity-60',
                     )}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTimeRange(appt.startTime, appt.endTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onAppointmentClick(appt)
                     }}
                   >
-                    <p className="truncate font-semibold">
-                      {appointmentCustomerLabel(appt)}
-                    </p>
-                    <p className="truncate opacity-80">{appt.services[0]?.name}</p>
-                    <p className="truncate opacity-70">
-                      {appointmentStaffName(appt.services[0]!)}
-                    </p>
+                    {height < 40 ? (
+                      <p className="truncate leading-tight">
+                        {appointmentCustomerLabel(appt)}{' '}
+                        {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="truncate font-semibold">
+                          {appointmentCustomerLabel(appt)}
+                        </p>
+                        <p className="truncate opacity-80">
+                          {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                        </p>
+                        <p className="truncate opacity-70">
+                          {appointmentStaffName(appt.services[0]!)}
+                        </p>
+                      </>
+                    )}
                   </button>
                 )
               })}

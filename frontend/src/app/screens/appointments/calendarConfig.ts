@@ -28,6 +28,22 @@ export function minutesToTime(total: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+/** "4:00-4:45 PM" — one period when both times share it. */
+export function formatCompactTimeRange(start: string, end: string): string {
+  const parts = (time: string) => {
+    const [hRaw, mRaw] = time.split(':').map(Number)
+    const h = hRaw ?? 0
+    const m = mRaw ?? 0
+    const period = h >= 12 ? 'PM' : 'AM'
+    const hour12 = h % 12 === 0 ? 12 : h % 12
+    return { clock: `${hour12}:${String(m).padStart(2, '0')}`, period }
+  }
+  const a = parts(start)
+  const b = parts(end)
+  if (a.period === b.period) return `${a.clock}-${b.clock} ${b.period}`
+  return `${a.clock} ${a.period}-${b.clock} ${b.period}`
+}
+
 export function formatHourLabel(minutesFromMidnight: number): string {
   const h = Math.floor(minutesFromMidnight / 60)
   const m = minutesFromMidnight % 60

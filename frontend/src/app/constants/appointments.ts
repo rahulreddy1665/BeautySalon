@@ -7,6 +7,8 @@ export const APPOINTMENTS = {
     viewDay: 'Day',
     viewWeek: 'Week',
     viewMonth: 'Month',
+    viewList: 'List',
+    loadingRange: 'Loading this range…',
     today: 'Today',
     prev: 'Previous',
     next: 'Next',

@@ -72,22 +72,27 @@ export function parseReportRange(
   if (fromRaw > toRaw) {
     return { ok: false, message: "from must be on or before to" };
   }
-  const dayCount = daysBetweenInclusive(fromRaw, toRaw);
+  const today = getSalonNow().dateKey;
+  let from = fromRaw;
+  let to = toRaw;
+  if (to > today) to = today;
+  if (from > to) from = to;
+  const dayCount = daysBetweenInclusive(from, to);
   if (dayCount > MAX_RANGE_DAYS) {
     return {
       ok: false,
       message: `Date range cannot exceed ${MAX_RANGE_DAYS} days`,
     };
   }
-  const previousTo = shiftDateKey(fromRaw, -1);
+  const previousTo = shiftDateKey(from, -1);
   const previousFrom = shiftDateKey(previousTo, -(dayCount - 1));
   return {
     ok: true,
     range: {
-      from: fromRaw,
-      to: toRaw,
-      fromDate: salonDayStartUtc(fromRaw),
-      toDate: salonDayEndUtc(toRaw),
+      from,
+      to,
+      fromDate: salonDayStartUtc(from),
+      toDate: salonDayEndUtc(to),
       dayCount,
       previousFrom,
       previousTo,

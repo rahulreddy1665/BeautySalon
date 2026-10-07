@@ -249,3 +249,14 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient()
+
+const publicHttp = axios.create({
+  baseURL: env.apiBaseUrl,
+  timeout: 60_000,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+/** Unauthenticated reads. Does not attach a token or clear the session. */
+export function publicGet<T>(url: string) {
+  return publicHttp.get<T>(url)
+}

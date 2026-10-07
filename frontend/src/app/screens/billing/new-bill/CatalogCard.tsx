@@ -140,9 +140,10 @@ export function CatalogCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+      <CardHeader className="flex flex-col items-stretch gap-3 space-y-0 pb-2 lg:flex-row lg:items-center lg:justify-between lg:gap-2">
         <CardTitle className="text-base">{BILLING.new.addItemsCardTitle}</CardTitle>
         <SegmentedControl
+          expandBelowLg
           value={tab}
           onChange={(v) => {
             setTab(v)

@@ -361,14 +361,15 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
 export const getAppointments = async (query: AppointmentListQuery = {}) => {
   try {
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
+    const limit = Math.min(1000, Math.max(1, Number(query.limit) || 50));
     const filter: Record<string, unknown> = {};
 
-    if (query.date) filter.date = query.date;
     if (query.from || query.to) {
       filter.date = {};
       if (query.from) (filter.date as Record<string, string>).$gte = query.from;
       if (query.to) (filter.date as Record<string, string>).$lte = query.to;
+    } else if (query.date) {
+      filter.date = query.date;
     }
     if (query.status) filter.status = query.status;
     if (query.staffId) filter["services.staff"] = query.staffId;
