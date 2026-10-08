@@ -152,8 +152,7 @@ export const BILLING = {
     shareWhatsApp: 'Share on WhatsApp',
     revokeLink: 'Revoke link',
     backToBills: 'Back to bills',
-    whatsappDownloaded:
-      'PDF downloaded. Attach it in WhatsApp if the link is not enough.',
+    whatsappDownloaded: 'Invoice link opened in WhatsApp.',
     walkInPhoneTitle: 'Customer phone for WhatsApp',
     walkInPhoneHint: 'Enter a mobile number with country code, or 10 digits for India.',
     walkInPhoneLabel: 'Phone number',

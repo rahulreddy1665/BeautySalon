@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
-import { BILLING } from '@/app/constants'
+import { BILLING, ROUTES } from '@/app/constants'
 import { useBillsQuery } from '@/app/hooks/queries/useBillingQuery'
 import type { BillRecord } from '@/app/service/billing/billingApi'
 import type { PaymentMode } from '@/app/service/invoices/invoicesApi'
@@ -38,7 +38,7 @@ const columns: ColumnDef<BillRow>[] = [
     header: 'Invoice',
     cell: ({ row }) => (
       <Link
-        to={`/billing/${row.original.id}`}
+        to={ROUTES.invoice(row.original.id)}
         className="font-medium text-primary hover:underline"
       >
         {row.original.invoiceNo}

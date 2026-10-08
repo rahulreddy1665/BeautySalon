@@ -1,4 +1,6 @@
+import { ArrowLeft } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { PageHeader } from '@/app/components/PageHeader'
@@ -6,7 +8,7 @@ import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
-import { AUTH } from '@/app/constants'
+import { AUTH, COMMON, ROUTES } from '@/app/constants'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
 import { authApi } from '@/app/service/auth/authApi'
 import { setCredentials } from '@/app/state/redux/slices/authSlice'
@@ -85,6 +87,13 @@ export function AccountScreen() {
 
   return (
     <div className="min-w-0 space-y-3">
+      <Link
+        to={ROUTES.home}
+        className="hidden items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground lg:inline-flex"
+      >
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
+        {COMMON.actions.back}
+      </Link>
       <PageHeader description={AUTH.account.title} />
 
       <div className="grid gap-3 lg:grid-cols-2">

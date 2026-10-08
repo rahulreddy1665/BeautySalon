@@ -292,7 +292,7 @@ export function CustomersReportScreen() {
         data &&
         tab === 'top' &&
         data.chart.length ? (
-          <Card>
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader className="pb-1">
               <CardTitle>{REPORTS.customers.chart.title}</CardTitle>
             </CardHeader>

@@ -228,8 +228,8 @@ export function AppointmentsReportScreen() {
       }
       chart={
         !query.isLoading && !query.isError && data && !empty ? (
-          <div className="grid gap-3 lg:grid-cols-3">
-            <Card>
+          <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+            <Card className="min-w-0 overflow-hidden">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.statusTitle}</CardTitle>
               </CardHeader>
@@ -242,7 +242,7 @@ export function AppointmentsReportScreen() {
                 />
               </CardContent>
             </Card>
-            <Card className="lg:col-span-1">
+            <Card className="min-w-0 overflow-hidden lg:col-span-1">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.walkInTitle}</CardTitle>
               </CardHeader>
@@ -253,7 +253,7 @@ export function AppointmentsReportScreen() {
                 />
               </CardContent>
             </Card>
-            <Card className="lg:col-span-3">
+            <Card className="min-w-0 overflow-hidden lg:col-span-3">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.busyTitle}</CardTitle>
               </CardHeader>

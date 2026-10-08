@@ -378,6 +378,11 @@ export function AppLayout() {
   const visiblePrimary = useVisibleNav(mobilePrimary)
   const visibleMore = useVisibleNav(mobileMore)
   const isNewBill = location.pathname === ROUTES.billingNew
+  const mobileBackTo = isNewBill
+    ? ROUTES.billing
+    : location.pathname === ROUTES.account
+      ? ROUTES.home
+      : null
   const themeMode = useAppSelector((s) => s.settings.themeMode)
 
   useEffect(() => {
@@ -437,7 +442,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] shrink-0 items-center gap-2 border-b border-border bg-card pt-[env(safe-area-inset-top,0px)] px-3 md:px-4 lg:h-16 lg:pt-0">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top,0px)] md:px-4 lg:h-16 lg:pt-0">
           <IconButton
             className="hidden lg:inline-flex"
             aria-label={collapsed ? COMMON.nav.expandSidebar : COMMON.nav.collapseSidebar}
@@ -450,11 +455,11 @@ export function AppLayout() {
             )}
           </IconButton>
 
-          {isNewBill ? (
+          {mobileBackTo ? (
             <IconButton
               className="lg:hidden"
               aria-label={COMMON.actions.back}
-              onClick={() => navigate(ROUTES.billing)}
+              onClick={() => navigate(mobileBackTo)}
             >
               <ArrowLeft strokeWidth={1.75} />
             </IconButton>
@@ -468,7 +473,7 @@ export function AppLayout() {
             {pageTitle(location.pathname)}
           </p>
 
-          <GlobalSearch className="max-w-md lg:flex-1" />
+          <GlobalSearch className="min-w-0 max-w-md lg:flex-1" />
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:ml-auto">
             <div className="hidden lg:contents">

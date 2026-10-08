@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useSyncExternalStore } from 'react'
 import {
   Bar,
   BarChart,
@@ -19,6 +19,18 @@ import {
 } from '@/app/components/charts/ChartTooltip'
 import { REPORTS } from '@/app/constants'
 import { formatINR, formatMoneyOrDash, formatNumber } from '@/app/utils'
+
+function useNarrowChart(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia('(max-width: 1023px)')
+      media.addEventListener('change', onChange)
+      return () => media.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia('(max-width: 1023px)').matches,
+    () => false,
+  )
+}
 
 interface RevenueTrendChartProps {
   data: { date: string; revenue: number }[]
@@ -325,22 +337,27 @@ interface DualSeriesChartProps {
 
 export function NewReturningChart({ data, height = 220 }: DualSeriesChartProps) {
   const colors = useChartTheme()
+  const narrow = useNarrowChart()
+  const tickSkip = narrow ? Math.max(0, Math.ceil(data.length / 4) - 1) : 0
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 overflow-hidden">
       <div style={{ width: '100%', height }} className="min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
           barCategoryGap="28%"
-          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          margin={{ top: 8, right: 8, left: 0, bottom: narrow ? 4 : 0 }}
         >
           <CartesianGrid stroke={colors.border} vertical={false} />
           <XAxis
             dataKey="key"
-            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            tick={{ fill: colors.mutedFg, fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: colors.border }}
             tickLine={false}
-            interval={0}
+            interval={tickSkip}
+            angle={narrow ? -40 : 0}
+            textAnchor={narrow ? 'end' : 'middle'}
+            height={narrow ? 52 : 30}
           />
           <YAxis
             tick={{ fill: colors.mutedFg, fontSize: 11 }}
@@ -409,16 +426,20 @@ interface StatusBreakdownChartProps {
 
 export function StatusBreakdownChart({ data, height = 200 }: StatusBreakdownChartProps) {
   const colors = useChartTheme()
+  const narrow = useNarrowChart()
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div style={{ width: '100%', height }} className="min-w-0 overflow-hidden">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: narrow ? 8 : 0 }}>
           <CartesianGrid stroke={colors.border} vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            tick={{ fill: colors.mutedFg, fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: colors.border }}
             tickLine={false}
+            {...(narrow
+              ? { interval: 0, angle: -35, textAnchor: 'end' as const, height: 56 }
+              : {})}
           />
           <YAxis
             tick={{ fill: colors.mutedFg, fontSize: 11 }}
@@ -550,7 +571,8 @@ export function WalkInVsAppointmentChart({
     },
   ]
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div className="min-w-0 max-w-full overflow-hidden">
+      <div style={{ width: '100%', height }} className="min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -578,9 +600,10 @@ export function WalkInVsAppointmentChart({
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex justify-center gap-4 text-xs text-muted-foreground">
+      </div>
+      <div className="mt-2 flex max-w-full flex-wrap justify-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
         {data.map((d) => (
-          <span key={d.name} className="inline-flex items-center gap-1.5">
+          <span key={d.name} className="inline-flex min-w-0 items-center gap-1.5">
             <span
               className="inline-block size-2.5 rounded-sm"
               style={{ background: d.color }}
@@ -607,7 +630,7 @@ export function BusyHoursGrid({
 }) {
   const max = Math.max(1, ...cells.flat())
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto">
       <div
         className="grid min-w-[480px] gap-1"
         style={{

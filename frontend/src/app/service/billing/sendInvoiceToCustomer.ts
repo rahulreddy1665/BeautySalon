@@ -6,7 +6,7 @@
 
 import { BILLING, SETTINGS } from '@/app/constants'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
-import { downloadBlob, generateInvoicePdf } from '@/app/utils/invoicePdf'
+import { releaseCaptureLock } from '@/app/utils/invoicePdf'
 import { fillWhatsAppMessage, normalizeWhatsAppPhone } from '@/app/utils/phone'
 
 const CACHE_PREFIX = 'invoice-share-url:'
@@ -73,7 +73,8 @@ export type SendInvoiceInput = {
   salonName: string
   amountLabel: string
   whatsappTemplate?: string
-  sheetElement: HTMLElement | null
+  /** Opened in the click handler so the browser still allows navigation. */
+  popup: Window | null
 }
 
 export type SendInvoiceOutcome =
@@ -106,43 +107,20 @@ export async function sendInvoiceToCustomer(
     },
   )
 
-  const fileName = `${input.invoiceNumber}.pdf`
-  let pdfFile: File | null = null
-  if (input.sheetElement) {
-    const pdf = await generateInvoicePdf(input.sheetElement, fileName)
-    if (pdf.ok) {
-      pdfFile = new File([pdf.blob], fileName, { type: 'application/pdf' })
-    }
-  }
-
-  const nav = navigator as Navigator & {
-    canShare?: (data?: ShareData) => boolean
-  }
-
-  if (
-    pdfFile &&
-    typeof nav.share === 'function' &&
-    typeof nav.canShare === 'function' &&
-    nav.canShare({ files: [pdfFile] })
-  ) {
-    try {
-      await nav.share({
-        files: [pdfFile],
-        title: input.invoiceNumber,
-        text: message,
-      })
-      return { mode: 'native-share' }
-    } catch {
-      /* user cancelled or share failed — fall through */
-    }
-  }
-
-  if (pdfFile) {
-    downloadBlob(pdfFile, fileName)
-  }
-
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-  window.open(waUrl, '_blank', 'noopener,noreferrer')
+  const popup = input.popup
+  if (popup && !popup.closed) {
+    try {
+      popup.opener = null
+      popup.location.replace(waUrl)
+    } catch {
+      window.open(waUrl, '_blank', 'noopener,noreferrer')
+    }
+  } else {
+    window.open(waUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  releaseCaptureLock()
   return {
     mode: 'wa-me',
     instruction: BILLING.invoice.whatsappDownloaded,

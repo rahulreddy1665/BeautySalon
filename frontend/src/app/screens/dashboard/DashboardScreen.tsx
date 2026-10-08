@@ -99,12 +99,12 @@ export function DashboardScreen() {
         <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
           {DASHBOARD.title}
         </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="max-w-full truncate rounded-full border border-border bg-card px-3 py-1 text-xs font-medium">
             {salonName}
           </span>
           <Select value={range} onValueChange={(v) => setRange(v as DashboardRange)}>
-            <SelectTrigger className="h-9 w-[140px] rounded-full">
+            <SelectTrigger className="h-9 w-[140px] max-w-full shrink-0 rounded-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -63,9 +63,12 @@ export function ResponsiveTable<TData extends object>({
           const original = row.original as TData
           const rowKey = getRowId ? getRowId(original) : row.id
           const expanded = expandedRowId != null && expandedRowId === rowKey
+          const titleCell = mobileTitleKey
+            ? row.getVisibleCells().find((cell) => cell.column.id === mobileTitleKey)
+            : row.getVisibleCells()[0]
           const titleValue = mobileTitleKey
             ? String(original[mobileTitleKey] ?? '')
-            : String(row.getVisibleCells()[0]?.getValue() ?? '')
+            : String(titleCell?.getValue() ?? '')
 
           const expandCell = row.getVisibleCells().find((cell) => cell.column.id === 'expand')
 
@@ -78,7 +81,11 @@ export function ResponsiveTable<TData extends object>({
               )}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="min-w-0 text-sm font-semibold">{titleValue}</p>
+                <div className="min-w-0 text-sm font-semibold [&_a]:text-primary">
+                  {titleCell
+                    ? flexRender(titleCell.column.columnDef.cell, titleCell.getContext())
+                    : titleValue}
+                </div>
                 {expandCell
                   ? flexRender(
                       expandCell.column.columnDef.cell,
