@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, INVENTORY } from '@/app/constants'
 import {
   useDeleteProductMutation,
@@ -66,6 +67,7 @@ export function InventoryScreen() {
     'all',
   )
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<SalonProduct | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -77,7 +79,7 @@ export function InventoryScreen() {
     search: search.trim() || undefined,
     type: typeFilter,
     page,
-    limit: 20,
+    limit: pageSize,
   })
   const deleteMutation = useDeleteProductMutation()
 
@@ -297,31 +299,17 @@ export function InventoryScreen() {
             emptyTitle={INVENTORY.list.emptyTitle}
             emptyDescription={INVENTORY.list.emptyHint}
           />
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                {COMMON.actions.previous}
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {COMMON.actions.next}
-              </Button>
-            </div>
-          ) : null}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={listQuery.data?.total ?? 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
         </>
       ) : null}
 

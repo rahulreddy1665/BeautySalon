@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, REPORTS } from '@/app/constants'
 import { useServicesReportQuery } from '@/app/hooks/queries/useReportsQuery'
 import { useServiceCategoriesQuery } from '@/app/hooks/queries/useServicesQuery'
@@ -24,7 +25,6 @@ import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi } from '@/app/service/reports/reportsApi'
 import { downloadCsv, formatMoneyOrDash, formatNumber } from '@/app/utils'
@@ -86,6 +86,7 @@ export function ServicesReportScreen() {
   const { range, from, to, setRange } = useReportRangeParams()
   const canExport = useCanExportReports()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [category, setCategory] = useState('all')
   const [notSold, setNotSold] = useState(false)
   const [chartMode, setChartMode] = useState<'revenue' | 'count'>('revenue')
@@ -95,7 +96,7 @@ export function ServicesReportScreen() {
     from,
     to,
     page,
-    limit: 25,
+    limit: pageSize,
     category: category === 'all' ? undefined : category,
     notSold: notSold || undefined,
   })
@@ -267,11 +268,16 @@ export function ServicesReportScreen() {
                   mobileTitleKey="name"
                   emptyTitle={REPORTS.services.emptyTitle}
                 />
-                <ReportPagination
+                <Pagination
                   page={page}
                   totalPages={totalPages}
                   total={data.table.total}
+                  pageSize={pageSize}
                   onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size)
+                    setPage(1)
+                  }}
                 />
               </CardContent>
             </Card>

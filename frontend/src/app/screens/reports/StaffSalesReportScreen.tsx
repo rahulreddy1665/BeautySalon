@@ -11,6 +11,7 @@ import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTabl
 import { StatCard } from '@/app/components/StatCard'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, REPORTS, ROUTES } from '@/app/constants'
 import {
   useStaffLinesQuery,
@@ -20,7 +21,6 @@ import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi, type StaffReportRow } from '@/app/service/reports/reportsApi'
 import { downloadCsv, formatMoneyOrDash, formatNumber } from '@/app/utils'
@@ -89,9 +89,10 @@ export function StaffSalesReportScreen() {
   const { range, from, to, setRange } = useReportRangeParams()
   const canExport = useCanExportReports()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const query = useStaffReportQuery({ from, to, page, limit: 25 })
+  const query = useStaffReportQuery({ from, to, page, limit: pageSize })
   const data = query.data
   const empty = Boolean(data && data.table.total === 0)
   const totalPages = data
@@ -263,11 +264,16 @@ export function StaffSalesReportScreen() {
                   )}
                 />
                 <div className="pt-3">
-                  <ReportPagination
+                  <Pagination
                     page={page}
                     totalPages={totalPages}
                     total={data.table.total}
+                    pageSize={pageSize}
                     onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size)
+                      setPage(1)
+                    }}
                   />
                 </div>
               </CardContent>

@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, SERVICES } from '@/app/constants'
 import { useCategoriesQuery } from '@/app/hooks/queries/useCategoriesQuery'
 import { useDeleteServiceMutation, useServicesQuery } from '@/app/hooks/queries/useServicesQuery'
@@ -40,6 +41,7 @@ export function ServicesScreen() {
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<SalonService | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -49,7 +51,7 @@ export function ServicesScreen() {
     search: search.trim() || undefined,
     categoryId: categoryId === 'all' ? undefined : categoryId,
     page,
-    limit: 20,
+    limit: pageSize,
   })
   const categoriesQuery = useCategoriesQuery(true)
   const deleteMutation = useDeleteServiceMutation()
@@ -224,33 +226,17 @@ export function ServicesScreen() {
                 emptyTitle={SERVICES.list.emptyTitle}
                 emptyDescription={SERVICES.list.emptyHint}
               />
-              {totalPages > 1 ? (
-                <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-                  <span>
-                    {listQuery.data?.total ?? 0} · {page} / {totalPages}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      {COMMON.actions.previous}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    >
-                      {COMMON.actions.next}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={listQuery.data?.total ?? 0}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+              />
             </>
           ) : null}
         </>

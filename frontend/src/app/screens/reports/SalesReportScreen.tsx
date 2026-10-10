@@ -22,20 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { Pagination } from '@/app/components/Pagination'
 import { COMMON, REPORTS, ROUTES } from '@/app/constants'
 import { useSalesReportQuery } from '@/app/hooks/queries/useReportsQuery'
 import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi, type SalesBillRow } from '@/app/service/reports/reportsApi'
 import { downloadCsv, formatMoneyOrDash } from '@/app/utils'
 
 type ChartSeries = 'total' | 'services' | 'products'
-
-const BILLS_PAGE_SIZE = 10
 
 const columns: ColumnDef<SalesBillRow>[] = [
   {
@@ -71,6 +69,7 @@ export function SalesReportScreen() {
   const { range, from, to, setRange } = useReportRangeParams()
   const canExport = useCanExportReports()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [q, setQ] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [chartSeries, setChartSeries] = useState<ChartSeries>('total')
@@ -96,12 +95,12 @@ export function SalesReportScreen() {
     })
   }, [data?.table.items, q, paymentFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filteredBills.length / BILLS_PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filteredBills.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageBills = useMemo(() => {
-    const start = (currentPage - 1) * BILLS_PAGE_SIZE
-    return filteredBills.slice(start, start + BILLS_PAGE_SIZE)
-  }, [filteredBills, currentPage])
+    const start = (currentPage - 1) * pageSize
+    return filteredBills.slice(start, start + pageSize)
+  }, [filteredBills, currentPage, pageSize])
 
   const empty = Boolean(data && data.table.total === 0)
   const tableEmpty = filteredBills.length === 0
@@ -315,11 +314,16 @@ export function SalesReportScreen() {
                       emptyTitle={REPORTS.shared.emptyBills}
                       emptyDescription={REPORTS.shared.emptyHint}
                     />
-                    <ReportPagination
+                    <Pagination
                       page={currentPage}
                       totalPages={totalPages}
                       total={filteredBills.length}
+                      pageSize={pageSize}
                       onPageChange={setPage}
+                      onPageSizeChange={(size) => {
+                        setPageSize(size)
+                        setPage(1)
+                      }}
                     />
                   </>
                 )}

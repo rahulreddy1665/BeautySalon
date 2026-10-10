@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, REPORTS, ROUTES } from '@/app/constants'
 import { useCustomersReportQuery } from '@/app/hooks/queries/useReportsQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
@@ -25,7 +26,6 @@ import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi } from '@/app/service/reports/reportsApi'
 import { downloadCsv, formatMoneyOrDash, formatNumber } from '@/app/utils'
@@ -67,6 +67,7 @@ export function CustomersReportScreen() {
   const [tab, setTab] = useState<Tab>('top')
   const [inactiveDays, setInactiveDays] = useState(30)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   const query = useCustomersReportQuery({
     from,
@@ -74,7 +75,7 @@ export function CustomersReportScreen() {
     tab,
     inactiveDays: tab === 'inactive' ? inactiveDays : undefined,
     page,
-    limit: 25,
+    limit: pageSize,
   })
   const data = query.data
   const empty = Boolean(data && data.table.total === 0)
@@ -331,11 +332,16 @@ export function CustomersReportScreen() {
                   mobileTitleKey="name"
                   emptyTitle={REPORTS.customers.emptyTitle}
                 />
-                <ReportPagination
+                <Pagination
                   page={page}
                   totalPages={totalPages}
                   total={data.table.total}
+                  pageSize={pageSize}
                   onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size)
+                    setPage(1)
+                  }}
                 />
               </CardContent>
             </Card>

@@ -27,6 +27,10 @@ export const COMMON = {
     next: 'Next',
     previous: 'Previous',
   },
+  pagination: {
+    showing: '{from}–{to} of {total}',
+    rowsPerPage: 'Rows per page',
+  },
   labels: {
     name: 'Name',
     phone: 'Phone',

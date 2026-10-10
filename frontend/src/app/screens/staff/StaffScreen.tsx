@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, STAFF } from '@/app/constants'
 import { useStaffListQuery } from '@/app/hooks/queries/useStaffQuery'
 import type { StaffLoginStatus, StaffMember } from '@/app/service/staff/staffApi'
@@ -38,6 +39,7 @@ export function StaffScreen() {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>('all')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
 
@@ -45,7 +47,7 @@ export function StaffScreen() {
     search: search.trim() || undefined,
     isActive: activeFilter === 'all' ? undefined : activeFilter,
     page,
-    limit: 20,
+    limit: pageSize,
   })
 
   const items = listQuery.data?.items ?? []
@@ -187,33 +189,17 @@ export function StaffScreen() {
             emptyTitle={STAFF.list.emptyTitle}
             emptyDescription={STAFF.list.emptyHint}
           />
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                {listQuery.data?.total ?? 0} · {page}/{totalPages}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  {COMMON.actions.previous}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  {COMMON.actions.next}
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={listQuery.data?.total ?? 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
         </>
       ) : null}
 

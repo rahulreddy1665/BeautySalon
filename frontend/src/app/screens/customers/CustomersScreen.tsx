@@ -6,14 +6,13 @@ import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
-import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { CUSTOMERS } from '@/app/constants'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import type { Customer } from '@/app/service/customers/customersApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
 
-const PAGE_SIZE = 20
 
 function displayName(customer: Customer): string {
   return [customer.name, customer.lastName].filter(Boolean).join(' ')
@@ -45,6 +44,7 @@ export function CustomersScreen() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
   const wantsNew = searchParams.get('new') === '1'
@@ -80,9 +80,9 @@ export function CustomersScreen() {
     })
   }, [data, search])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, pageCount - 1)
-  const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  const pageRows = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize)
 
   return (
     <div className="min-w-0 space-y-3">
@@ -129,36 +129,17 @@ export function CustomersScreen() {
             }
           />
 
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {filtered.length} customer{filtered.length === 1 ? '' : 's'}
-              {search ? ' matching' : ''}
-              {' · '}
-              Client-side page {safePage + 1} of {pageCount}
-            </span>
-            <div className="flex gap-1.5">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8"
-                disabled={safePage <= 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8"
-                disabled={safePage >= pageCount - 1}
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={safePage + 1}
+            totalPages={pageCount}
+            total={filtered.length}
+            pageSize={pageSize}
+            onPageChange={(p) => setPage(p - 1)}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(0)
+            }}
+          />
 
           {/* Quick edit from list via detail; keep create sheet here */}
           <CustomerFormSheet

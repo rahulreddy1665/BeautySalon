@@ -55,8 +55,6 @@ export const REPORTS = {
     },
     export: 'Export CSV',
     searchPlaceholder: 'Search…',
-    pageOf: '{page} / {total}',
-    rowsTotal: '{total} rows',
   },
   presets: {
     today: 'Today',

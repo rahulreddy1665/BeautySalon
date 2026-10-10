@@ -9,6 +9,7 @@ import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { LOYALTY } from '@/app/constants'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import { useLoyaltyBalancesQuery } from '@/app/hooks/queries/useLoyaltyQuery'
@@ -23,7 +24,6 @@ type MemberRow = {
   updatedLabel: string
 }
 
-const PAGE_SIZE = 20
 
 function displayName(customer: Customer): string {
   return [customer.name, customer.lastName].filter(Boolean).join(' ')
@@ -80,6 +80,7 @@ export function LoyaltyScreen() {
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [presetCustomerId, setPresetCustomerId] = useState<string | null>(null)
 
@@ -116,9 +117,9 @@ export function LoyaltyScreen() {
       .sort((a, b) => b.points - a.points)
   }, [customers, balanceByCustomer, search])
 
-  const pageCount = Math.max(1, Math.ceil(members.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(members.length / pageSize))
   const safePage = Math.min(page, pageCount - 1)
-  const pageRows = members.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  const pageRows = members.slice(safePage * pageSize, safePage * pageSize + pageSize)
 
   const loading = customersQuery.isLoading || balancesQuery.isLoading
   const error =
@@ -186,34 +187,17 @@ export function LoyaltyScreen() {
             emptyDescription={LOYALTY.emptyMembersHint}
           />
 
-          {members.length > PAGE_SIZE ? (
-            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>
-                {members.length} {LOYALTY.members.toLowerCase()} · page {safePage + 1} /{' '}
-                {pageCount}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={safePage <= 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={safePage >= pageCount - 1}
-                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <Pagination
+            page={safePage + 1}
+            totalPages={pageCount}
+            total={members.length}
+            pageSize={pageSize}
+            onPageChange={(p) => setPage(p - 1)}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(0)
+            }}
+          />
         </div>
       ) : null}
 
