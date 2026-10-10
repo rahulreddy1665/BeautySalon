@@ -61,12 +61,8 @@ export function AppointmentConfirmDialog({
   const staff = [
     ...new Set(appointment.services.map((s) => appointmentStaffName(s))),
   ].join(', ')
-  const duration = appointment.services.reduce(
-    (s, line) => s + (line.durationMinutes || 0),
-    0,
-  )
   const dateLabel = format(parseISO(appointment.date), 'dd MMM yyyy')
-  const timeLabel = `${appointment.startTime} – ${appointment.endTime}`
+  const timeLabel = appointment.startTime
 
   const onPrint = () => window.print()
 
@@ -136,12 +132,6 @@ export function AppointmentConfirmDialog({
             <div className="flex justify-between gap-2">
               <dt className="text-muted-foreground">{APPOINTMENTS.confirm.time}</dt>
               <dd className="tabular-nums">{timeLabel}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">{APPOINTMENTS.confirm.duration}</dt>
-              <dd>
-                {duration} {APPOINTMENTS.form.estimatedMinutes}
-              </dd>
             </div>
             {totalPrice != null ? (
               <div className="flex justify-between gap-2 border-t border-border pt-1.5 font-semibold">

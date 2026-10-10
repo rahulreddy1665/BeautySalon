@@ -75,7 +75,7 @@ export function AppointmentDetailSheet({
         <SheetHeader>
           <SheetTitle>{appointmentCustomerLabel(appointment)}</SheetTitle>
           <SheetDescription>
-            {appointment.date} · {appointment.startTime}–{appointment.endTime}
+            {appointment.date} · {appointment.startTime}
           </SheetDescription>
         </SheetHeader>
 
@@ -104,7 +104,7 @@ export function AppointmentDetailSheet({
                   >
                     <p className="font-medium">{line.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {line.durationMinutes} min · {appointmentStaffName(line)}
+                      {appointmentStaffName(line)}
                       {price != null ? ` · ${formatINR(price)}` : ''}
                     </p>
                   </li>

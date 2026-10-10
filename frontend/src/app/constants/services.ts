@@ -1,6 +1,6 @@
 export const SERVICES = {
   list: {
-    description: 'Service menu with duration and price.',
+    description: 'Service menu with prices.',
     add: 'Add service',
     import: 'Import',
     emptyTitle: 'No services yet',
@@ -14,13 +14,12 @@ export const SERVICES = {
   form: {
     createTitle: 'Add service',
     editTitle: 'Edit service',
-    description: 'Name, category, price, and how long the service takes.',
+    description: 'Name, category, and price.',
     name: 'Name',
     category: 'Category',
     categoryPlaceholder: 'Select a category',
     createCategoryOption: '+ Create new category',
     price: 'Price',
-    duration: 'Duration (minutes)',
   },
   categories: {
     title: 'Categories',
@@ -73,7 +72,6 @@ export const SERVICES = {
     confirmAboveList:
       'Combo price is not below the list total. Save anyway?',
     confirmAboveListAction: 'Save anyway',
-    duration: 'Duration',
     toasts: {
       created: 'Combo added',
       updated: 'Combo updated',

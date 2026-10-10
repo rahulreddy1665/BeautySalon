@@ -52,27 +52,27 @@ export function isFinalAppointmentStatus(status: string): boolean {
   return status === 'completed' || status === 'cancelled' || status === 'no_show'
 }
 
-export function isAppointmentEndPast(
+export function isAppointmentPast(
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   const salon = getSalonNow(now)
   if (date < salon.dateKey) return true
   if (date > salon.dateKey) return false
-  const endMin = parseHhMm(endTime)
-  if (endMin == null) return false
-  return endMin <= salon.totalMinutes
+  const startMin = parseHhMm(startTime)
+  if (startMin == null) return false
+  return startMin <= salon.totalMinutes
 }
 
 export function isAppointmentLocked(
   status: string,
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   if (isFinalAppointmentStatus(status)) return true
-  return isAppointmentEndPast(date, endTime, now)
+  return isAppointmentPast(date, startTime, now)
 }
 
 /** Slot start is in the past (cannot create). Today remaining times OK. */

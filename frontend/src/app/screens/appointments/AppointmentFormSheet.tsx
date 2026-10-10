@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2 } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -18,7 +18,6 @@ import {
   Sheet,
   SheetBody,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -36,7 +35,6 @@ import {
   appointmentStaffId,
   type Appointment,
 } from '@/app/service/appointments/appointmentsApi'
-import { minutesToTime, timeToMinutes } from '@/app/screens/appointments/calendarConfig'
 import { toErrorMessage } from '@/app/utils'
 
 const lineSchema = z.object({
@@ -156,19 +154,7 @@ export function AppointmentFormSheet({
     }
   }, [open, appointment, prefill, form])
 
-  const watchedServices = form.watch('services')
-  const startTime = form.watch('startTime')
   const mode = form.watch('mode')
-
-  const endTimePreview = useMemo(() => {
-    const catalog = servicesQuery.data ?? []
-    const duration = (watchedServices ?? []).reduce((sum, line) => {
-      const svc = catalog.find((s) => s._id === line.serviceId)
-      return sum + (svc?.durationMinutes ?? 0)
-    }, 0)
-    if (!startTime || duration <= 0) return '—'
-    return minutesToTime(timeToMinutes(startTime) + duration)
-  }, [watchedServices, startTime, servicesQuery.data])
 
   const onSubmit = form.handleSubmit(async (values) => {
     const payload = {
@@ -207,9 +193,6 @@ export function AppointmentFormSheet({
               ? `Edit · ${appointment ? appointmentCustomerLabel(appointment) : ''}`
               : 'New appointment'}
           </SheetTitle>
-          <SheetDescription>
-            End time is calculated from service durations.
-          </SheetDescription>
         </SheetHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit} noValidate>
@@ -295,13 +278,6 @@ export function AppointmentFormSheet({
               </FormField>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              End time (read-only):{' '}
-              <span className="font-medium tabular-nums text-foreground">
-                {endTimePreview}
-              </span>
-            </p>
-
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Services</p>
@@ -341,7 +317,7 @@ export function AppointmentFormSheet({
                       <SelectContent>
                         {(servicesQuery.data ?? []).map((svc) => (
                           <SelectItem key={svc._id} value={svc._id}>
-                            {svc.name} · {svc.durationMinutes} min
+                            {svc.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

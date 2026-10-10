@@ -15,7 +15,7 @@ import {
   appointmentStaffName,
   type Appointment,
 } from '@/app/service/appointments/appointmentsApi'
-import { formatCompactTimeRange } from '@/app/screens/appointments/calendarConfig'
+import { formatCompactTime } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusChipClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { formatINR } from '@/app/utils'
 import { isAppointmentLocked, isFinalAppointmentStatus } from '@/app/utils/salonTime'
@@ -74,7 +74,7 @@ export function AppointmentSidePanel({
   const locked = isAppointmentLocked(
     appointment.status,
     appointment.date,
-    appointment.endTime,
+    appointment.startTime,
   )
   const final = isFinalAppointmentStatus(appointment.status)
   const canBill = appointment.status === 'booked' && !appointment.invoice
@@ -137,7 +137,7 @@ export function AppointmentSidePanel({
           </dt>
           <dd className="min-w-0 break-words tabular-nums">
             {format(parseISO(`${appointment.date}T12:00:00`), 'd MMM yyyy')}{' '}
-            {formatCompactTimeRange(appointment.startTime, appointment.endTime)}
+            {formatCompactTime(appointment.startTime)}
           </dd>
         </div>
         <div>

@@ -5,7 +5,6 @@ export interface CreateServiceDto {
   /** Legacy / import: category name (resolved to master) */
   category?: string;
   price: number;
-  durationMinutes?: number;
 }
 
 export interface UpdateServiceDto {
@@ -13,7 +12,6 @@ export interface UpdateServiceDto {
   categoryId?: string;
   category?: string;
   price?: number;
-  durationMinutes?: number;
 }
 
 export interface ServiceListQuery {

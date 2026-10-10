@@ -69,13 +69,6 @@ export function ServicesScreen() {
       ),
     },
     {
-      accessorKey: 'durationMinutes',
-      header: SERVICES.form.duration,
-      cell: ({ getValue }) => (
-        <span className="tabular-nums">{Number(getValue())} min</span>
-      ),
-    },
-    {
       accessorKey: 'price',
       header: SERVICES.form.price,
       cell: ({ getValue }) => formatINR(Number(getValue())),

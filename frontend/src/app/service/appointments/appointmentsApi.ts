@@ -5,9 +5,8 @@ export type AppointmentStatus = 'booked' | 'completed' | 'cancelled' | 'no_show'
 
 export interface AppointmentServiceLine {
   service:
-    string | { _id: string; name?: string; price?: number; durationMinutes?: number }
+    string | { _id: string; name?: string; price?: number }
   name: string
-  durationMinutes: number
   staff: string | { _id: string; name?: string; isActive?: boolean }
 }
 
@@ -20,7 +19,6 @@ export interface Appointment {
   services: AppointmentServiceLine[]
   date: string
   startTime: string
-  endTime: string
   status: AppointmentStatus
   notes?: string
   invoice?: string | { _id: string } | null

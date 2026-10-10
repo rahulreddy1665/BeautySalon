@@ -6,7 +6,6 @@ export interface ComboServiceRef {
     _id: string
     name: string
     price: number
-    durationMinutes: number
     category?: string
     categoryId?: string | null
   }
@@ -22,7 +21,6 @@ export interface SalonCombo {
   comboPrice: number
   listTotal: number
   saving: number
-  totalDuration: number
 }
 
 export interface ComboInput {

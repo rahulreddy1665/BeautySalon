@@ -118,7 +118,7 @@ Deactivate blocked while any service references the category (`CATEGORY_IN_USE`)
 
 | Method | Path | Permission | Notes |
 |--------|------|------------|-------|
-| GET | `/api/combo` | `service:read` | `activeOnly`; computed `listTotal`, `saving`, `totalDuration` |
+| GET | `/api/combo` | `service:read` | `activeOnly`; computed `listTotal`, `saving` |
 | GET | `/api/combo/:id` | `service:read` | |
 | POST | `/api/combo` | `service:create` | ≥2 services, no duplicates; `confirmPriceAboveList` if price ≥ list |
 | PATCH | `/api/combo/:id` | `service:update` | |
@@ -136,9 +136,9 @@ Deactivate blocked while any service references the category (`CATEGORY_IN_USE`)
 | PATCH | `/api/service/:id` | `service:update` | |
 | DELETE | `/api/service/:id` | `service:delete` | Hard delete |
 
-Fields: `name`, `category`, `categoryId`, `price`, `durationMinutes` (default 30, min 5, step 5).  
+Fields: `name`, `category`, `categoryId`, `price`.  
 Unique: name + category (case-insensitive).  
-Import: per-row created/updated/skipped/error; blank duration → 30.
+Import: per-row created/updated/skipped/error.
 
 ### Appointments (`/api/appointment`) — **new** (replaces booking for scheduling)
 
@@ -151,7 +151,7 @@ Import: per-row created/updated/skipped/error; blank duration → 30.
 | PATCH | `/api/appointment/:id/status` | `appointment:update` | `{ status }` |
 | POST | `/api/appointment/:id/cancel` | `appointment:update` | → cancelled |
 
-Rules: server computes `endTime` from service durations; reject staff overlaps; no past booking (new); completed cannot edit/cancel.  
+Rules: appointments have a start time only (no end time / staff-overlap check); start must be within business hours; no past booking (new); completed or past-start cannot edit/cancel.  
 Rejects bookings outside `business.openingTime`–`closingTime` or on non-`workingDays` with code `SALON_CLOSED`.  
 Legacy `/api/booking` still exists (old model) — prefer `/api/appointment`.
 

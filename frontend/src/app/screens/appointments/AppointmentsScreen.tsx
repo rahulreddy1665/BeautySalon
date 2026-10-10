@@ -36,7 +36,7 @@ import { MonthCalendar } from '@/app/screens/appointments/MonthCalendar'
 import { WeekCalendar } from '@/app/screens/appointments/WeekCalendar'
 import {
   DEFAULT_CALENDAR_HOURS,
-  formatCompactTimeRange,
+  formatCompactTime,
 } from '@/app/screens/appointments/calendarConfig'
 import { cn } from '@/app/utils'
 import { getSalonNow, parseHhMm } from '@/app/utils/salonTime'
@@ -436,7 +436,7 @@ export function AppointmentsScreen() {
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                           {format(parseISO(`${appt.date}T12:00:00`), 'd MMM')}{' '}
-                          {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                          {formatCompactTime(appt.startTime)}
                         </span>
                       </button>
                     </li>

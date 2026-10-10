@@ -11,7 +11,7 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
-  formatCompactTimeRange,
+  formatCompactTime,
   formatHourLabel,
   isTimeWithinHours,
   minutesToTime,
@@ -19,7 +19,7 @@ import {
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
-import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
+import { isAppointmentPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface DayCalendarProps {
   date: string
@@ -85,7 +85,7 @@ export function DayCalendar({
           const columnAppts = appointments.filter(
             (appt) =>
               appt.date === date &&
-              appointmentOverlapsHours(appt.startTime, appt.endTime, hours) &&
+              appointmentOverlapsHours(appt.startTime, hours) &&
               appt.services.some((line) => appointmentStaffId(line) === member._id),
           )
           return (
@@ -124,12 +124,12 @@ export function DayCalendar({
 
               {columnAppts.map((appt) => {
                 const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
-                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const rawHeight = appointmentHeightPx()
                 const height = Math.min(
                   Math.max(rawHeight - 2, 28),
                   Math.max(0, gridHeight - top),
                 )
-                const past = isAppointmentEndPast(appt.date, appt.endTime)
+                const past = isAppointmentPast(appt.date, appt.startTime)
                 return (
                   <button
                     key={`${appt._id}-${member._id}`}
@@ -140,7 +140,7 @@ export function DayCalendar({
                       past && 'opacity-60',
                       !past && 'hover:brightness-[0.98]',
                     )}
-                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTimeRange(appt.startTime, appt.endTime)}`}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTime(appt.startTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -150,7 +150,7 @@ export function DayCalendar({
                     {height < 40 ? (
                       <p className="truncate text-[11px] leading-tight">
                         {appointmentCustomerLabel(appt)}{' '}
-                        {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                        {formatCompactTime(appt.startTime)}
                       </p>
                     ) : (
                       <>
@@ -158,7 +158,7 @@ export function DayCalendar({
                           {appointmentCustomerLabel(appt)}
                         </p>
                         <p className="truncate text-[10px] tabular-nums opacity-80">
-                          {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                          {formatCompactTime(appt.startTime)}
                         </p>
                         <p className="truncate text-[10px] opacity-70">
                           {appt.services.map((s) => s.name).join(', ')}

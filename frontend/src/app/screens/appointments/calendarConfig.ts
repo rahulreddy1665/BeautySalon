@@ -29,19 +29,13 @@ export function minutesToTime(total: number): string {
 }
 
 /** "4:00-4:45 PM" — one period when both times share it. */
-export function formatCompactTimeRange(start: string, end: string): string {
-  const parts = (time: string) => {
-    const [hRaw, mRaw] = time.split(':').map(Number)
-    const h = hRaw ?? 0
-    const m = mRaw ?? 0
-    const period = h >= 12 ? 'PM' : 'AM'
-    const hour12 = h % 12 === 0 ? 12 : h % 12
-    return { clock: `${hour12}:${String(m).padStart(2, '0')}`, period }
-  }
-  const a = parts(start)
-  const b = parts(end)
-  if (a.period === b.period) return `${a.clock}-${b.clock} ${b.period}`
-  return `${a.clock} ${a.period}-${b.clock} ${b.period}`
+export function formatCompactTime(time: string): string {
+  const [hRaw, mRaw] = time.split(':').map(Number)
+  const h = hRaw ?? 0
+  const m = mRaw ?? 0
+  const period = h >= 12 ? 'PM' : 'AM'
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`
 }
 
 export function formatHourLabel(minutesFromMidnight: number): string {
@@ -76,17 +70,15 @@ export function isTimeWithinHours(
   return mins >= start && mins < end
 }
 
-/** Appointment overlaps the visible calendar window. */
+/** Appointment start falls inside the visible calendar window. */
 export function appointmentOverlapsHours(
   startTime: string,
-  endTime: string,
   hours: CalendarHours = DEFAULT_CALENDAR_HOURS,
 ): boolean {
   const start = hours.startHour * 60
   const end = hours.endHour * 60
   const aStart = timeToMinutes(startTime)
-  const aEnd = Math.max(aStart + 1, timeToMinutes(endTime))
-  return aStart < end && aEnd > start
+  return aStart >= start && aStart < end
 }
 
 export function appointmentTopPx(
@@ -99,12 +91,7 @@ export function appointmentTopPx(
   return (mins / step) * CALENDAR_SLOT_HEIGHT_PX
 }
 
-export function appointmentHeightPx(
-  startTime: string,
-  endTime: string,
-  hours: CalendarHours = DEFAULT_CALENDAR_HOURS,
-): number {
-  const step = Math.max(5, hours.slotMinutes || CALENDAR_SLOT_MINUTES)
-  const duration = Math.max(step, timeToMinutes(endTime) - timeToMinutes(startTime))
-  return (duration / step) * CALENDAR_SLOT_HEIGHT_PX
+/** Appointments have no end time, so each occupies a single slot. */
+export function appointmentHeightPx(): number {
+  return CALENDAR_SLOT_HEIGHT_PX
 }

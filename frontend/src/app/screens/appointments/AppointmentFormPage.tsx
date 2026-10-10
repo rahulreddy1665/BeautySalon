@@ -47,7 +47,6 @@ import {
   AppointmentConfirmDialog,
   type ConfirmKind,
 } from '@/app/screens/appointments/AppointmentConfirmDialog'
-import { minutesToTime, timeToMinutes } from '@/app/screens/appointments/calendarConfig'
 import { formatINR, toErrorMessage } from '@/app/utils'
 import { isAppointmentLocked } from '@/app/utils/salonTime'
 import { AppointmentSidePanel } from '@/app/screens/appointments/AppointmentSidePanel'
@@ -157,7 +156,6 @@ export function AppointmentFormPage() {
   }, [appointmentQuery.data, form])
 
   const watchedServices = useWatch({ control: form.control, name: 'services' })
-  const startTime = useWatch({ control: form.control, name: 'startTime' })
   const mode = useWatch({ control: form.control, name: 'mode' })
   const catalog = servicesQuery.data ?? []
   const suggestCatalog = useMemo(
@@ -180,22 +178,6 @@ export function AppointmentFormPage() {
   }, [focusStaffIndex, fields.length])
 
   const combos = combosQuery.data ?? []
-
-  const duration = useMemo(
-    () =>
-      (watchedServices ?? []).reduce((sum, line) => {
-        if (line.serviceId.startsWith('combo:')) {
-          const combo = combos.find((c) => c._id === line.serviceId.slice(6))
-          return sum + (combo?.totalDuration ?? 0)
-        }
-        const svc = catalog.find((s) => s._id === line.serviceId)
-        return sum + (svc?.durationMinutes ?? 0)
-      }, 0),
-    [watchedServices, catalog, combos],
-  )
-
-  const endTimePreview =
-    startTime && duration > 0 ? minutesToTime(timeToMinutes(startTime) + duration) : '—'
 
   const priceTotal = useMemo(
     () =>
@@ -259,7 +241,7 @@ export function AppointmentFormPage() {
     isAppointmentLocked(
       appointmentQuery.data.status,
       appointmentQuery.data.date,
-      appointmentQuery.data.endTime,
+      appointmentQuery.data.startTime,
     )
 
   if (lockedEdit && appointmentQuery.data) {
@@ -300,8 +282,8 @@ export function AppointmentFormPage() {
         </h1>
       </div>
 
-      <form className="grid gap-4 lg:grid-cols-3" onSubmit={onSubmit} noValidate>
-        <div className="space-y-4 lg:col-span-2">
+      <form className="grid grid-cols-1 gap-4 lg:grid-cols-3" onSubmit={onSubmit} noValidate>
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>{APPOINTMENTS.form.sectionContact}</CardTitle>
@@ -432,14 +414,12 @@ export function AppointmentFormPage() {
                             key={`combo-${combo._id}`}
                             value={`combo:${combo._id}`}
                           >
-                            {combo.name} · {combo.totalDuration}{' '}
-                            {APPOINTMENTS.form.estimatedMinutes}
+                            {combo.name}
                           </SelectItem>
                         ))}
                         {catalog.map((svc) => (
                           <SelectItem key={svc._id} value={svc._id}>
-                            {svc.name} · {svc.durationMinutes}{' '}
-                            {APPOINTMENTS.form.estimatedMinutes}
+                            {svc.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -514,10 +494,6 @@ export function AppointmentFormPage() {
                   setFocusStaffIndex(fields.length)
                 }}
               />
-              <p className="text-xs text-muted-foreground">
-                {APPOINTMENTS.form.duration}: {duration}{' '}
-                {APPOINTMENTS.form.estimatedMinutes}
-              </p>
             </CardContent>
           </Card>
 
@@ -534,7 +510,7 @@ export function AppointmentFormPage() {
           </Card>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>{APPOINTMENTS.form.schedule}</CardTitle>
@@ -544,16 +520,22 @@ export function AppointmentFormPage() {
                 label={APPOINTMENTS.form.date}
                 error={form.formState.errors.date?.message}
               >
-                <Input type="date" className="min-w-0 max-w-full" {...form.register('date')} />
+                <Input
+                  type="date"
+                  className="min-w-0 max-w-full max-lg:block max-lg:appearance-none max-lg:text-left max-lg:[&::-webkit-date-and-time-value]:text-left max-lg:[&::-webkit-date-and-time-value]:min-h-[1.5em]"
+                  {...form.register('date')}
+                />
               </FormField>
               <FormField
                 label={APPOINTMENTS.form.startTime}
                 error={form.formState.errors.startTime?.message}
               >
-                <Input type="time" step={1800} className="min-w-0 max-w-full" {...form.register('startTime')} />
-              </FormField>
-              <FormField label={APPOINTMENTS.form.endTime}>
-                <Input value={endTimePreview} readOnly />
+                <Input
+                  type="time"
+                  step={1800}
+                  className="min-w-0 max-w-full max-lg:block max-lg:appearance-none max-lg:text-left max-lg:[&::-webkit-date-and-time-value]:text-left max-lg:[&::-webkit-date-and-time-value]:min-h-[1.5em]"
+                  {...form.register('startTime')}
+                />
               </FormField>
             </CardContent>
           </Card>

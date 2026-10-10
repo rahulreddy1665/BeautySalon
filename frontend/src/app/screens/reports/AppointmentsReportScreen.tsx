@@ -37,7 +37,6 @@ type ApptRow = {
   id: string
   date: string
   startTime: string
-  endTime: string
   status: string
   customerName: string
   staffNames: string[]
@@ -65,7 +64,7 @@ const columns: ColumnDef<ApptRow>[] = [
   {
     id: 'time',
     header: REPORTS.appointments.table.time,
-    cell: ({ row }) => `${row.original.startTime}–${row.original.endTime}`,
+    cell: ({ row }) => row.original.startTime,
   },
   {
     accessorKey: 'status',

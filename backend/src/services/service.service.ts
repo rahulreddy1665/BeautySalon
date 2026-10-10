@@ -9,12 +9,6 @@ import { Category } from "../models/category.model";
 import { Service } from "../models/service.model";
 import { ensureCategoryByName } from "./category.service";
 
-function normalizeDuration(value: unknown): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 5) return 30;
-  return Math.max(5, Math.round(n / 5) * 5);
-}
-
 function normalizePrice(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
@@ -77,7 +71,6 @@ export const createService = async (data: CreateServiceDto) => {
       category: resolved.category,
       categoryId: resolved.categoryId,
       price,
-      durationMinutes: normalizeDuration(data.durationMinutes),
     });
     return { statusCode: 200, data: service };
   } catch (error) {
@@ -212,9 +205,6 @@ export const updateService = async (id: string, data: UpdateServiceDto) => {
       }
       update.price = price;
     }
-    if (data.durationMinutes !== undefined) {
-      update.durationMinutes = normalizeDuration(data.durationMinutes);
-    }
 
     const service = await Service.findByIdAndUpdate(id, update, {
       new: true,
@@ -251,7 +241,6 @@ export const importServices = async (
     name?: string;
     category?: string;
     price?: unknown;
-    durationMinutes?: unknown;
   }>,
 ) => {
   const results: ImportRowResult[] = [];
@@ -263,11 +252,6 @@ export const importServices = async (
     const name = String(raw.name ?? "").trim();
     const categoryName = String(raw.category ?? "").trim();
     const price = normalizePrice(raw.price);
-    const durationRaw = raw.durationMinutes;
-    const durationBlank =
-      durationRaw === undefined ||
-      durationRaw === null ||
-      String(durationRaw).trim() === "";
 
     if (!name || !categoryName) {
       results.push({
@@ -312,14 +296,9 @@ export const importServices = async (
         category: { $regex: new RegExp(`^${escapeRegex(cat.name)}$`, "i") },
       });
 
-      const durationMinutes = durationBlank
-        ? 30
-        : normalizeDuration(durationRaw);
-
       if (existing) {
         const same =
           existing.price === price &&
-          existing.durationMinutes === durationMinutes &&
           existing.name === name &&
           existing.category === cat.name &&
           String(existing.categoryId ?? "") === String(cat._id);
@@ -338,7 +317,6 @@ export const importServices = async (
         existing.category = cat.name;
         existing.categoryId = cat._id as mongoose.Types.ObjectId;
         existing.price = price;
-        existing.durationMinutes = durationMinutes;
         await existing.save();
         results.push({
           row: rowNum,
@@ -353,7 +331,6 @@ export const importServices = async (
           category: cat.name,
           categoryId: cat._id,
           price,
-          durationMinutes,
         });
         results.push({
           row: rowNum,

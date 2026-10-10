@@ -12,14 +12,14 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
-  formatCompactTimeRange,
+  formatCompactTime,
   formatHourLabel,
   minutesToTime,
   type CalendarHours,
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
-import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
+import { isAppointmentPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface Props {
   weekStart: string
@@ -109,7 +109,7 @@ export function WeekCalendar({
           const closed = closedWeekdays.includes(WEEKDAY_KEYS[day.getDay()] ?? '')
           const dayAppts = appointments.filter(
             (a) =>
-              a.date === key && appointmentOverlapsHours(a.startTime, a.endTime, hours),
+              a.date === key && appointmentOverlapsHours(a.startTime, hours),
           )
           return (
             <div
@@ -146,9 +146,9 @@ export function WeekCalendar({
                 )
               })}
               {dayAppts.map((appt) => {
-                const past = isAppointmentEndPast(appt.date, appt.endTime)
+                const past = isAppointmentPast(appt.date, appt.startTime)
                 const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
-                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const rawHeight = appointmentHeightPx()
                 const height = Math.min(
                   Math.max(rawHeight - 2, 28),
                   Math.max(0, gridHeight - top),
@@ -162,7 +162,7 @@ export function WeekCalendar({
                       appointmentStatusClasses(appt.status, selectedId === appt._id),
                       past && 'opacity-60',
                     )}
-                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTimeRange(appt.startTime, appt.endTime)}`}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTime(appt.startTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -172,7 +172,7 @@ export function WeekCalendar({
                     {height < 40 ? (
                       <p className="truncate leading-tight">
                         {appointmentCustomerLabel(appt)}{' '}
-                        {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                        {formatCompactTime(appt.startTime)}
                       </p>
                     ) : (
                       <>
@@ -180,7 +180,7 @@ export function WeekCalendar({
                           {appointmentCustomerLabel(appt)}
                         </p>
                         <p className="truncate opacity-80">
-                          {formatCompactTimeRange(appt.startTime, appt.endTime)}
+                          {formatCompactTime(appt.startTime)}
                         </p>
                         <p className="truncate opacity-70">
                           {appointmentStaffName(appt.services[0]!)}

@@ -36,8 +36,6 @@ export const APPOINTMENTS = {
     emailOptional: 'Email (optional)',
     date: 'Date',
     startTime: 'Start time',
-    endTime: 'End time',
-    duration: 'Duration',
     services: 'Services',
     assignStaff: 'Staff',
     addService: 'Add service',
@@ -46,7 +44,6 @@ export const APPOINTMENTS = {
     priceTotal: 'Estimated total',
     save: 'Save appointment',
     cancel: 'Cancel',
-    estimatedMinutes: 'min',
   },
   detail: {
     collectPayment: 'Create bill',
@@ -76,7 +73,6 @@ export const APPOINTMENTS = {
     staff: 'Staff',
     date: 'Date',
     time: 'Time',
-    duration: 'Duration',
     total: 'Total',
     whatsappTemplate:
       'Hi {customer}, your appointment at {salon} is on {date} at {time} for {services}. See you soon!',

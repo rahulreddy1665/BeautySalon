@@ -7,7 +7,6 @@ export interface SalonService {
   category: string
   categoryId?: string | { _id: string; name?: string; isActive?: boolean } | null
   price: number
-  durationMinutes: number
   createdAt?: string
   updatedAt?: string
 }
@@ -17,7 +16,6 @@ export interface ServiceInput {
   categoryId?: string
   category?: string
   price: number
-  durationMinutes?: number
 }
 
 export interface PaginatedServices {

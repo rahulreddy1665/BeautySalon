@@ -73,7 +73,6 @@ async function computeTotals(
   const docs = await Service.find({ _id: { $in: ids } });
   const byId = new Map(docs.map((d) => [String(d._id), d]));
   let listTotal = 0;
-  let totalDuration = 0;
   const populated = [];
   for (const line of services) {
     const svc = byId.get(String(line.service));
@@ -84,13 +83,11 @@ async function computeTotals(
       };
     }
     listTotal = round2(listTotal + svc.price * line.qty);
-    totalDuration += svc.durationMinutes * line.qty;
     populated.push({
       service: {
         _id: svc._id,
         name: svc.name,
         price: svc.price,
-        durationMinutes: svc.durationMinutes,
         category: svc.category,
         categoryId: svc.categoryId,
       },
@@ -100,7 +97,6 @@ async function computeTotals(
   return {
     ok: true as const,
     listTotal,
-    totalDuration,
     populated,
   };
 }
@@ -112,7 +108,6 @@ function toPublic(
   },
   extras: {
     listTotal: number;
-    totalDuration: number;
     services: unknown[];
   },
 ) {
@@ -125,7 +120,6 @@ function toPublic(
     listTotal: extras.listTotal,
     comboPrice,
     saving: round2(extras.listTotal - comboPrice),
-    totalDuration: extras.totalDuration,
   };
 }
 
@@ -136,7 +130,6 @@ async function enrichCombo(doc: InstanceType<typeof Combo>) {
     statusCode: 200 as const,
     data: toPublic(doc, {
       listTotal: totals.listTotal,
-      totalDuration: totals.totalDuration,
       services: totals.populated,
     }),
   };

@@ -52,13 +52,12 @@ function categoryIdOf(service?: SalonService | null): string {
 
 function toValues(service?: SalonService | null): ServiceFormValues {
   if (!service) {
-    return { name: '', categoryId: '', price: 0, durationMinutes: 30 }
+    return { name: '', categoryId: '', price: 0 }
   }
   return {
     name: service.name,
     categoryId: categoryIdOf(service),
     price: service.price,
-    durationMinutes: service.durationMinutes ?? 30,
   }
 }
 
@@ -88,7 +87,6 @@ export function ServiceFormSheet({
       name: values.name,
       categoryId: values.categoryId,
       price: values.price,
-      durationMinutes: values.durationMinutes,
     }
     if (isEdit && service) {
       await updateMutation.mutateAsync({ id: service._id, payload })
@@ -159,36 +157,20 @@ export function ServiceFormSheet({
                 </Select>
               </FormField>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={SERVICES.form.price}
-                  htmlFor="svc-price"
-                  error={form.formState.errors.price?.message}
-                >
-                  <Input
-                    id="svc-price"
-                    type="number"
-                    min={0}
-                    step="1"
-                    className="tabular-nums"
-                    {...form.register('price', { valueAsNumber: true })}
-                  />
-                </FormField>
-                <FormField
-                  label={SERVICES.form.duration}
-                  htmlFor="svc-duration"
-                  error={form.formState.errors.durationMinutes?.message}
-                >
-                  <Input
-                    id="svc-duration"
-                    type="number"
-                    min={5}
-                    step={5}
-                    className="tabular-nums"
-                    {...form.register('durationMinutes', { valueAsNumber: true })}
-                  />
-                </FormField>
-              </div>
+              <FormField
+                label={SERVICES.form.price}
+                htmlFor="svc-price"
+                error={form.formState.errors.price?.message}
+              >
+                <Input
+                  id="svc-price"
+                  type="number"
+                  min={0}
+                  step="1"
+                  className="tabular-nums"
+                  {...form.register('price', { valueAsNumber: true })}
+                />
+              </FormField>
             </SheetBody>
 
             <SheetFooter>

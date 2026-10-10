@@ -25,11 +25,7 @@ const WEEKDAY_KEYS: Weekday[] = [
   "saturday",
 ];
 
-async function assertWithinBusinessHours(
-  date: string,
-  startMin: number,
-  endMin: number,
-) {
+async function assertWithinBusinessHours(date: string, startMin: number) {
   const settings = await getOrCreateSettings();
   const open =
     settings.business.openingTime ||
@@ -55,7 +51,7 @@ async function assertWithinBusinessHours(
     });
   }
 
-  if (startMin < openMin || endMin > closeMin) {
+  if (startMin < openMin || startMin >= closeMin) {
     const openLabel = formatAmPm(openMin);
     const closeLabel = formatAmPm(closeMin);
     throw Object.assign(
@@ -123,20 +119,6 @@ function parseTimeToMinutes(time: string): number | null {
   return h * 60 + m;
 }
 
-function minutesToTime(total: number): string {
-  const h = Math.floor(total / 60) % 24;
-  const m = total % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function rangesOverlap(
-  aStart: number,
-  aEnd: number,
-  bStart: number,
-  bEnd: number,
-): boolean {
-  return aStart < bEnd && bStart < aEnd;
-}
 
 async function buildServiceLines(services: AppointmentServiceInput[]) {
   if (!Array.isArray(services) || services.length === 0) {
@@ -184,7 +166,6 @@ async function buildServiceLines(services: AppointmentServiceInput[]) {
           lines.push({
             service: service._id as mongoose.Types.ObjectId,
             name: service.name,
-            durationMinutes: service.durationMinutes ?? 30,
             staff: staff._id as mongoose.Types.ObjectId,
           });
         }
@@ -206,51 +187,10 @@ async function buildServiceLines(services: AppointmentServiceInput[]) {
     lines.push({
       service: service._id as mongoose.Types.ObjectId,
       name: service.name,
-      durationMinutes: service.durationMinutes ?? 30,
       staff: staff._id as mongoose.Types.ObjectId,
     });
   }
   return lines;
-}
-
-async function assertNoStaffConflict(opts: {
-  date: string;
-  startMin: number;
-  endMin: number;
-  staffIds: string[];
-  excludeId?: string;
-}) {
-  const filter: Record<string, unknown> = {
-    date: opts.date,
-    status: { $in: ["booked", "completed"] },
-    "services.staff": { $in: opts.staffIds },
-  };
-  if (opts.excludeId) filter._id = { $ne: opts.excludeId };
-
-  const existing = await Appointment.find(filter);
-  for (const appt of existing) {
-    const otherStart = parseTimeToMinutes(appt.startTime);
-    const otherEnd = parseTimeToMinutes(appt.endTime);
-    if (otherStart === null || otherEnd === null) continue;
-    if (!rangesOverlap(opts.startMin, opts.endMin, otherStart, otherEnd)) {
-      continue;
-    }
-    const conflictingStaff = appt.services.find((s) =>
-      opts.staffIds.includes(String(s.staff)),
-    );
-    const staffName = conflictingStaff
-      ? String(conflictingStaff.staff)
-      : "staff";
-    const staffDoc = conflictingStaff
-      ? await Staff.findById(conflictingStaff.staff)
-      : null;
-    throw Object.assign(
-      new Error(
-        `Conflicts with ${staffDoc?.name ?? staffName}'s appointment ${appt.startTime}–${appt.endTime} on ${appt.date}`,
-      ),
-      { statusCode: 409 },
-    );
-  }
 }
 
 function assertNotPast(date: string, startTime: string, allowPast: boolean) {
@@ -318,19 +258,8 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
 
     assertNotPast(data.date, data.startTime, false);
     const lines = await buildServiceLines(data.services);
-    const totalDuration = lines.reduce((sum, l) => sum + l.durationMinutes, 0);
-    const endMin = startMin + totalDuration;
-    const endTime = minutesToTime(endMin);
-    const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
 
-    await assertWithinBusinessHours(data.date, startMin, endMin);
-
-    await assertNoStaffConflict({
-      date: data.date,
-      startMin,
-      endMin,
-      staffIds,
-    });
+    await assertWithinBusinessHours(data.date, startMin);
 
     const customerFields = await resolveCustomerFields(data);
 
@@ -339,7 +268,6 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
       services: lines,
       date: data.date,
       startTime: data.startTime,
-      endTime,
       status: "booked",
       notes: data.notes?.trim() || undefined,
       createdBy: data.createdBy || null,
@@ -378,7 +306,7 @@ export const getAppointments = async (query: AppointmentListQuery = {}) => {
       Appointment.find(filter)
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name isActive")
-        .populate("services.service", "name durationMinutes price")
+        .populate("services.service", "name price")
         .sort({ date: 1, startTime: 1 })
         .skip((page - 1) * limit)
         .limit(limit),
@@ -405,7 +333,7 @@ export const getAppointmentById = async (id: string) => {
     const appointment = await Appointment.findById(id)
       .populate("customer", "name lastName phone")
       .populate("services.staff", "name isActive")
-      .populate("services.service", "name durationMinutes price")
+      .populate("services.service", "name price")
       .populate("invoice");
     if (!appointment) {
       return { statusCode: 404, data: null, message: "Appointment not found" };
@@ -426,7 +354,7 @@ export const updateAppointment = async (
       return { statusCode: 404, data: null, message: "Appointment not found" };
     }
     if (
-      isAppointmentLocked(current.status, current.date, current.endTime)
+      isAppointmentLocked(current.status, current.date, current.startTime)
     ) {
       return fail(
         400,
@@ -453,24 +381,10 @@ export const updateAppointment = async (
       : current.services.map((s) => ({
           service: s.service,
           name: s.name,
-          durationMinutes: s.durationMinutes,
           staff: s.staff,
         }));
 
-    const totalDuration = lines.reduce((sum, l) => sum + l.durationMinutes, 0);
-    const endMin = startMin + totalDuration;
-    const endTime = minutesToTime(endMin);
-    const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
-
-    await assertWithinBusinessHours(date, startMin, endMin);
-
-    await assertNoStaffConflict({
-      date,
-      startMin,
-      endMin,
-      staffIds,
-      excludeId: id,
-    });
+    await assertWithinBusinessHours(date, startMin);
 
     let customerFields: {
       customer: mongoose.Types.ObjectId | null;
@@ -499,7 +413,6 @@ export const updateAppointment = async (
       services: lines,
       date,
       startTime,
-      endTime,
       notes: data.notes !== undefined ? data.notes.trim() : current.notes,
     });
     await current.save();
@@ -531,10 +444,10 @@ export const changeAppointmentStatus = async (
         ErrorCodes.APPOINTMENT_LOCKED,
       );
     }
-    // Cancel is blocked once the slot has ended; no-show / completed still OK.
+    // Cancel is blocked once the start time has passed; no-show / completed still OK.
     if (
       status === "cancelled" &&
-      isAppointmentLocked(current.status, current.date, current.endTime)
+      isAppointmentLocked(current.status, current.date, current.startTime)
     ) {
       return fail(
         400,

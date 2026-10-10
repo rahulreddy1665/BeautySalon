@@ -8,8 +8,6 @@ export interface IService extends Document {
   /** Managed category master reference. */
   categoryId?: mongoose.Types.ObjectId | null;
   price: number;
-  /** Duration in minutes; default 30, min 5, step 5. */
-  durationMinutes: number;
 }
 
 const serviceSchema = new Schema<IService>(
@@ -34,12 +32,6 @@ const serviceSchema = new Schema<IService>(
       type: Number,
       required: true,
       min: 0,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-      default: 30,
-      min: 5,
     },
   },
   {

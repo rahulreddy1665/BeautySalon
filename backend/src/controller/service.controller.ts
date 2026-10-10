@@ -190,12 +190,6 @@ export const importServicesController = async (req: Request, res: Response) => {
         name: pick("name", "service name", "service"),
         category: pick("category", "service category"),
         price: pick("price", "price (inr)", "amount"),
-        durationMinutes: pick(
-          "duration (min)",
-          "duration",
-          "durationminutes",
-          "duration_minutes",
-        ),
       };
     });
 
@@ -204,7 +198,6 @@ export const importServicesController = async (req: Request, res: Response) => {
         name: r.name !== undefined ? String(r.name) : undefined,
         category: r.category !== undefined ? String(r.category) : undefined,
         price: r.price,
-        durationMinutes: r.durationMinutes,
       })),
     );
 

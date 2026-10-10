@@ -285,7 +285,6 @@ export const getDashboard = async (
       return {
         id: String(a._id),
         startTime: a.startTime,
-        endTime: a.endTime,
         status: a.status,
         customerName,
         services: (a.services ?? []).map((s) => s.name),

@@ -9,7 +9,6 @@ export type AppointmentStatus =
 export interface IAppointmentServiceLine {
   service: mongoose.Types.ObjectId;
   name: string;
-  durationMinutes: number;
   staff: mongoose.Types.ObjectId;
 }
 
@@ -20,7 +19,6 @@ export interface IAppointment extends Document {
   services: IAppointmentServiceLine[];
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
-  endTime: string; // HH:mm server-computed
   status: AppointmentStatus;
   notes?: string;
   invoice?: mongoose.Types.ObjectId | null;
@@ -31,7 +29,6 @@ const appointmentServiceSchema = new Schema<IAppointmentServiceLine>(
   {
     service: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     name: { type: String, required: true },
-    durationMinutes: { type: Number, required: true, min: 5 },
     staff: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
   },
   { _id: false },
@@ -56,7 +53,6 @@ const appointmentSchema = new Schema<IAppointment>(
     },
     date: { type: String, required: true },
     startTime: { type: String, required: true },
-    endTime: { type: String, required: true },
     status: {
       type: String,
       enum: ["booked", "completed", "cancelled", "no_show"],

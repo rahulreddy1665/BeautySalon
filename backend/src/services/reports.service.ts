@@ -1615,7 +1615,6 @@ export const getReportsAppointments = async (
         id: String(a._id),
         date: a.date,
         startTime: a.startTime,
-        endTime: a.endTime,
         status: a.status,
         customerName,
         staffNames,
@@ -1676,7 +1675,6 @@ export const exportReportsAppointments = async (
         items: Array<{
           date: string;
           startTime: string;
-          endTime: string;
           status: string;
           customerName: string;
           staffNames: string[];
@@ -1687,8 +1685,7 @@ export const exportReportsAppointments = async (
     };
     const headers = [
       "Date",
-      "Start",
-      "End",
+      "Time",
       "Status",
       "Customer",
       "Staff",
@@ -1698,7 +1695,6 @@ export const exportReportsAppointments = async (
     const rows = data.table.items.map((r) => [
       r.date,
       r.startTime,
-      r.endTime,
       r.status,
       r.customerName,
       r.staffNames.join("; "),
