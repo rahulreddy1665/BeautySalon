@@ -29,13 +29,9 @@ export interface UpdateBookingDto {
 }
 
 export interface CreateCustomerDto {
-  name: string;
-  lastName: string;
-  email: string;
+  name?: string;
+  email?: string;
   phone: number;
-  address: string;
-  address1: string;
-  pincode: number;
 }
 
 export interface UpdateCustomerDto {
@@ -43,7 +39,4 @@ export interface UpdateCustomerDto {
   lastName?: string;
   email?: string;
   phone?: number;
-  address?: string;
-  address1?: string;
-  pincode?: number;
 }

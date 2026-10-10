@@ -36,23 +36,15 @@ function toFormValues(customer?: Customer | null): CustomerFormValues {
   if (!customer) {
     return {
       name: '',
-      lastName: '',
       email: '',
       phone: '',
-      address: '',
-      address1: '',
-      pincode: '',
     }
   }
 
   return {
-    name: customer.name ?? '',
-    lastName: customer.lastName ?? '',
+    name: [customer.name, customer.lastName].filter(Boolean).join(' '),
     email: customer.email ?? '',
     phone: String(customer.phone ?? ''),
-    address: customer.address ?? '',
-    address1: customer.address1 ?? '',
-    pincode: customer.pincode ? String(customer.pincode) : '',
   }
 }
 
@@ -97,7 +89,7 @@ export function CustomerFormSheet({
           <SheetDescription>
             {isEdit
               ? 'Update profile details for this guest.'
-              : 'Capture name and phone for walk-ins and bookings.'}
+              : 'Only the phone number is required.'}
           </SheetDescription>
         </SheetHeader>
 
@@ -108,25 +100,8 @@ export function CustomerFormSheet({
           noValidate
         >
           <SheetBody>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                label="First name"
-                htmlFor="name"
-                error={form.formState.errors.name?.message}
-              >
-                <Input id="name" {...form.register('name')} autoComplete="given-name" />
-              </FormField>
-              <FormField label="Last name" htmlFor="lastName">
-                <Input
-                  id="lastName"
-                  {...form.register('lastName')}
-                  autoComplete="family-name"
-                />
-              </FormField>
-            </div>
-
             <FormField
-              label="Phone"
+              label="Phone *"
               htmlFor="phone"
               error={form.formState.errors.phone?.message}
             >
@@ -141,6 +116,14 @@ export function CustomerFormSheet({
             </FormField>
 
             <FormField
+              label="Name"
+              htmlFor="name"
+              error={form.formState.errors.name?.message}
+            >
+              <Input id="name" {...form.register('name')} autoComplete="name" />
+            </FormField>
+
+            <FormField
               label="Email"
               htmlFor="email"
               error={form.formState.errors.email?.message}
@@ -150,27 +133,6 @@ export function CustomerFormSheet({
                 type="email"
                 {...form.register('email')}
                 autoComplete="email"
-              />
-            </FormField>
-
-            <FormField label="Address" htmlFor="address">
-              <Input id="address" {...form.register('address')} />
-            </FormField>
-
-            <FormField label="Address line 2" htmlFor="address1">
-              <Input id="address1" {...form.register('address1')} />
-            </FormField>
-
-            <FormField
-              label="PIN code"
-              htmlFor="pincode"
-              error={form.formState.errors.pincode?.message}
-            >
-              <Input
-                id="pincode"
-                inputMode="numeric"
-                {...form.register('pincode')}
-                autoComplete="postal-code"
               />
             </FormField>
           </SheetBody>

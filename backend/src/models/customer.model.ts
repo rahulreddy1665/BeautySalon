@@ -2,12 +2,11 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface ICustomer extends Document {
   name: string;
+  /** Legacy: older records split the name; new records keep it all in `name`. */
   lastName: string;
   email: string;
+  /** The only required field. */
   phone: number;
-  address: string;
-  address1: string;
-  pincode: number;
   isActive: boolean;
 }
 
@@ -15,7 +14,7 @@ const customerSchema = new Schema<ICustomer>(
   {
     name: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
     },
     lastName: {
@@ -29,15 +28,6 @@ const customerSchema = new Schema<ICustomer>(
       unique: true,
       required: true,
       trim: true,
-    },
-    address: {
-      type: String,
-    },
-    address1: {
-      type: String,
-    },
-    pincode: {
-      type: Number,
     },
     isActive: {
       type: Boolean,

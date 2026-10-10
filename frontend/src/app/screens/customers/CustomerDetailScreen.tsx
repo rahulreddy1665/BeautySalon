@@ -109,7 +109,7 @@ export function CustomerDetailScreen() {
       </div>
 
       <PageHeader
-        description={`${fullName} · ${customer.phone}`}
+        description={[fullName, customer.phone].filter(Boolean).join(' · ')}
         actions={
           <Button
             type="button"
@@ -155,14 +155,6 @@ export function CustomerDetailScreen() {
           <div>
             <p className="text-xs text-muted-foreground">{CUSTOMERS.detail.phone}</p>
             <p className="tabular-nums">{customer.phone}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-xs text-muted-foreground">{CUSTOMERS.detail.address}</p>
-            <p>
-              {[customer.address, customer.address1, customer.pincode]
-                .filter(Boolean)
-                .join(', ') || '—'}
-            </p>
           </div>
         </CardContent>
       </Card>

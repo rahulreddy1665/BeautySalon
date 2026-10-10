@@ -68,3 +68,20 @@ export function useDeleteCustomerMutation() {
     },
   })
 }
+
+export function useImportCustomersMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (file: File) => customersApi.importFile(file),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customers.all })
+      toast.success(
+        `Import done · ${result.summary.created} created · ${result.summary.updated} updated · ${result.summary.error} errors`,
+      )
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Import failed'))
+    },
+  })
+}

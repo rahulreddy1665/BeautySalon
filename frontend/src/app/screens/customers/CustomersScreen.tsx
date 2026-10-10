@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Search, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -6,16 +6,17 @@ import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
+import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { CUSTOMERS } from '@/app/constants'
 import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import type { Customer } from '@/app/service/customers/customersApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
-
+import { CustomerImportDialog } from '@/app/screens/customers/CustomerImportDialog'
 
 function displayName(customer: Customer): string {
-  return [customer.name, customer.lastName].filter(Boolean).join(' ')
+  return [customer.name, customer.lastName].filter(Boolean).join(' ') || 'Unnamed'
 }
 
 const columns: ColumnDef<Customer & { fullName: string; phoneLabel: string }>[] = [
@@ -47,6 +48,7 @@ export function CustomersScreen() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const wantsNew = searchParams.get('new') === '1'
   const createOpen = sheetOpen || wantsNew
 
@@ -86,7 +88,21 @@ export function CustomersScreen() {
 
   return (
     <div className="min-w-0 space-y-3">
-      <PageHeader description={CUSTOMERS.list.description} />
+      <PageHeader
+        description={CUSTOMERS.list.description}
+        actions={
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="size-4" strokeWidth={1.75} />
+            {CUSTOMERS.list.import}
+          </Button>
+        }
+      />
 
       <div className="relative max-w-md">
         <Search
@@ -157,6 +173,8 @@ export function CustomersScreen() {
           />
         </>
       ) : null}
+
+      <CustomerImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

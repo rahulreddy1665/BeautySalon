@@ -7,22 +7,36 @@ export interface Customer {
   lastName?: string
   email?: string
   phone: number
-  address?: string
-  address1?: string
-  pincode?: number
   isActive?: boolean
   createdAt?: string
   updatedAt?: string
 }
 
 export interface CustomerInput {
-  name: string
+  name?: string
+  /** Legacy split name; sent as '' to fold it into `name`. */
   lastName?: string
   email?: string
   phone: number
-  address?: string
-  address1?: string
-  pincode?: number
+}
+
+export interface CustomerImportRowResult {
+  row: number
+  status: 'created' | 'updated' | 'skipped' | 'error'
+  reason?: string
+  name?: string
+  phone?: string
+}
+
+export interface CustomerImportResult {
+  results: CustomerImportRowResult[]
+  summary: {
+    created: number
+    updated: number
+    skipped: number
+    error: number
+    total: number
+  }
 }
 
 export const customersApi = {
@@ -48,6 +62,19 @@ export const customersApi = {
     const { data } = await apiClient.patch<ApiSuccessResponse<Customer>>(
       `/customer/${id}`,
       payload,
+    )
+    return data.data
+  },
+
+  importFile: async (file: File): Promise<CustomerImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await apiClient.post<ApiSuccessResponse<CustomerImportResult>>(
+      '/customer/import',
+      form,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
     )
     return data.data
   },

@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
+import * as XLSX from "xlsx";
 
 import {
   createCustomer,
   deleteCustomer,
   getCustomerById,
   getCustomers,
+  importCustomers,
   updateCustomer,
 } from "../services/customer.service";
 import { sendResponse } from "../middlewares/response.middleware";
@@ -111,6 +113,65 @@ export const deleteCustomerController = async (
     return sendResponse(res, {
       statusCode: 500,
       message: "Customer delete failed",
+      errors: error,
+    });
+  }
+};
+
+export const importCustomersController = async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return sendResponse(res, {
+        statusCode: 400,
+        message: "Upload a .xlsx or .csv file",
+        data: null,
+      });
+    }
+
+    const workbook = XLSX.read(file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      return sendResponse(res, {
+        statusCode: 400,
+        message: "Spreadsheet has no sheets",
+        data: null,
+      });
+    }
+    const sheet = workbook.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: "",
+    });
+
+    const mapped = rawRows.map((row) => {
+      const keys = Object.keys(row);
+      const pick = (...names: string[]) => {
+        for (const name of names) {
+          const key = keys.find(
+            (k) => k.trim().toLowerCase() === name.toLowerCase(),
+          );
+          if (key !== undefined) return row[key];
+        }
+        return undefined;
+      };
+      return {
+        name: pick("name", "customer name", "full name"),
+        phone: pick("phone", "mobile", "mobile number", "phone number"),
+        email: pick("email", "email address"),
+      };
+    });
+
+    const data = await importCustomers(mapped);
+
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message: "Customer import complete",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Customer import failed",
       errors: error,
     });
   }
