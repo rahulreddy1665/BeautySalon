@@ -17,7 +17,11 @@ import {
   DialogTitle,
 } from '@/app/components/ui/dialog'
 import { useAppointmentsQuery } from '@/app/hooks/queries/useAppointmentsQuery'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
+import {
+  useCustomerQuery,
+  useCustomersPageQuery,
+} from '@/app/hooks/queries/useCustomersQuery'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import { useLoyaltyBalancesQuery } from '@/app/hooks/queries/useLoyaltyQuery'
 import { SegmentedControl } from '@/app/screens/billing/new-bill/segmented'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
@@ -68,13 +72,35 @@ export function CustomerCard({
   const [confirmWalkIn, setConfirmWalkIn] = useState(false)
   const todayKey = getSalonNow().dateKey
 
-  const customersQuery = useCustomersQuery()
-  const balancesQuery = useLoyaltyBalancesQuery()
+  // Server-side search, fired only after typing pauses.
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch.trim())
+  const customerSearchQuery = useCustomersPageQuery(
+    { q: debouncedCustomerSearch, limit: 8 },
+    { enabled: debouncedCustomerSearch.length > 0 },
+  )
+  const selectedCustomerQuery = useCustomerQuery(cart.customerId ?? undefined)
   const appointmentsQuery = useAppointmentsQuery({
     date: todayKey,
     status: 'booked',
     limit: 100,
   })
+
+  const customerResults =
+    customerSearch.trim() && debouncedCustomerSearch
+      ? (customerSearchQuery.data?.items ?? [])
+      : []
+
+  const selectedCustomer = cart.customerId ? (selectedCustomerQuery.data ?? null) : null
+
+  // Points only for customers actually on screen: the search results + the selected one.
+  const visibleCustomerIds = useMemo(
+    () => [
+      ...customerResults.map((c) => c._id),
+      ...(cart.customerId ? [cart.customerId] : []),
+    ],
+    [customerResults, cart.customerId],
+  )
+  const balancesQuery = useLoyaltyBalancesQuery(visibleCustomerIds)
 
   const balanceById = useMemo(() => {
     const map = new Map<string, number>()
@@ -83,23 +109,6 @@ export function CustomerCard({
     }
     return map
   }, [balancesQuery.data])
-
-  const customerResults = useMemo(() => {
-    const q = customerSearch.trim().toLowerCase()
-    if (!q) return []
-    return (customersQuery.data ?? [])
-      .filter((c) => {
-        const name = [c.name, c.lastName].filter(Boolean).join(' ').toLowerCase()
-        const phone = String(c.phone ?? '')
-        return name.includes(q) || phone.includes(q)
-      })
-      .slice(0, 8)
-  }, [customerSearch, customersQuery.data])
-
-  const selectedCustomer = useMemo(
-    () => (customersQuery.data ?? []).find((c) => c._id === cart.customerId) ?? null,
-    [customersQuery.data, cart.customerId],
-  )
 
   const bookedAppointments = useMemo(
     () =>

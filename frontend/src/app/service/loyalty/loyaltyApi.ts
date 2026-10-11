@@ -38,6 +38,8 @@ export interface AdjustLoyaltyPayload {
 
 export type UpdateLoyaltyRulesPayload = Partial<LoyaltyRules>
 
+const MAX_IDS_IN_URL = 100
+
 export const loyaltyApi = {
   getRules: async (): Promise<LoyaltyRules> => {
     const { data } =
@@ -54,10 +56,14 @@ export const loyaltyApi = {
   },
 
   listBalances: async (customerIds?: string[]): Promise<LoyaltyBalance[]> => {
+    // IDs travel in the query string (24 chars each). Past ~100 the URL gets long
+    // enough for proxies to reject it, so fetch all balances instead.
+    const filterIds =
+      customerIds?.length && customerIds.length <= MAX_IDS_IN_URL ? customerIds : undefined
     const { data } = await apiClient.get<ApiSuccessResponse<LoyaltyBalance[]>>(
       '/loyalty/balances',
       {
-        params: customerIds?.length ? { customerIds: customerIds.join(',') } : undefined,
+        params: filterIds ? { customerIds: filterIds.join(',') } : undefined,
       },
     )
     return data.data

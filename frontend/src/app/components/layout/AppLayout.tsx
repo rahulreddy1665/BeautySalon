@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 
 import { ErrorBoundary } from '@/app/components/ErrorBoundary'
+import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { GlobalSearch } from '@/app/components/layout/GlobalSearch'
 import { Logo } from '@/app/components/Logo'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
@@ -504,7 +505,9 @@ export function AppLayout() {
           )}
         >
           <ErrorBoundary key={location.pathname}>
-            <Outlet />
+            <Suspense fallback={<LoadingSkeleton rows={6} />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

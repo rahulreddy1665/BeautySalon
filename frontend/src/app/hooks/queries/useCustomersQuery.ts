@@ -1,14 +1,37 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
-import { customersApi, type CustomerInput } from '@/app/service/customers/customersApi'
+import {
+  customersApi,
+  type CustomerInput,
+  type CustomerListParams,
+} from '@/app/service/customers/customersApi'
 import { toErrorMessage } from '@/app/utils'
 
+/** Full customer list. Prefer `useCustomersPageQuery` for anything that grows. */
 export function useCustomersQuery() {
   return useQuery({
-    queryKey: queryKeys.customers.list(),
+    queryKey: queryKeys.customers.list({ all: true }),
     queryFn: () => customersApi.getAll(),
+  })
+}
+
+/** Server-paginated / searched customers. Keeps the previous page visible while the next loads. */
+export function useCustomersPageQuery(
+  params: CustomerListParams,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.customers.list(params as Record<string, unknown>),
+    queryFn: () => customersApi.list(params),
+    placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   })
 }
 

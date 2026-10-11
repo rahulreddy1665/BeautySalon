@@ -1,6 +1,5 @@
 import { Download, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { DialogBody } from '@/app/components/ui/dialog'
 import { Button } from '@/app/components/ui/button'
@@ -16,6 +15,7 @@ import { Input } from '@/app/components/ui/input'
 import { useImportServicesMutation } from '@/app/hooks/queries/useServicesQuery'
 import type { ServiceImportRowResult } from '@/app/service/services/servicesApi'
 import { cn } from '@/app/utils'
+import { loadXlsx } from '@/app/utils/loadXlsx'
 
 interface ServiceImportDialogProps {
   open: boolean
@@ -30,7 +30,8 @@ type PreviewRow = {
   error?: string
 }
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await loadXlsx()
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
     ['Name', 'Category', 'Price'],
@@ -52,7 +53,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
   const parseFile = async (next: File) => {
     setFile(next)
     setResults(null)
-    const buffer = await next.arrayBuffer()
+    const [XLSX, buffer] = await Promise.all([loadXlsx(), next.arrayBuffer()])
     const wb = XLSX.read(buffer, { type: 'array' })
     const sheet = wb.Sheets[wb.SheetNames[0] ?? '']
     if (!sheet) {
@@ -118,7 +119,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
 
         <DialogBody>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={downloadTemplate}>
+            <Button type="button" size="sm" variant="outline" onClick={() => void downloadTemplate()}>
               <Download className="size-4" strokeWidth={1.75} />
               Download template
             </Button>

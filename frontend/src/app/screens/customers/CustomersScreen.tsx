@@ -10,7 +10,8 @@ import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { CUSTOMERS } from '@/app/constants'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useCustomersPageQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import type { Customer } from '@/app/service/customers/customersApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
 import { CustomerImportDialog } from '@/app/screens/customers/CustomerImportDialog'
@@ -41,11 +42,17 @@ const columns: ColumnDef<Customer & { fullName: string; phoneLabel: string }>[] 
 ]
 
 export function CustomersScreen() {
-  const { data, isLoading, isError, error, refetch } = useCustomersQuery()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Wait for a pause in typing before hitting the server.
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const { data, isLoading, isError, error, refetch } = useCustomersPageQuery({
+    page,
+    limit: pageSize,
+    q: debouncedSearch || undefined,
+  })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -64,27 +71,15 @@ export function CustomersScreen() {
     )
   }
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = (data ?? []).map((customer) => ({
-      ...customer,
-      fullName: displayName(customer),
-      phoneLabel: String(customer.phone ?? ''),
-    }))
-
-    if (!q) return rows
-
-    return rows.filter((customer) => {
-      const haystack = [customer.fullName, customer.phoneLabel, customer.email ?? '']
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(q)
-    })
-  }, [data, search])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const safePage = Math.min(page, pageCount - 1)
-  const pageRows = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize)
+  const pageRows = useMemo(
+    () =>
+      (data?.items ?? []).map((customer) => ({
+        ...customer,
+        fullName: displayName(customer),
+        phoneLabel: String(customer.phone ?? ''),
+      })),
+    [data],
+  )
 
   return (
     <div className="min-w-0 space-y-3">
@@ -113,7 +108,7 @@ export function CustomersScreen() {
           value={search}
           onChange={(event) => {
             setSearch(event.target.value)
-            setPage(0)
+            setPage(1)
           }}
           placeholder={CUSTOMERS.list.searchPlaceholder}
           className="pl-8"
@@ -146,14 +141,14 @@ export function CustomersScreen() {
           />
 
           <Pagination
-            page={safePage + 1}
-            totalPages={pageCount}
-            total={filtered.length}
+            page={data?.page ?? page}
+            totalPages={data?.totalPages ?? 1}
+            total={data?.total ?? 0}
             pageSize={pageSize}
-            onPageChange={(p) => setPage(p - 1)}
+            onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size)
-              setPage(0)
+              setPage(1)
             }}
           />
 

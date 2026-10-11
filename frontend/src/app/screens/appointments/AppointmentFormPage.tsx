@@ -21,6 +21,10 @@ import {
 } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
 import {
+  SearchableSelect,
+  type SearchableOption,
+} from '@/app/components/ui/searchable-select'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -178,6 +182,25 @@ export function AppointmentFormPage() {
   }, [focusStaffIndex, fields.length])
 
   const combos = combosQuery.data ?? []
+
+  // Combos first, then services grouped by category (catalog is already sorted by category).
+  const serviceOptions = useMemo(
+    (): SearchableOption[] => [
+      ...combos.map((combo) => ({
+        value: `combo:${combo._id}`,
+        label: combo.name,
+        group: APPOINTMENTS.form.combosGroup,
+        hint: formatINR(combo.comboPrice),
+      })),
+      ...catalog.map((svc) => ({
+        value: svc._id,
+        label: svc.name,
+        group: svc.category || APPOINTMENTS.form.otherGroup,
+        hint: formatINR(svc.price),
+      })),
+    ],
+    [combos, catalog],
+  )
 
   const priceTotal = useMemo(
     () =>
@@ -395,35 +418,24 @@ export function AppointmentFormPage() {
                       form.formState.errors.services?.[index]?.serviceId?.message
                     }
                   >
-                    <Select
+                    <SearchableSelect
                       value={form.watch(`services.${index}.serviceId`) || undefined}
-                      onValueChange={(v) =>
+                      onValueChange={(v) => {
                         form.setValue(`services.${index}.serviceId`, v, {
                           shouldDirty: true,
                           shouldTouch: true,
                           shouldValidate: true,
                         })
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {combos.map((combo) => (
-                          <SelectItem
-                            key={`combo-${combo._id}`}
-                            value={`combo:${combo._id}`}
-                          >
-                            {combo.name}
-                          </SelectItem>
-                        ))}
-                        {catalog.map((svc) => (
-                          <SelectItem key={svc._id} value={svc._id}>
-                            {svc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        setFocusStaffIndex(index)
+                      }}
+                      options={serviceOptions}
+                      placeholder={APPOINTMENTS.form.servicePlaceholder}
+                      searchPlaceholder={APPOINTMENTS.form.serviceSearch}
+                      emptyText={APPOINTMENTS.form.serviceNoMatch}
+                      aria-invalid={Boolean(
+                        form.formState.errors.services?.[index]?.serviceId,
+                      )}
+                    />
                   </FormField>
                   <FormField
                     label={APPOINTMENTS.form.assignStaff}

@@ -1,6 +1,5 @@
 import { Download, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { Button } from '@/app/components/ui/button'
 import {
@@ -17,6 +16,7 @@ import { phoneToNumber } from '@/app/helpers/customerValidation'
 import { useImportCustomersMutation } from '@/app/hooks/queries/useCustomersQuery'
 import type { CustomerImportRowResult } from '@/app/service/customers/customersApi'
 import { cn } from '@/app/utils'
+import { loadXlsx } from '@/app/utils/loadXlsx'
 
 interface CustomerImportDialogProps {
   open: boolean
@@ -34,7 +34,8 @@ type PreviewRow = {
 const INDIAN_PHONE = /^(?:\+?91[\s-]?|0)?[6-9]\d{9}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await loadXlsx()
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
     ['Name', 'Phone', 'Email'],
@@ -56,7 +57,7 @@ export function CustomerImportDialog({ open, onOpenChange }: CustomerImportDialo
   const parseFile = async (next: File) => {
     setFile(next)
     setResults(null)
-    const buffer = await next.arrayBuffer()
+    const [XLSX, buffer] = await Promise.all([loadXlsx(), next.arrayBuffer()])
     const wb = XLSX.read(buffer, { type: 'array' })
     const sheet = wb.Sheets[wb.SheetNames[0] ?? '']
     if (!sheet) {
@@ -121,7 +122,12 @@ export function CustomerImportDialog({ open, onOpenChange }: CustomerImportDialo
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void downloadTemplate()}
+          >
             <Download className="size-3.5" strokeWidth={1.75} />
             Download template
           </Button>

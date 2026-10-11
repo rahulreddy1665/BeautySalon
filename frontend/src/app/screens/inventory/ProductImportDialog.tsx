@@ -1,6 +1,5 @@
 import { Download, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { Button } from '@/app/components/ui/button'
 import {
@@ -16,6 +15,7 @@ import { Input } from '@/app/components/ui/input'
 import { useImportProductsMutation } from '@/app/hooks/queries/useInventoryQuery'
 import type { ProductImportRowResult } from '@/app/service/products/productsApi'
 import { cn } from '@/app/utils'
+import { loadXlsx } from '@/app/utils/loadXlsx'
 
 interface ProductImportDialogProps {
   open: boolean
@@ -29,7 +29,8 @@ type PreviewRow = {
   error?: string
 }
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await loadXlsx()
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
     ['Name', 'Price'],
@@ -51,7 +52,7 @@ export function ProductImportDialog({ open, onOpenChange }: ProductImportDialogP
   const parseFile = async (next: File) => {
     setFile(next)
     setResults(null)
-    const buffer = await next.arrayBuffer()
+    const [XLSX, buffer] = await Promise.all([loadXlsx(), next.arrayBuffer()])
     const wb = XLSX.read(buffer, { type: 'array' })
     const sheet = wb.Sheets[wb.SheetNames[0] ?? '']
     if (!sheet) {
@@ -113,7 +114,7 @@ export function ProductImportDialog({ open, onOpenChange }: ProductImportDialogP
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
+          <Button type="button" variant="outline" size="sm" onClick={() => void downloadTemplate()}>
             <Download className="size-3.5" strokeWidth={1.75} />
             Download template
           </Button>

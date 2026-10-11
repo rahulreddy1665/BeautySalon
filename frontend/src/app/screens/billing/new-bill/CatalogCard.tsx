@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import {
   CategorySuggestions,
@@ -9,6 +9,7 @@ import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
 import { BILLING } from '@/app/constants'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import { SegmentedControl } from '@/app/screens/billing/new-bill/segmented'
 import { cn, formatINR } from '@/app/utils'
 
@@ -75,14 +76,12 @@ export function CatalogCard({
         name: item.name,
         price: item.price,
         category: 'category' in item ? item.category : prev?.category,
-        timesSold:
-          ('timesSold' in item ? item.timesSold : undefined) ?? prev?.timesSold,
+        timesSold: ('timesSold' in item ? item.timesSold : undefined) ?? prev?.timesSold,
         kind: ('kind' in item && item.kind) || prev?.kind || defaultKind,
         trackStock: 'trackStock' in item ? item.trackStock : prev?.trackStock,
         stockQty: 'stockQty' in item ? item.stockQty : prev?.stockQty,
         disabled: 'disabled' in item ? item.disabled : prev?.disabled,
-        disabledLabel:
-          'disabledLabel' in item ? item.disabledLabel : prev?.disabledLabel,
+        disabledLabel: 'disabledLabel' in item ? item.disabledLabel : prev?.disabledLabel,
         stockLabel: 'stockLabel' in item ? item.stockLabel : prev?.stockLabel,
       }
       byId.set(item.id, entry)
@@ -97,23 +96,36 @@ export function CatalogCard({
     )
   }, [catalog, popular, comboCatalog, tab])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return mergedQuickAdd.filter((item) => {
-      if (
-        categoryFilter &&
-        (item.category ?? '').trim().toLowerCase() !== categoryFilter.toLowerCase()
-      ) {
-        return false
-      }
-      return !q || item.name.toLowerCase().includes(q)
-    })
-  }, [mergedQuickAdd, search, categoryFilter])
+  // Input stays instant; the list only re-filters once typing pauses.
+  const debouncedSearch = useDebouncedValue(search)
 
-  const visible = showAll || search.trim() || categoryFilter
-    ? filtered
-    : filtered.slice(0, PREVIEW_COUNT)
-  const canExpand = !search.trim() && !categoryFilter && filtered.length > PREVIEW_COUNT
+  const filterItems = useCallback(
+    (query: string) => {
+      const q = query.trim().toLowerCase()
+      return mergedQuickAdd.filter((item) => {
+        if (
+          categoryFilter &&
+          (item.category ?? '').trim().toLowerCase() !== categoryFilter.toLowerCase()
+        ) {
+          return false
+        }
+        return !q || item.name.toLowerCase().includes(q)
+      })
+    },
+    [mergedQuickAdd, categoryFilter],
+  )
+
+  const filtered = useMemo(
+    () => filterItems(debouncedSearch),
+    [filterItems, debouncedSearch],
+  )
+
+  const visible =
+    showAll || debouncedSearch.trim() || categoryFilter
+      ? filtered
+      : filtered.slice(0, PREVIEW_COUNT)
+  const canExpand =
+    !debouncedSearch.trim() && !categoryFilter && filtered.length > PREVIEW_COUNT
 
   const categoryOrder = useMemo(() => {
     if (tab !== 'service' || selectedServiceIds.length === 0) return undefined
@@ -171,7 +183,8 @@ export function CatalogCard({
           }
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              const first = filtered.find((item) => !item.disabled)
+              // Use the live text, not the debounced one, so fast "type + Enter" picks correctly.
+              const first = filterItems(search).find((item) => !item.disabled)
               if (!first) return
               e.preventDefault()
               pick(first.id, first.kind)

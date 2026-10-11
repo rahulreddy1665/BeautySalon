@@ -20,7 +20,7 @@ import {
   useCreateComboMutation,
   useUpdateComboMutation,
 } from '@/app/hooks/queries/useCombosQuery'
-import { useServicesQuery } from '@/app/hooks/queries/useServicesQuery'
+import { useServicesCatalogQuery } from '@/app/hooks/queries/useServicesQuery'
 import type { SalonCombo } from '@/app/service/combos/combosApi'
 import { cn, formatINR, toErrorMessage } from '@/app/utils'
 
@@ -42,7 +42,7 @@ export function ComboFormSheet({ open, onOpenChange, combo }: Props) {
   const isEdit = Boolean(combo)
   const createMutation = useCreateComboMutation()
   const updateMutation = useUpdateComboMutation()
-  const servicesQuery = useServicesQuery({ page: 1, limit: 100 })
+  const servicesQuery = useServicesCatalogQuery()
   const [confirmAbove, setConfirmAbove] = useState(false)
   const pending = createMutation.isPending || updateMutation.isPending
 
@@ -67,7 +67,7 @@ export function ComboFormSheet({ open, onOpenChange, combo }: Props) {
 
   const serviceIds = form.watch('serviceIds')
   const comboPrice = form.watch('comboPrice')
-  const catalog = servicesQuery.data?.items ?? []
+  const catalog = servicesQuery.data ?? []
 
   const listTotal = useMemo(() => {
     return serviceIds.reduce((sum, id) => {

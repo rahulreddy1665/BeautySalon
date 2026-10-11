@@ -39,9 +39,34 @@ export interface CustomerImportResult {
   }
 }
 
+export interface CustomerListParams {
+  page?: number
+  limit?: number
+  /** Name, email, or phone digits. */
+  q?: string
+}
+
+export interface PaginatedCustomers {
+  items: Customer[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export const customersApi = {
+  /** Server-paginated, searchable list. */
+  list: async (params: CustomerListParams = {}): Promise<PaginatedCustomers> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<PaginatedCustomers>>(
+      '/customer',
+      { params },
+    )
+    return data.data
+  },
+
+  /** Unpaginated. Only for pickers not yet on server search; prefer `list`. */
   getAll: async (): Promise<Customer[]> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<Customer[]>>('/customer')
+    const { data } = await apiClient.get<ApiSuccessResponse<Customer[]>>('/customer/all')
     return data.data ?? []
   },
 
