@@ -107,14 +107,23 @@ export function mapInvoiceToBill(inv: InvoiceRecord): BillRecord {
   }
 }
 
+export interface BillsPage {
+  items: BillRecord[]
+  total: number
+  page: number
+  totalPages: number
+}
+
 export const billingApi = {
-  list: async (params: Record<string, unknown> = {}): Promise<BillRecord[]> => {
-    const page = await invoicesApi.list({
-      page: 1,
-      limit: 100,
-      ...params,
-    })
-    return page.items.map(mapInvoiceToBill)
+  /** One server page of bills; search, filters and paging all run on the server. */
+  listPage: async (params: Record<string, unknown> = {}): Promise<BillsPage> => {
+    const page = await invoicesApi.list(params)
+    return {
+      items: page.items.map(mapInvoiceToBill),
+      total: page.total,
+      page: page.page,
+      totalPages: page.totalPages,
+    }
   },
 
   getById: async (id: string): Promise<InvoiceRecord> => {

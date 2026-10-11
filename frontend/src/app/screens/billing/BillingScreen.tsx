@@ -11,6 +11,7 @@ import {
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Badge } from '@/app/components/ui/badge'
 import { Input } from '@/app/components/ui/input'
@@ -22,7 +23,8 @@ import {
   SelectValue,
 } from '@/app/components/ui/select'
 import { BILLING, ROUTES } from '@/app/constants'
-import { useBillsQuery } from '@/app/hooks/queries/useBillingQuery'
+import { useBillsPageQuery } from '@/app/hooks/queries/useBillingQuery'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import type { BillRecord } from '@/app/service/billing/billingApi'
 import type { PaymentMode } from '@/app/service/invoices/invoicesApi'
 import { formatINR } from '@/app/utils'
@@ -70,20 +72,26 @@ export function BillingScreen() {
   const [range, setRange] = useState<DateRange>(defaultTodayRange)
   const [mode, setMode] = useState<PaymentMode | 'all'>('all')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Server-side search: wait for a pause in typing before querying.
+  const debouncedSearch = useDebouncedValue(search.trim())
 
   const from = format(range.from, 'yyyy-MM-dd')
   const to = format(range.to, 'yyyy-MM-dd')
 
-  const { data, isLoading, isError, error, refetch } = useBillsQuery({
+  const { data, isLoading, isError, error, refetch } = useBillsPageQuery({
     from,
     to,
     paymentMode: mode === 'all' ? undefined : mode,
-    search: search.trim() || undefined,
+    search: debouncedSearch || undefined,
+    page,
+    limit: pageSize,
   })
 
   const rows = useMemo(
     () =>
-      (data ?? []).map((bill) => ({
+      (data?.items ?? []).map((bill) => ({
         ...bill,
         dateLabel: format(parseISO(bill.createdAt), 'dd MMM yyyy'),
         totalLabel: formatINR(bill.total),
@@ -95,7 +103,13 @@ export function BillingScreen() {
     <div className="min-w-0 space-y-3">
       <PageHeader description={BILLING.list.description} />
 
-      <DateRangeFilter value={range} onChange={setRange} />
+      <DateRangeFilter
+        value={range}
+        onChange={(next) => {
+          setRange(next)
+          setPage(1)
+        }}
+      />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
@@ -105,14 +119,20 @@ export function BillingScreen() {
           />
           <Input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search invoice or customer"
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search invoice, customer or phone"
             className="pl-8"
           />
         </div>
         <Select
           value={mode}
-          onValueChange={(value) => setMode(value as PaymentMode | 'all')}
+          onValueChange={(value) => {
+            setMode(value as PaymentMode | 'all')
+            setPage(1)
+          }}
         >
           <SelectTrigger className="w-full sm:w-36">
             <SelectValue placeholder="Mode" />
@@ -136,13 +156,30 @@ export function BillingScreen() {
       ) : null}
 
       {!isLoading && !isError ? (
-        <ResponsiveTable
-          data={rows}
-          columns={columns}
-          mobileTitleKey="invoiceNo"
-          emptyTitle="No bills in this range"
-          emptyDescription="Collect a payment to create the first invoice."
-        />
+        <>
+          <ResponsiveTable
+            data={rows}
+            columns={columns}
+            mobileTitleKey="invoiceNo"
+            emptyTitle={debouncedSearch ? 'No matching bills' : 'No bills in this range'}
+            emptyDescription={
+              debouncedSearch
+                ? 'Try another invoice number, customer name or phone.'
+                : 'Collect a payment to create the first invoice.'
+            }
+          />
+          <Pagination
+            page={data?.page ?? page}
+            totalPages={data?.totalPages ?? 1}
+            total={data?.total ?? 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
+        </>
       ) : null}
     </div>
   )
