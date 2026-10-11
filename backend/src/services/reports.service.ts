@@ -1,16 +1,24 @@
 /**
  * Reports service — invoice/appointment analytics.
  *
- * Indexes: relies on existing Invoice.createdAt and Appointment.date+status
- * (plus Appointment services.staff+date+startTime). No new indexes added —
- * range queries filter on those fields.
+ * Indexes: Invoice.createdAt (range filters), Invoice.customer+createdAt
+ * (customer history), Appointment.date+status and services.staff+date+startTime.
+ *
+ * Data volume: invoices snapshot the salon logo (~300 KB each). Every list read
+ * here uses INVOICE_LIST_PROJECTION (or a narrower field list) so reports move
+ * kilobytes, not hundreds of MB. Money totals are still summed in JS with the
+ * same round2 semantics as billing, so report figures match invoices exactly.
  */
 
 import mongoose from "mongoose";
 
 import { Appointment } from "../models/appointment.model";
 import { Customer } from "../models/customer.model";
-import { Invoice } from "../models/invoice.model";
+import {
+  Invoice,
+  INVOICE_LIST_PROJECTION,
+  INVOICE_TOTALS_PROJECTION,
+} from "../models/invoice.model";
 import { LoyaltyBalance } from "../models/loyalty.model";
 import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
@@ -176,7 +184,18 @@ function requireRange(fromRaw: unknown, toRaw: unknown) {
 async function loadInvoices(fromDate: Date, toDate: Date): Promise<LeanInvoice[]> {
   return Invoice.find({
     createdAt: { $gte: fromDate, $lte: toDate },
-  }).lean() as Promise<LeanInvoice[]>;
+  })
+    .select(INVOICE_LIST_PROJECTION)
+    .lean() as Promise<LeanInvoice[]>;
+}
+
+/** Revenue / tip / count only, for "previous period" comparisons. */
+async function loadInvoiceTotals(fromDate: Date, toDate: Date): Promise<LeanInvoice[]> {
+  return Invoice.find({
+    createdAt: { $gte: fromDate, $lte: toDate },
+  })
+    .select(INVOICE_TOTALS_PROJECTION)
+    .lean() as Promise<LeanInvoice[]>;
 }
 
 function serviceNet(inv: LeanInvoice): number {
@@ -316,8 +335,8 @@ export const getReportsOverview = async (opts: ReportOpts) => {
     const range = thisMonthToDateRange();
     const [currInvoices, prevInvoices, currAppts, prevAppts, newCurr, newPrev] =
       await Promise.all([
-        loadInvoices(range.fromDate, range.toDate),
-        loadInvoices(range.previousFromDate, range.previousToDate),
+        loadInvoiceTotals(range.fromDate, range.toDate),
+        loadInvoiceTotals(range.previousFromDate, range.previousToDate),
         Appointment.find({
           date: { $gte: range.from, $lte: range.to },
         })
@@ -544,9 +563,11 @@ export const getReportsSales = async (
       Invoice.find({
         createdAt: { $gte: range.fromDate, $lte: range.toDate },
       })
+        .select(INVOICE_LIST_PROJECTION)
         .populate("customer", "name lastName phone")
         .lean() as Promise<LeanInvoice[]>,
-      loadInvoices(range.previousFromDate, range.previousToDate),
+      // Previous period only feeds the KPI deltas (revenue, tips, bill count).
+      loadInvoiceTotals(range.previousFromDate, range.previousToDate),
     ]);
 
     const kpisRaw = salesKpis(curr, prev);
@@ -684,6 +705,7 @@ export const exportReportsSales = async (
     const curr = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
+      .select(INVOICE_LIST_PROJECTION)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -1146,6 +1168,7 @@ export const getReportsCustomers = async (
     const invoices = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
+      .select(INVOICE_LIST_PROJECTION)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -1310,6 +1333,16 @@ export const getReportsCustomers = async (
             customer: { $ne: null },
           },
         },
+        // Keep the sort small: only the fields the $group below reads.
+        {
+          $project: {
+            customer: 1,
+            createdAt: 1,
+            amountPayable: 1,
+            grandTotal: 1,
+            tip: 1,
+          },
+        },
         { $sort: { createdAt: -1 } },
         {
           $group: {
@@ -1331,6 +1364,9 @@ export const getReportsCustomers = async (
             lastVisitAt: { $lte: cutoffEnd },
           },
         },
+        // $group output order is unspecified; the table sorts by day, so ties
+        // need a fixed order or pagination can repeat / skip customers.
+        { $sort: { lastVisitAt: -1, _id: 1 } },
       ]);
 
       const ids = lastInvoices.map((r) => r._id);

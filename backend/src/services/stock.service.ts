@@ -27,18 +27,25 @@ async function writeLedger(opts: {
   reference?: mongoose.Types.ObjectId | null;
   staff?: mongoose.Types.ObjectId | null;
   createdBy?: string | null;
+  session?: mongoose.ClientSession;
 }) {
-  return StockLedger.create({
-    product: opts.productId,
-    type: opts.type,
-    quantity: opts.quantity,
-    balanceAfter: opts.balanceAfter,
-    reason: opts.reason,
-    note: opts.note,
-    reference: opts.reference ?? null,
-    staff: opts.staff ?? null,
-    createdBy: opts.createdBy || null,
-  });
+  const [entry] = await StockLedger.create(
+    [
+      {
+        product: opts.productId,
+        type: opts.type,
+        quantity: opts.quantity,
+        balanceAfter: opts.balanceAfter,
+        reason: opts.reason,
+        note: opts.note,
+        reference: opts.reference ?? null,
+        staff: opts.staff ?? null,
+        createdBy: opts.createdBy || null,
+      },
+    ],
+    { session: opts.session },
+  );
+  return entry;
 }
 
 /**
@@ -56,6 +63,8 @@ export async function applyStockDelta(opts: {
   createdBy?: string | null;
   /** Force allow/deny negative; defaults to settings. */
   allowNegative?: boolean;
+  /** Run inside the caller's transaction. */
+  session?: mongoose.ClientSession;
 }) {
   if (!mongoose.Types.ObjectId.isValid(opts.productId)) {
     return fail(404, ErrorMessages.NOT_FOUND, ErrorCodes.NOT_FOUND);
@@ -65,7 +74,9 @@ export async function applyStockDelta(opts: {
     return fail(400, "Stock quantity change must be a non-zero number");
   }
 
-  const product = await Product.findById(opts.productId);
+  const product = await Product.findById(opts.productId).session(
+    opts.session ?? null,
+  );
   if (!product) {
     return fail(404, ErrorMessages.NOT_FOUND, ErrorCodes.NOT_FOUND);
   }
@@ -89,7 +100,7 @@ export async function applyStockDelta(opts: {
   const updated = await Product.findOneAndUpdate(
     filter,
     { $inc: { stockQty: delta } },
-    { new: true },
+    { new: true, session: opts.session },
   );
 
   if (!updated) {
@@ -122,6 +133,7 @@ export async function applyStockDelta(opts: {
       ? new mongoose.Types.ObjectId(opts.staffId)
       : null,
     createdBy: opts.createdBy,
+    session: opts.session,
   });
 
   return {
@@ -230,17 +242,28 @@ export const applySaleDeduction = async (opts: {
   quantity: number;
   invoiceId: string;
   createdBy?: string | null;
+  /** Pass when the caller already loaded it (skips a lookup). */
+  trackStock?: boolean;
+  /** Pass when the caller already loaded settings (skips a lookup). */
+  allowNegative?: boolean;
+  session?: mongoose.ClientSession;
 }) => {
   const qty = roundQty(Number(opts.quantity));
   if (!Number.isFinite(qty) || qty <= 0) {
     return fail(400, "Sale quantity must be greater than 0");
   }
-  const product = await Product.findById(opts.productId);
-  if (!product) {
-    return fail(404, ErrorMessages.NOT_FOUND, ErrorCodes.NOT_FOUND);
+  let trackStock = opts.trackStock;
+  if (trackStock === undefined) {
+    const product = await Product.findById(opts.productId).session(
+      opts.session ?? null,
+    );
+    if (!product) {
+      return fail(404, ErrorMessages.NOT_FOUND, ErrorCodes.NOT_FOUND);
+    }
+    trackStock = product.trackStock;
   }
-  if (!product.trackStock) {
-    return { statusCode: 200, data: { skipped: true, product } };
+  if (!trackStock) {
+    return { statusCode: 200, data: { skipped: true } };
   }
   return applyStockDelta({
     productId: opts.productId,
@@ -248,6 +271,8 @@ export const applySaleDeduction = async (opts: {
     type: "sale",
     reference: opts.invoiceId,
     createdBy: opts.createdBy,
+    allowNegative: opts.allowNegative,
+    session: opts.session,
   });
 };
 

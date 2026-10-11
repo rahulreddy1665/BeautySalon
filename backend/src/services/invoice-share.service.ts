@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { Invoice } from "../models/invoice.model";
 import { InvoiceShareLink } from "../models/invoice-share-link.model";
+import { withInvoiceLogo } from "./logo.service";
 import { getSettings } from "./settings.service";
 
 function hashToken(token: string): string {
@@ -166,6 +167,7 @@ export const getPublicInvoiceByToken = async (token: string) => {
     if (!invoice) {
       return fail(404, ErrorMessages[ErrorCodes.NOT_FOUND], ErrorCodes.NOT_FOUND);
     }
+    await withInvoiceLogo(invoice);
 
     const customer = invoice.customer as {
       name?: string;

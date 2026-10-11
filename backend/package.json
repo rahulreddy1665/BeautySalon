@@ -6,7 +6,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed:rbac": "tsx src/seeds/rbac.seed.ts"
+    "seed:rbac": "tsx src/seeds/rbac.seed.ts",
+    "migrate:invoice-logos": "tsx src/scripts/migrate-invoice-logos.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -127,6 +127,9 @@ export interface IInvoice extends Document {
     phone?: string;
     email?: string;
     invoiceFooterNote?: string;
+    /** Logo store id (content hash). New invoices only store this. */
+    logoId?: string | null;
+    /** Legacy: older invoices embedded the logo; filled in on read for new ones. */
     logoBase64?: string | null;
     logoMimeType?: string | null;
   };
@@ -282,6 +285,7 @@ const invoiceSchema = new Schema<IInvoice>(
       phone: { type: String, default: "" },
       email: { type: String, default: "" },
       invoiceFooterNote: { type: String, default: "" },
+      logoId: { type: String, default: null },
       logoBase64: { type: String, default: null },
       logoMimeType: { type: String, default: null },
     },
@@ -302,8 +306,20 @@ const invoiceSchema = new Schema<IInvoice>(
 
 invoiceSchema.index({ createdAt: -1 });
 invoiceSchema.index({ appointment: 1 }, { sparse: true });
+// Customer history / visit counts / "last visit" lookups.
+invoiceSchema.index({ customer: 1, createdAt: -1 });
 
 export const Invoice = mongoose.model<IInvoice>("Invoice", invoiceSchema);
+
+/**
+ * Projection for anything that loads invoices as a list (reports, dashboard,
+ * billing history). Each invoice snapshots the salon logo as base64 (~300 KB),
+ * which list views never use. Only single-invoice views need the snapshots.
+ */
+export const INVOICE_LIST_PROJECTION = "-businessSnapshot -templateSnapshot";
+
+/** Just enough to compute revenue (invoiceRevenue) and tips. */
+export const INVOICE_TOTALS_PROJECTION = "amountPayable grandTotal tip";
 
 /** @deprecated Prefer InvoiceSequence — kept so old year counters don't break reads */
 export interface IInvoiceCounter extends Document {

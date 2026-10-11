@@ -25,10 +25,17 @@ export const patchLoyaltyRules = async (
   data: Parameters<typeof updateLoyaltySettings>[0],
 ) => updateLoyaltySettings(data);
 
-async function getOrCreateBalance(customerId: string) {
-  let bal = await LoyaltyBalance.findOne({ customer: customerId });
+async function getOrCreateBalance(
+  customerId: string,
+  session?: mongoose.ClientSession,
+) {
+  let bal = await LoyaltyBalance.findOne({ customer: customerId }).session(
+    session ?? null,
+  );
   if (!bal) {
-    bal = await LoyaltyBalance.create({ customer: customerId, points: 0 });
+    [bal] = await LoyaltyBalance.create([{ customer: customerId, points: 0 }], {
+      session,
+    });
   }
   return bal;
 }
@@ -178,16 +185,20 @@ export const applyInvoiceLoyalty = async (opts: {
   earnBaseAmount: number;
   invoiceId: string;
   createdBy?: string | null;
+  /** Rules the caller already loaded (skips a settings lookup). */
+  rules?: Awaited<ReturnType<typeof getOrCreateSettings>>["loyalty"];
+  /** Run inside the caller's transaction. */
+  session?: mongoose.ClientSession;
 }) => {
-  const settings = await getOrCreateSettings();
-  const rules = settings.loyalty;
+  const rules = opts.rules ?? (await getOrCreateSettings()).loyalty;
+  const session = opts.session;
   if (!rules.enabled) {
     return { redeemedPoints: 0, redeemedValue: 0, earnedPoints: 0 };
   }
 
   let redeemedPoints = 0;
   let redeemedValue = 0;
-  const bal = await getOrCreateBalance(opts.customerId);
+  const bal = await getOrCreateBalance(opts.customerId, session);
 
   if (opts.redeemPoints > 0) {
     redeemedPoints = Math.min(
@@ -224,16 +235,21 @@ export const applyInvoiceLoyalty = async (opts: {
     }
     if (redeemedPoints > 0) {
       bal.points -= redeemedPoints;
-      await bal.save();
-      await LoyaltyLedger.create({
-        customer: opts.customerId,
-        type: "redeem",
-        points: -redeemedPoints,
-        reason: "Redeemed on invoice",
-        balanceAfter: bal.points,
-        invoice: opts.invoiceId,
-        createdBy: opts.createdBy || null,
-      });
+      await bal.save({ session });
+      await LoyaltyLedger.create(
+        [
+          {
+            customer: opts.customerId,
+            type: "redeem",
+            points: -redeemedPoints,
+            reason: "Redeemed on invoice",
+            balanceAfter: bal.points,
+            invoice: opts.invoiceId,
+            createdBy: opts.createdBy || null,
+          },
+        ],
+        { session },
+      );
     }
   }
 
@@ -246,16 +262,21 @@ export const applyInvoiceLoyalty = async (opts: {
 
   if (earnedPoints > 0) {
     bal.points += earnedPoints;
-    await bal.save();
-    await LoyaltyLedger.create({
-      customer: opts.customerId,
-      type: "earn",
-      points: earnedPoints,
-      reason: "Earned on invoice",
-      balanceAfter: bal.points,
-      invoice: opts.invoiceId,
-      createdBy: opts.createdBy || null,
-    });
+    await bal.save({ session });
+    await LoyaltyLedger.create(
+      [
+        {
+          customer: opts.customerId,
+          type: "earn",
+          points: earnedPoints,
+          reason: "Earned on invoice",
+          balanceAfter: bal.points,
+          invoice: opts.invoiceId,
+          createdBy: opts.createdBy || null,
+        },
+      ],
+      { session },
+    );
   }
 
   return { redeemedPoints, redeemedValue, earnedPoints };

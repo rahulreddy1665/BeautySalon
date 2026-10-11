@@ -1,5 +1,5 @@
 import { Appointment } from "../models/appointment.model";
-import { Invoice } from "../models/invoice.model";
+import { Invoice, INVOICE_LIST_PROJECTION } from "../models/invoice.model";
 import { LoyaltyBalance } from "../models/loyalty.model";
 import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { getStaffSalesSummary } from "./invoice.service";
@@ -136,16 +136,22 @@ export const getDashboard = async (
     ] = await Promise.all([
       Invoice.find({
         createdAt: { $gte: bounds.current.from, $lte: bounds.current.to },
-      }).lean(),
+      })
+        .select(INVOICE_LIST_PROJECTION)
+        .lean(),
       Invoice.find({
         createdAt: { $gte: bounds.previous.from, $lte: bounds.previous.to },
-      }).lean(),
+      })
+        .select(INVOICE_LIST_PROJECTION)
+        .lean(),
       Invoice.find({
         createdAt: {
           $gte: startOfDay(now),
           $lte: endOfDay(now),
         },
-      }).lean(),
+      })
+        .select(INVOICE_LIST_PROJECTION)
+        .lean(),
       Appointment.find({ date: todayKey })
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name")
@@ -187,7 +193,9 @@ export const getDashboard = async (
           $gte: new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0),
           $lte: endOfDay(now),
         },
-      }).lean(),
+      })
+        .select(INVOICE_LIST_PROJECTION)
+        .lean(),
       getStaffSalesSummary(bounds.current.fromKey, bounds.current.toKey),
     ]);
 
@@ -352,6 +360,7 @@ export const getDashboard = async (
     })
       .sort({ createdAt: -1 })
       .limit(40)
+      .select(INVOICE_LIST_PROJECTION)
       .populate("customer", "name lastName phone")
       .lean();
 
