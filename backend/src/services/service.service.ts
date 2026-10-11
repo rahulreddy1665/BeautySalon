@@ -78,6 +78,24 @@ export const createService = async (data: CreateServiceDto) => {
   }
 };
 
+/**
+ * Full catalog for billing / appointment pickers. Unpaginated on purpose: the
+ * service menu is small and bounded, and pickers need every item. Lean +
+ * field projection keeps the payload light.
+ */
+export const getServiceCatalog = async () => {
+  try {
+    const items = await Service.find({})
+      .select("name category categoryId price")
+      .populate("categoryId", "name isActive")
+      .sort({ category: 1, name: 1 })
+      .lean();
+    return { statusCode: 200, data: items };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
+};
+
 export const getServices = async (query: ServiceListQuery = {}) => {
   try {
     const page = Math.max(1, Number(query.page) || 1);

@@ -39,4 +39,7 @@ const customerSchema = new Schema<ICustomer>(
   },
 );
 
+// Default list order (newest first) for the paginated customer list.
+customerSchema.index({ createdAt: -1 });
+
 export const Customer = mongoose.model<ICustomer>("Customer", customerSchema);

@@ -9,9 +9,79 @@ export const createCustomer = async (data: CreateCustomerDto) => {
   }
 };
 
-export const getCustomers = async () => {
+export interface CustomerListQuery {
+  page?: unknown;
+  limit?: unknown;
+  /** Matches name / last name (contains) or phone digits (contains). */
+  q?: unknown;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Paginated + searchable list. Newest customers first. */
+export const getCustomers = async (query: CustomerListQuery = {}) => {
   try {
-    return { statusCode: 200, data: await Customer.find() };
+    const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(query.limit)) || 20));
+    const q = String(query.q ?? "").trim();
+
+    const filter: Record<string, unknown> = {};
+    if (q) {
+      const or: Record<string, unknown>[] = [
+        { name: { $regex: escapeRegex(q), $options: "i" } },
+        { lastName: { $regex: escapeRegex(q), $options: "i" } },
+        { email: { $regex: escapeRegex(q), $options: "i" } },
+      ];
+      const digits = q.replace(/\D/g, "");
+      if (digits) {
+        // phone is stored as a Number; a full 10-digit query hits the unique index,
+        // partial digits fall back to a string match.
+        or.push(
+          digits.length === 10
+            ? { phone: Number(digits) }
+            : {
+                $expr: {
+                  $regexMatch: { input: { $toString: "$phone" }, regex: digits },
+                },
+              },
+        );
+      }
+      filter.$or = or;
+    }
+
+    const [items, total] = await Promise.all([
+      Customer.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Customer.countDocuments(filter),
+    ]);
+
+    return {
+      statusCode: 200,
+      data: {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
+};
+
+/**
+ * Unpaginated list. Only for pickers not yet moved to server search
+ * (appointment form, loyalty, global search). Prefer `getCustomers`.
+ */
+export const getAllCustomers = async () => {
+  try {
+    return { statusCode: 200, data: await Customer.find().lean() };
   } catch (error) {
     return { statusCode: 500, data: error };
   }

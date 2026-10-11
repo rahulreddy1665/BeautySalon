@@ -7,6 +7,7 @@ import {
   createServiceController,
   deleteServiceController,
   getServiceByIdController,
+  getServiceCatalogController,
   getServiceCategoriesController,
   getServicesController,
   importServicesController,
@@ -25,6 +26,13 @@ router.get(
   authenticate,
   requirePermission("service:read"),
   getServicesController,
+);
+
+router.get(
+  "/catalog",
+  authenticate,
+  requirePermission("service:read"),
+  getServiceCatalogController,
 );
 
 router.get(

@@ -5,6 +5,7 @@ import {
   createService,
   deleteService,
   getServiceById,
+  getServiceCatalog,
   getServiceCategories,
   getServices,
   importServices,
@@ -53,6 +54,27 @@ export const getServicesController = async (req: Request, res: Response) => {
     return sendResponse(res, {
       statusCode: 500,
       message: "Service get failed",
+      errors: error,
+    });
+  }
+};
+
+export const getServiceCatalogController = async (
+  _req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await getServiceCatalog();
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        data.statusCode == 200 ? "Service catalog" : "Service catalog failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Service catalog failed",
       errors: error,
     });
   }

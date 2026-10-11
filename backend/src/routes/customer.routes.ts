@@ -6,6 +6,7 @@ import { requirePermission } from "../middlewares/permission.middleware";
 import {
   createCustomerController,
   deleteCustomerController,
+  getAllCustomersController,
   getCustomerByIdController,
   getCustomersController,
   importCustomersController,
@@ -24,6 +25,13 @@ router.get(
   authenticate,
   requirePermission("customer:read"),
   getCustomersController,
+);
+
+router.get(
+  "/all",
+  authenticate,
+  requirePermission("customer:read"),
+  getAllCustomersController,
 );
 
 router.get(

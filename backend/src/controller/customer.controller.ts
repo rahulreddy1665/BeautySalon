@@ -5,6 +5,7 @@ import {
   createCustomer,
   deleteCustomer,
   getCustomerById,
+  getAllCustomers,
   getCustomers,
   importCustomers,
   updateCustomer,
@@ -30,9 +31,30 @@ export const createCustomerController = async (req: Request, res: Response) => {
   }
 };
 
-export const getCustomersController = async (_req: Request, res: Response) => {
+export const getCustomersController = async (req: Request, res: Response) => {
   try {
-    const data: ApiResponseOptions = await getCustomers();
+    const data: ApiResponseOptions = await getCustomers({
+      page: req.query.page,
+      limit: req.query.limit,
+      q: req.query.q,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message: data.statusCode == 200 ? "Customer Get" : "Customer Get failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Customer get failed",
+      errors: error,
+    });
+  }
+};
+
+export const getAllCustomersController = async (_req: Request, res: Response) => {
+  try {
+    const data: ApiResponseOptions = await getAllCustomers();
     return sendResponse(res, {
       statusCode: data.statusCode,
       message: data.statusCode == 200 ? "Customer Get" : "Customer Get failed",

@@ -120,74 +120,105 @@ function parseTimeToMinutes(time: string): number | null {
 }
 
 
+function badRequest(message: string) {
+  return Object.assign(new Error(message), { statusCode: 400 });
+}
+
+function assertObjectId(id: string | undefined, label: string): string {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    throw badRequest(`${label} not found: ${id ?? ""}`);
+  }
+  return id;
+}
+
+/**
+ * Resolves booking lines with a fixed number of queries regardless of how many
+ * lines there are: staff + combos in parallel, then every service (direct and
+ * combo components) in one `$in`. Previously each line did its own findById.
+ */
 async function buildServiceLines(services: AppointmentServiceInput[]) {
   if (!Array.isArray(services) || services.length === 0) {
-    throw Object.assign(new Error("At least one service is required"), {
-      statusCode: 400,
-    });
+    throw badRequest("At least one service is required");
   }
 
+  const staffIds = new Set<string>();
+  const comboIds = new Set<string>();
+  const directServiceIds = new Set<string>();
+  for (const item of services) {
+    staffIds.add(assertObjectId(item.staffId, "Staff"));
+    if (item.comboId) {
+      comboIds.add(assertObjectId(item.comboId, "Combo"));
+    } else if (item.serviceId) {
+      directServiceIds.add(assertObjectId(item.serviceId, "Service"));
+    } else {
+      throw badRequest("serviceId or comboId is required");
+    }
+  }
+
+  // Round trip 1: staff and combos together.
+  const [staffDocs, comboDocs] = await Promise.all([
+    Staff.find({ _id: { $in: [...staffIds] } })
+      .select("name isActive")
+      .lean(),
+    comboIds.size
+      ? Combo.find({
+          _id: { $in: [...comboIds] },
+          isDeleted: false,
+          isActive: true,
+        })
+          .select("services")
+          .lean()
+      : Promise.resolve([]),
+  ]);
+  const staffById = new Map(staffDocs.map((d) => [String(d._id), d]));
+  const comboById = new Map(comboDocs.map((d) => [String(d._id), d]));
+
+  // Round trip 2: every service referenced directly or through a combo.
+  const allServiceIds = new Set(directServiceIds);
+  for (const combo of comboDocs) {
+    for (const row of combo.services) allServiceIds.add(String(row.service));
+  }
+  const serviceDocs = await Service.find({ _id: { $in: [...allServiceIds] } })
+    .select("name")
+    .lean();
+  const serviceById = new Map(serviceDocs.map((d) => [String(d._id), d]));
+
+  // Build lines in request order; same validation and messages as before.
   const lines = [];
   for (const item of services) {
-    const staff = await Staff.findById(item.staffId);
-    if (!staff) {
-      throw Object.assign(new Error(`Staff not found: ${item.staffId}`), {
-        statusCode: 400,
-      });
-    }
+    const staff = staffById.get(String(item.staffId));
+    if (!staff) throw badRequest(`Staff not found: ${item.staffId}`);
     if (!staff.isActive) {
-      throw Object.assign(
-        new Error(`Staff "${staff.name}" is inactive and cannot be booked`),
-        { statusCode: 400 },
-      );
+      throw badRequest(`Staff "${staff.name}" is inactive and cannot be booked`);
     }
+    const staffId = staff._id as mongoose.Types.ObjectId;
 
     if (item.comboId) {
-      const combo = await Combo.findOne({
-        _id: item.comboId,
-        isDeleted: false,
-        isActive: true,
-      });
-      if (!combo) {
-        throw Object.assign(new Error(`Combo not found: ${item.comboId}`), {
-          statusCode: 400,
-        });
-      }
+      const combo = comboById.get(String(item.comboId));
+      if (!combo) throw badRequest(`Combo not found: ${item.comboId}`);
       for (const row of combo.services) {
-        const service = await Service.findById(row.service);
+        const service = serviceById.get(String(row.service));
         if (!service) {
-          throw Object.assign(
-            new Error(`Service not found in combo: ${String(row.service)}`),
-            { statusCode: 400 },
-          );
+          throw badRequest(`Service not found in combo: ${String(row.service)}`);
         }
         const qty = Math.max(1, Math.floor(Number(row.qty) || 1));
         for (let i = 0; i < qty; i += 1) {
           lines.push({
             service: service._id as mongoose.Types.ObjectId,
             name: service.name,
-            staff: staff._id as mongoose.Types.ObjectId,
+            staff: staffId,
           });
         }
       }
       continue;
     }
 
-    if (!item.serviceId) {
-      throw Object.assign(new Error("serviceId or comboId is required"), {
-        statusCode: 400,
-      });
-    }
-    const service = await Service.findById(item.serviceId);
-    if (!service) {
-      throw Object.assign(new Error(`Service not found: ${item.serviceId}`), {
-        statusCode: 400,
-      });
-    }
+    const service = serviceById.get(String(item.serviceId));
+    if (!service) throw badRequest(`Service not found: ${item.serviceId}`);
     lines.push({
       service: service._id as mongoose.Types.ObjectId,
       name: service.name,
-      staff: staff._id as mongoose.Types.ObjectId,
+      staff: staffId,
     });
   }
   return lines;
