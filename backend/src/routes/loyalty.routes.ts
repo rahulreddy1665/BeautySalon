@@ -8,6 +8,7 @@ import {
   getLoyaltyRulesController,
   listBalancesController,
   listLedgerController,
+  listMembersController,
   patchLoyaltyRulesController,
 } from "../controller/loyalty.controller";
 
@@ -32,6 +33,13 @@ router.get(
   authenticate,
   requirePermission("loyalty:read"),
   listBalancesController,
+);
+
+router.get(
+  "/members",
+  authenticate,
+  requirePermission("loyalty:read"),
+  listMembersController,
 );
 
 router.get(

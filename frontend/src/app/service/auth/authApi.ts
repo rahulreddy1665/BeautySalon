@@ -7,6 +7,14 @@ import type {
 } from '@/app/types/api'
 
 export const authApi = {
+  /** The signed-in user with their current role and permissions. */
+  me: async (): Promise<AuthUser> => {
+    const { data } = await apiClient.get<
+      ApiSuccessResponse<{ user: AuthUser; mustChangePassword: boolean }>
+    >('/auth/me')
+    return { ...data.data.user, mustChangePassword: data.data.mustChangePassword }
+  },
+
   login: async (payload: LoginPayload): Promise<LoginResult> => {
     const { data } = await apiClient.post<ApiSuccessResponse<LoginResult>>(
       '/auth/login',

@@ -26,25 +26,12 @@ async function runSearch(
   const hits: Hit[] = []
 
   if (canCustomers) {
-    const all = await customersApi.getAll()
-    const lower = query.toLowerCase()
-    for (const c of all) {
+    // Server-side search (name, email, phone digits): 8 rows, not the whole list.
+    const page = await customersApi.list({ q: query, page: 1, limit: 8 })
+    for (const c of page.items) {
       const name = [c.name, c.lastName].filter(Boolean).join(' ')
       const phone = String(c.phone ?? '')
-      const id = c._id
-      if (
-        name.toLowerCase().includes(lower) ||
-        phone.includes(query.replace(/\D/g, '')) ||
-        id.toLowerCase().includes(lower)
-      ) {
-        hits.push({
-          kind: 'customer',
-          id,
-          title: name || phone,
-          subtitle: phone,
-        })
-      }
-      if (hits.length >= 8) break
+      hits.push({ kind: 'customer', id: c._id, title: name || phone, subtitle: phone })
     }
   }
 

@@ -43,6 +43,8 @@ export interface CreateInvoiceInput {
   paymentMode: PaymentMode
   tip?: number
   loyaltyRedeemPoints?: number
+  /** Salon date (YYYY-MM-DD) for a bill entered late; omit for today. */
+  billDate?: string
 }
 
 export interface InvoiceTaxSnapshot {

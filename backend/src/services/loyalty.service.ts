@@ -281,3 +281,110 @@ export const applyInvoiceLoyalty = async (opts: {
 
   return { redeemedPoints, redeemedValue, earnedPoints };
 };
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Loyalty screen: every active customer with their points, highest first
+ * (ties in customer creation order), searchable by name or phone, one page at a
+ * time. Replaces downloading all customers + all balances to join in the browser.
+ */
+export const listLoyaltyMembers = async (query: {
+  page?: unknown;
+  limit?: unknown;
+  q?: unknown;
+}) => {
+  try {
+    const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(query.limit)) || 20));
+    const q = typeof query.q === "string" ? query.q.trim() : "";
+
+    // "First Last" (no trailing space when there is no last name) + " " + phone,
+    // the same text the screen used to search in the browser.
+    const fullName = {
+      $cond: [
+        { $gt: [{ $strLenCP: { $ifNull: ["$lastName", ""] } }, 0] },
+        { $concat: [{ $ifNull: ["$name", ""] }, " ", "$lastName"] },
+        { $ifNull: ["$name", ""] },
+      ],
+    };
+
+    const match: Record<string, unknown> = { isActive: { $ne: false } };
+    if (q) {
+      match.$expr = {
+        $regexMatch: {
+          input: { $concat: [fullName, " ", { $toString: { $ifNull: ["$phone", ""] } }] },
+          regex: escapeRegex(q),
+          options: "i",
+        },
+      };
+    }
+
+    const [result] = await Customer.aggregate<{
+      items: Array<{
+        customerId: mongoose.Types.ObjectId;
+        name: string;
+        lastName?: string;
+        phone?: number;
+        points: number;
+        updatedAt: Date | null;
+      }>;
+      total: Array<{ n: number }>;
+    }>([
+      { $match: match },
+      { $project: { name: 1, lastName: 1, phone: 1 } },
+      {
+        $lookup: {
+          from: LoyaltyBalance.collection.name,
+          localField: "_id",
+          foreignField: "customer",
+          as: "balance",
+          pipeline: [{ $project: { points: 1, updatedAt: 1 } }],
+        },
+      },
+      {
+        $set: {
+          points: { $ifNull: [{ $first: "$balance.points" }, 0] },
+          updatedAt: { $ifNull: [{ $first: "$balance.updatedAt" }, null] },
+        },
+      },
+      { $sort: { points: -1, _id: 1 } },
+      {
+        $facet: {
+          items: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                customerId: "$_id",
+                name: 1,
+                lastName: 1,
+                phone: 1,
+                points: 1,
+                updatedAt: 1,
+              },
+            },
+          ],
+          total: [{ $count: "n" }],
+        },
+      },
+    ]).allowDiskUse(true);
+
+    const total = result?.total[0]?.n ?? 0;
+    return {
+      statusCode: 200,
+      data: {
+        items: (result?.items ?? []).map((r) => ({ ...r, customerId: String(r.customerId) })),
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
+};

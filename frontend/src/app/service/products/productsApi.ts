@@ -65,6 +65,13 @@ export const productsApi = {
     return data.data
   },
 
+  /** Every billable (retail) product, unpaginated, for the billing picker. */
+  catalog: async (): Promise<SalonProduct[]> => {
+    const { data } =
+      await apiClient.get<ApiSuccessResponse<SalonProduct[]>>('/product/catalog')
+    return data.data ?? []
+  },
+
   getAll: async (): Promise<SalonProduct[]> => {
     const page = await productsApi.list({ page: 1, limit: 100 })
     return page.items

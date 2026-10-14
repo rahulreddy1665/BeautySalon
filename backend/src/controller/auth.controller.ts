@@ -5,6 +5,7 @@ import type { AuthRequest } from "../middlewares/auth.middleware";
 import {
   changeEmail,
   changePassword,
+  getCurrentUser,
   loginUser,
 } from "../services/auth.service";
 
@@ -100,5 +101,24 @@ export const changeEmailController = async (
       message: "Email change failed",
       errors: error,
     });
+  }
+};
+
+export const meController = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendResponse(res, { statusCode: 401, message: "Unauthorized" });
+      return;
+    }
+    const result = await getCurrentUser(userId);
+    sendResponse(res, {
+      statusCode: result.statusCode,
+      message: (result as { message?: string }).message ?? "Current user",
+      data: result.data,
+      errors: (result as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    sendResponse(res, { statusCode: 500, message: "Failed", errors: error });
   }
 };

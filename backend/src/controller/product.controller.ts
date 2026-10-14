@@ -6,6 +6,7 @@ import {
   createProduct,
   deleteProduct,
   getProductById,
+  getProductCatalog,
   getProducts,
   importProducts,
   updateProduct,
@@ -38,6 +39,23 @@ export const createProductController = async (
     return sendResponse(res, {
       statusCode: 500,
       message: "Product created failed",
+      errors: error,
+    });
+  }
+};
+
+export const getProductCatalogController = async (_req: Request, res: Response) => {
+  try {
+    const data = await getProductCatalog();
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message: data.statusCode == 200 ? "Product catalog" : "Product catalog failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Product catalog failed",
       errors: error,
     });
   }

@@ -37,7 +37,8 @@ import {
   useCreateAppointmentMutation,
   useUpdateAppointmentMutation,
 } from '@/app/hooks/queries/useAppointmentsQuery'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useCustomerQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { CustomerPicker } from '@/app/components/CustomerPicker'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
 import { useCombosQuery } from '@/app/hooks/queries/useCombosQuery'
 import { useServicesCatalogQuery } from '@/app/hooks/queries/useServicesQuery'
@@ -97,7 +98,6 @@ export function AppointmentFormPage() {
   const navigate = useNavigate()
   const isEdit = Boolean(id)
   const appointmentQuery = useAppointmentQuery(id)
-  const customersQuery = useCustomersQuery()
   const servicesQuery = useServicesCatalogQuery()
   const combosQuery = useCombosQuery(true)
   const staffQuery = useActiveStaffQuery()
@@ -161,6 +161,8 @@ export function AppointmentFormPage() {
 
   const watchedServices = useWatch({ control: form.control, name: 'services' })
   const mode = useWatch({ control: form.control, name: 'mode' })
+  const watchedCustomerId = useWatch({ control: form.control, name: 'customerId' })
+  const selectedCustomerQuery = useCustomerQuery(watchedCustomerId || undefined)
   const catalog = servicesQuery.data ?? []
   const suggestCatalog = useMemo(
     (): SuggestableService[] =>
@@ -339,25 +341,14 @@ export function AppointmentFormPage() {
                   label={APPOINTMENTS.form.customer}
                   error={form.formState.errors.customerId?.message}
                 >
-                  <Select
+                  <CustomerPicker
                     value={form.watch('customerId') || undefined}
-                    onValueChange={(v) => {
-                      form.setValue('customerId', v)
-                      const c = (customersQuery.data ?? []).find((x) => x._id === v)
+                    onChange={(id, c) => {
+                      form.setValue('customerId', id, { shouldValidate: true })
                       if (c?.phone) form.setValue('guestPhone', String(c.phone))
                     }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(customersQuery.data ?? []).map((c) => (
-                        <SelectItem key={c._id} value={c._id}>
-                          {[c.name, c.lastName].filter(Boolean).join(' ')} · {c.phone}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    aria-invalid={Boolean(form.formState.errors.customerId)}
+                  />
                 </FormField>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -375,12 +366,11 @@ export function AppointmentFormPage() {
               {mode === 'customer' ? (
                 <FormField label={APPOINTMENTS.form.guestPhone}>
                   <Input
-                    value={(() => {
-                      const c = (customersQuery.data ?? []).find(
-                        (x) => x._id === form.watch('customerId'),
-                      )
-                      return c?.phone != null ? String(c.phone) : ''
-                    })()}
+                    value={
+                      selectedCustomerQuery.data?.phone != null
+                        ? String(selectedCustomerQuery.data.phone)
+                        : ''
+                    }
                     readOnly
                   />
                 </FormField>

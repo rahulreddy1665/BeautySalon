@@ -1,3 +1,6 @@
+/** Must match BACKDATE_MAX_DAYS in the backend invoice service. */
+export const BACKDATE_MAX_DAYS = 90
+
 export const BILLING = {
   list: {
     description: "Today's bills and walk-in checkouts.",
@@ -7,6 +10,10 @@ export const BILLING = {
     searchPlaceholder: 'Search invoice or customer',
   },
   new: {
+    billDate: 'Bill date',
+    billDateToday: 'Today',
+    backdatedNotice: 'Backdated bill: it will be recorded on {date} in reports, history and the billing list.',
+    backdateLimit: 'Bills can be backdated by up to {days} days.',
     title: 'New bill',
     description: 'Add services and products, then checkout.',
     draftSubtitle: 'Draft · {when}',

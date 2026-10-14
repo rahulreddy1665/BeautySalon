@@ -5,7 +5,7 @@
  * (customer history), Appointment.date+status and services.staff+date+startTime.
  *
  * Data volume: invoices snapshot the salon logo (~300 KB each). Every list read
- * here uses INVOICE_LIST_PROJECTION (or a narrower field list) so reports move
+ * here uses REPORT_INVOICE_FIELDS (or a narrower field list) so reports move
  * kilobytes, not hundreds of MB. Money totals are still summed in JS with the
  * same round2 semantics as billing, so report figures match invoices exactly.
  */
@@ -14,11 +14,7 @@ import mongoose from "mongoose";
 
 import { Appointment } from "../models/appointment.model";
 import { Customer } from "../models/customer.model";
-import {
-  Invoice,
-  INVOICE_LIST_PROJECTION,
-  INVOICE_TOTALS_PROJECTION,
-} from "../models/invoice.model";
+import { Invoice, INVOICE_TOTALS_PROJECTION } from "../models/invoice.model";
 import { LoyaltyBalance } from "../models/loyalty.model";
 import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
@@ -87,7 +83,14 @@ type LeanInvoice = {
   createdAt?: Date;
 };
 
-type ReportOpts = { canViewRevenue: boolean };
+type ReportOpts = {
+  canViewRevenue: boolean;
+  /** Internal: exports lift the 100-row page cap to get every row. */
+  maxLimit?: number;
+};
+
+/** Exports need the whole report, not one page. */
+const UNCAPPED = Number.MAX_SAFE_INTEGER;
 
 const APPT_STATUSES = new Set(["booked", "completed", "cancelled", "no_show"]);
 
@@ -153,12 +156,12 @@ function allBucketKeys(
   return keys;
 }
 
-function parsePageLimit(pageRaw: unknown, limitRaw: unknown) {
+function parsePageLimit(pageRaw: unknown, limitRaw: unknown, maxLimit = 100) {
   let page = Math.floor(Number(pageRaw));
   if (!Number.isFinite(page) || page < 1) page = 1;
   let limit = Math.floor(Number(limitRaw));
   if (!Number.isFinite(limit) || limit < 1) limit = 25;
-  if (limit > 100) limit = 100;
+  if (limit > maxLimit) limit = maxLimit;
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -181,11 +184,15 @@ function requireRange(fromRaw: unknown, toRaw: unknown) {
   return parseReportRange(fromRaw, toRaw);
 }
 
+/** Exactly the fields in LeanInvoice: everything report code reads, nothing more. */
+const REPORT_INVOICE_FIELDS =
+  "invoiceNumber customer walkIn walkInName source appointment serviceItems productItems comboItems serviceSubtotal productSubtotal serviceDiscountTotal productDiscountTotal tip amountPayable grandTotal paymentMode status createdAt";
+
 async function loadInvoices(fromDate: Date, toDate: Date): Promise<LeanInvoice[]> {
   return Invoice.find({
     createdAt: { $gte: fromDate, $lte: toDate },
   })
-    .select(INVOICE_LIST_PROJECTION)
+    .select(REPORT_INVOICE_FIELDS)
     .lean() as Promise<LeanInvoice[]>;
 }
 
@@ -532,7 +539,7 @@ export const getReportsSales = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -563,7 +570,7 @@ export const getReportsSales = async (
       Invoice.find({
         createdAt: { $gte: range.fromDate, $lte: range.toDate },
       })
-        .select(INVOICE_LIST_PROJECTION)
+        .select(REPORT_INVOICE_FIELDS)
         .populate("customer", "name lastName phone")
         .lean() as Promise<LeanInvoice[]>,
       // Previous period only feeds the KPI deltas (revenue, tips, bill count).
@@ -705,7 +712,7 @@ export const exportReportsSales = async (
     const curr = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
-      .select(INVOICE_LIST_PROJECTION)
+      .select(REPORT_INVOICE_FIELDS)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -879,7 +886,7 @@ export const getReportsStaff = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1152,7 +1159,7 @@ export const getReportsCustomers = async (
     const inactiveDays = [30, 60, 90].includes(inactiveDaysRaw)
       ? inactiveDaysRaw
       : 30;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1168,7 +1175,7 @@ export const getReportsCustomers = async (
     const invoices = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
-      .select(INVOICE_LIST_PROJECTION)
+      .select(REPORT_INVOICE_FIELDS)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -1367,7 +1374,7 @@ export const getReportsCustomers = async (
         // $group output order is unspecified; the table sorts by day, so ties
         // need a fixed order or pagination can repeat / skip customers.
         { $sort: { lastVisitAt: -1, _id: 1 } },
-      ]);
+      ]).allowDiskUse(true);
 
       const ids = lastInvoices.map((r) => r._id);
       const customers = await Customer.find({ _id: { $in: ids } })
@@ -1439,8 +1446,8 @@ export const exportReportsCustomers = async (
 ) => {
   try {
     const result = await getReportsCustomers(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) {
       return result;
@@ -1530,7 +1537,7 @@ export const getReportsAppointments = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, _opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1553,7 +1560,8 @@ export const getReportsAppointments = async (
     if (statusFilter) match.status = statusFilter;
     if (staffId) match["services.staff"] = new mongoose.Types.ObjectId(staffId);
 
-    const [appointments, invoices, settings] = await Promise.all([
+    const filtered = Boolean(statusFilter || staffId);
+    const [appointments, invoices, settings, unfilteredInRange] = await Promise.all([
       Appointment.find(match)
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name")
@@ -1564,14 +1572,17 @@ export const getReportsAppointments = async (
         .select("walkIn source appointment")
         .lean(),
       getOrCreateSettings(),
+      // KPIs ignore the status/staff filters. Without filters that's the same set
+      // as `appointments`, so only query again when a filter is applied.
+      filtered
+        ? Appointment.find({
+            date: { $gte: range.from, $lte: range.to },
+          })
+            .select("status invoice date startTime")
+            .lean()
+        : null,
     ]);
-
-    // KPIs from unfiltered range status counts (re-query without status/staff for KPIs)
-    const allInRange = await Appointment.find({
-      date: { $gte: range.from, $lte: range.to },
-    })
-      .select("status invoice date startTime")
-      .lean();
+    const allInRange = unfilteredInRange ?? appointments;
 
     const total = allInRange.length;
     const completed = allInRange.filter((a) => a.status === "completed").length;
@@ -1701,8 +1712,8 @@ export const exportReportsAppointments = async (
 ) => {
   try {
     const result = await getReportsAppointments(
-      { ...query, page: 1, limit: 100000 },
-      _opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ..._opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {
@@ -1777,7 +1788,7 @@ export const getReportsServices = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1992,8 +2003,8 @@ export const exportReportsServices = async (
 ) => {
   try {
     const result = await getReportsServices(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {
@@ -2069,7 +2080,7 @@ export const getReportsProducts = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -2289,8 +2300,8 @@ export const exportReportsProducts = async (
 ) => {
   try {
     const result = await getReportsProducts(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {

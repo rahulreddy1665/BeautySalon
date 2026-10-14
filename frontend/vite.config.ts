@@ -22,8 +22,34 @@ export default defineConfig({
         theme_color: '#FFFFFF',
         background_color: '#F6F6F7',
         display: 'standalone',
+        // Stable identity so the installed app survives start_url changes.
+        id: '/',
         start_url: '/',
         scope: '/',
+        categories: ['business', 'productivity'],
+        // Desktop: reopening the app focuses the open window instead of a second copy.
+        launch_handler: { client_mode: 'focus-existing' },
+        // Right-click the taskbar / Dock icon (desktop) or long-press (Android).
+        shortcuts: [
+          {
+            name: 'New bill',
+            short_name: 'New bill',
+            url: '/billing/new',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'New appointment',
+            short_name: 'Appointment',
+            url: '/appointments/new',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Billing history',
+            short_name: 'Bills',
+            url: '/billing',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           {
             src: 'icons/icon-192.png',

@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   BarChart3,
@@ -19,6 +20,7 @@ import {
   Settings,
   UserRound,
   Users,
+  MonitorDown,
 } from 'lucide-react'
 
 import { ErrorBoundary } from '@/app/components/ErrorBoundary'
@@ -47,7 +49,7 @@ import {
   SheetTrigger,
 } from '@/app/components/ui/sheet'
 import { COMMON, ROUTES } from '@/app/constants'
-import { useNavBadgesQuery } from '@/app/hooks/queries/useNavBadgesQuery'
+import { useInstallApp } from '@/app/hooks/useInstallApp'
 import { permissionForPath, useHasPermission } from '@/app/hooks/useHasPermission'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
 import { clearCredentials } from '@/app/state/redux/slices/authSlice'
@@ -62,7 +64,6 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   end?: boolean
-  badge?: 'appointments' | 'customers' | 'services'
 }
 
 const generalNav: NavItem[] = [
@@ -71,19 +72,16 @@ const generalNav: NavItem[] = [
     to: '/appointments',
     label: COMMON.nav.appointments,
     icon: CalendarDays,
-    badge: 'appointments',
   },
   {
     to: '/customers',
     label: COMMON.nav.customers,
     icon: Users,
-    badge: 'customers',
   },
   {
     to: '/services',
     label: COMMON.nav.services,
     icon: Scissors,
-    badge: 'services',
   },
   { to: '/inventory', label: COMMON.nav.products, icon: Package },
   { to: '/staff', label: COMMON.nav.staff, icon: UserRound },
@@ -148,25 +146,13 @@ function useVisibleNav(items: readonly NavItem[]): NavItem[] {
   })
 }
 
-function NavBadge({ value }: { value: number | null | undefined }) {
-  if (value == null || value <= 0) return null
-  const label = value > 99 ? '99+' : String(value)
-  return (
-    <span className="ml-auto rounded-full bg-gold-soft px-1.5 py-0.5 text-[10px] font-semibold text-gold-deep tabular-nums">
-      {label}
-    </span>
-  )
-}
-
 function SidebarLink({
   item,
   collapsed,
-  badgeValue,
   onNavigate,
 }: {
   item: NavItem
   collapsed: boolean
-  badgeValue?: number | null
   onNavigate?: () => void
 }) {
   return (
@@ -184,12 +170,7 @@ function SidebarLink({
       }
     >
       <item.icon className="size-4 shrink-0" strokeWidth={1.75} />
-      {!collapsed ? (
-        <>
-          <span className="truncate">{item.label}</span>
-          <NavBadge value={badgeValue} />
-        </>
-      ) : null}
+      {!collapsed ? <span className="truncate">{item.label}</span> : null}
     </NavLink>
   )
 }
@@ -198,16 +179,10 @@ function NavGroup({
   label,
   items,
   collapsed,
-  badges,
 }: {
   label: string
   items: NavItem[]
   collapsed: boolean
-  badges: {
-    appointments?: number | null
-    customers?: number | null
-    services?: number | null
-  }
 }) {
   if (items.length === 0) return null
   return (
@@ -224,15 +199,6 @@ function NavGroup({
           key={item.to}
           item={item}
           collapsed={collapsed}
-          badgeValue={
-            item.badge === 'appointments'
-              ? badges.appointments
-              : item.badge === 'customers'
-                ? badges.customers
-                : item.badge === 'services'
-                  ? badges.services
-                  : null
-          }
         />
       ))}
     </div>
@@ -282,6 +248,7 @@ function ContextualCta() {
 }
 
 function UserMenu({ compact }: { compact?: boolean }) {
+  const installApp = useInstallApp()
   const dispatch = useAppDispatch()
   const user = useAppSelector((s) => s.auth.user)
   const themeMode = useAppSelector((s) => s.settings.themeMode)
@@ -326,6 +293,23 @@ function UserMenu({ compact }: { compact?: boolean }) {
             {COMMON.nav.account}
           </Link>
         </DropdownMenuItem>
+        {installApp.available ? (
+          <DropdownMenuItem
+            onClick={() => {
+              if (installApp.canPrompt) {
+                void installApp.install()
+                return
+              }
+              toast.info(COMMON.nav.installAppTitle, {
+                description: COMMON.nav.installSteps[installApp.browser],
+                duration: 10000,
+              })
+            }}
+          >
+            <MonitorDown className="size-4" strokeWidth={1.75} />
+            {COMMON.nav.installApp}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           {COMMON.nav.theme}
@@ -366,13 +350,6 @@ export function AppLayout() {
       return false
     }
   })
-  const badgesQuery = useNavBadgesQuery()
-  const badges = {
-    appointments: badgesQuery.data?.appointmentsToday,
-    customers: badgesQuery.data?.customersTotal,
-    services: badgesQuery.data?.servicesTotal,
-  }
-
   const visibleGeneral = useVisibleNav(generalNav)
   const visibleFinance = useVisibleNav(financeNav)
   const visibleManagement = useVisibleNav(managementNav)
@@ -416,19 +393,16 @@ export function AppLayout() {
             label={COMMON.nav.groupGeneral}
             items={visibleGeneral}
             collapsed={collapsed}
-            badges={badges}
           />
           <NavGroup
             label={COMMON.nav.groupFinance}
             items={visibleFinance}
             collapsed={collapsed}
-            badges={badges}
           />
           <NavGroup
             label={COMMON.nav.groupManagement}
             items={visibleManagement}
             collapsed={collapsed}
-            badges={badges}
           />
         </nav>
 

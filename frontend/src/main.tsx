@@ -10,6 +10,7 @@ import '@fontsource/dm-sans/600.css'
 
 import { AppProviders } from '@/app/providers/AppProviders'
 import { AppRouter } from '@/app/router/AppRouter'
+import { initInstallPrompt } from '@/app/hooks/useInstallApp'
 import '@/app/styles/global.css'
 
 const rootElement = document.getElementById('root')
@@ -17,6 +18,9 @@ const rootElement = document.getElementById('root')
 if (!rootElement) {
   throw new Error('Root element #root not found')
 }
+
+// Capture the one-time install event before any screen renders.
+initInstallPrompt()
 
 createRoot(rootElement).render(
   <StrictMode>

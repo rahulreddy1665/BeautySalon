@@ -1,9 +1,11 @@
+import mongoose from "mongoose";
+
 import { Appointment } from "../models/appointment.model";
-import { Invoice, INVOICE_LIST_PROJECTION } from "../models/invoice.model";
+import { Invoice, INVOICE_TOTALS_PROJECTION } from "../models/invoice.model";
 import { LoyaltyBalance } from "../models/loyalty.model";
 import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { getStaffSalesSummary } from "./invoice.service";
-import { getSettings } from "./settings.service";
+import { getOrCreateSettings } from "./settings.service";
 
 export type DashboardRange = "today" | "week" | "month";
 
@@ -117,11 +119,8 @@ export const getDashboard = async (
     const now = new Date();
     const todayKey = ymd(now);
     const bounds = rangeBounds(range, now);
-    const settings = await getSettings();
-    const loyaltyEnabled = Boolean(
-      (settings.data as { loyalty?: { enabled?: boolean } } | null)?.loyalty
-        ?.enabled,
-    );
+    const settings = await getOrCreateSettings();
+    const loyaltyEnabled = Boolean(settings.loyalty?.enabled);
 
     const [
       rangeInvoices,
@@ -134,15 +133,16 @@ export const getDashboard = async (
       yearInvoices,
       staffSalesResult,
     ] = await Promise.all([
+      // Revenue only needs payable / total / tip.
       Invoice.find({
         createdAt: { $gte: bounds.current.from, $lte: bounds.current.to },
       })
-        .select(INVOICE_LIST_PROJECTION)
+        .select(INVOICE_TOTALS_PROJECTION)
         .lean(),
       Invoice.find({
         createdAt: { $gte: bounds.previous.from, $lte: bounds.previous.to },
       })
-        .select(INVOICE_LIST_PROJECTION)
+        .select(INVOICE_TOTALS_PROJECTION)
         .lean(),
       Invoice.find({
         createdAt: {
@@ -150,61 +150,49 @@ export const getDashboard = async (
           $lte: endOfDay(now),
         },
       })
-        .select(INVOICE_LIST_PROJECTION)
+        .select(`${INVOICE_TOTALS_PROJECTION} paymentMode`)
         .lean(),
       Appointment.find({ date: todayKey })
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name")
         .sort({ startTime: 1 })
         .lean(),
-      Appointment.countDocuments({
-        date: bounds.previous.fromKey,
-      }).then(async (n) => {
-        if (range === "today") return n;
-        return Appointment.countDocuments({
-          date: {
-            $gte: bounds.previous.fromKey,
-            $lte: bounds.previous.toKey,
-          },
-        });
-      }),
-      Invoice.find({
+      Appointment.countDocuments(
+        range === "today"
+          ? { date: bounds.previous.fromKey }
+          : { date: { $gte: bounds.previous.fromKey, $lte: bounds.previous.toKey } },
+      ),
+      // Distinct customer ids, counted in the database (not one doc per bill).
+      Invoice.distinct("customer", {
         createdAt: {
           $gte: startOfDay(addDays(now, -29)),
           $lte: endOfDay(now),
         },
         walkIn: { $ne: true },
         customer: { $ne: null },
-      })
-        .select("customer")
-        .lean(),
-      Invoice.find({
+      }),
+      Invoice.distinct("customer", {
         createdAt: {
           $gte: startOfDay(addDays(now, -59)),
           $lte: endOfDay(addDays(now, -30)),
         },
         walkIn: { $ne: true },
         customer: { $ne: null },
-      })
-        .select("customer")
-        .lean(),
+      }),
       Invoice.find({
         createdAt: {
           $gte: new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0),
           $lte: endOfDay(now),
         },
       })
-        .select(INVOICE_LIST_PROJECTION)
+        // Monthly chart: only these fields are read.
+        .select("createdAt serviceSubtotal productSubtotal amountPayable grandTotal tip")
         .lean(),
       getStaffSalesSummary(bounds.current.fromKey, bounds.current.toKey),
     ]);
 
-    const activeClients = new Set(
-      activeWindowInvoices.map((i) => String(i.customer)).filter(Boolean),
-    ).size;
-    const prevActiveClients = new Set(
-      prevActiveWindowInvoices.map((i) => String(i.customer)).filter(Boolean),
-    ).size;
+    const activeClients = activeWindowInvoices.length;
+    const prevActiveClients = prevActiveWindowInvoices.length;
 
     const apptCountToday = todayAppointments.length;
     const walkInsToday = todayAppointments.filter(
@@ -360,7 +348,7 @@ export const getDashboard = async (
     })
       .sort({ createdAt: -1 })
       .limit(40)
-      .select(INVOICE_LIST_PROJECTION)
+      .select("customer serviceItems.name productItems.name createdAt")
       .populate("customer", "name lastName phone")
       .lean();
 
@@ -389,17 +377,32 @@ export const getDashboard = async (
         inv.serviceItems?.[0]?.name ||
         inv.productItems?.[0]?.name ||
         "";
-      const visitCount = await Invoice.countDocuments({ customer: cid });
       const visitAt = (inv as { createdAt?: Date }).createdAt;
       recentCustomers.push({
         id: cid,
         name,
         lastService,
         lastVisit: visitAt ? new Date(visitAt).toISOString() : "",
-        visitCount,
+        visitCount: 0,
         points: null,
       });
       if (recentCustomers.length >= 5) break;
+    }
+
+    // Visit counts for the (up to 5) recent customers in one query.
+    if (recentCustomers.length > 0) {
+      const counts = await Invoice.aggregate<{ _id: unknown; n: number }>([
+        {
+          $match: {
+            customer: {
+              $in: recentCustomers.map((c) => new mongoose.Types.ObjectId(c.id)),
+            },
+          },
+        },
+        { $group: { _id: "$customer", n: { $sum: 1 } } },
+      ]);
+      const countById = new Map(counts.map((c) => [String(c._id), c.n]));
+      for (const c of recentCustomers) c.visitCount = countById.get(c.id) ?? 0;
     }
 
     if (loyaltyEnabled && recentCustomers.length > 0) {

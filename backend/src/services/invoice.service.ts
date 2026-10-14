@@ -24,6 +24,13 @@ import {
   getOrCreateSettings,
 } from "./settings.service";
 import { applySaleDeduction } from "./stock.service";
+import {
+  daysBetweenInclusive,
+  isValidDateKey,
+  salonDateKeyFromUtc,
+  salonDayStartUtc,
+} from "../utils/reportRange";
+import { getSalonNow } from "../utils/salonTime";
 
 export interface LineDiscountInput {
   type?: DiscountType;
@@ -73,6 +80,11 @@ export interface CreateInvoiceDto {
   tip?: number;
   loyaltyRedeemPoints?: number;
   createdBy?: string | null;
+  /**
+   * Salon date (YYYY-MM-DD) the bill belongs to, for bills entered late.
+   * Omitted or today → now. Past dates only, at most BACKDATE_MAX_DAYS back.
+   */
+  billDate?: string;
 }
 
 export interface InvoiceListQuery {
@@ -109,6 +121,41 @@ function applyDiscount(
 }
 
 type SalonSettings = Awaited<ReturnType<typeof getOrCreateSettings>>;
+
+/** How far back a forgotten bill may be entered. Guards against wrong-year typos. */
+export const BACKDATE_MAX_DAYS = 90;
+
+/**
+ * Resolves the bill's timestamp. A past salon date keeps the current time of
+ * day (salon time), so it lands on that day in reports, dashboard and history.
+ */
+function resolveBillTimestamp(
+  billDate: unknown,
+): { ok: true; createdAt?: Date } | { ok: false; message: string } {
+  if (billDate === undefined || billDate === null || billDate === "") return { ok: true };
+  // Shape check + round trip (rejects impossible dates like 2026-02-31).
+  if (
+    !isValidDateKey(billDate) ||
+    salonDateKeyFromUtc(salonDayStartUtc(billDate)) !== billDate
+  ) {
+    return { ok: false, message: "billDate must be a valid YYYY-MM-DD date" };
+  }
+  const now = new Date();
+  const todayKey = getSalonNow(now).dateKey;
+  if (billDate === todayKey) return { ok: true };
+  if (billDate > todayKey) {
+    return { ok: false, message: "Bill date can't be in the future" };
+  }
+  const daysBack = daysBetweenInclusive(billDate, todayKey) - 1;
+  if (daysBack > BACKDATE_MAX_DAYS) {
+    return {
+      ok: false,
+      message: `Bills can be backdated by at most ${BACKDATE_MAX_DAYS} days`,
+    };
+  }
+  const timeOfDayMs = now.getTime() - salonDayStartUtc(todayKey).getTime();
+  return { ok: true, createdAt: new Date(salonDayStartUtc(billDate).getTime() + timeOfDayMs) };
+}
 
 async function highestExistingInvoiceSeq(
   invoice: SalonSettings["invoice"],
@@ -260,6 +307,11 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
 
     if (!["upi", "cash", "card"].includes(data.paymentMode)) {
       return { statusCode: 400, data: null, message: "Invalid paymentMode" };
+    }
+
+    const billTime = resolveBillTimestamp(data.billDate);
+    if (!billTime.ok) {
+      return { statusCode: 400, data: null, message: billTime.message };
     }
 
     const tip = Math.max(0, round2(Number(data.tip) || 0));
@@ -771,6 +823,8 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
               paymentMode: data.paymentMode,
               status: "paid",
               createdBy: data.createdBy || null,
+              // Backdated bill: recorded on the chosen salon day.
+              ...(billTime.createdAt ? { createdAt: billTime.createdAt } : {}),
             },
           ],
           { session },
@@ -1012,6 +1066,8 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
   }
 };
 
+const POPULAR_WINDOW_DAYS = 90;
+
 export const getPopularBillingItems = async (limitRaw?: unknown) => {
   try {
     const limit = Math.min(50, Math.max(1, Math.floor(Number(limitRaw) || 12)));
@@ -1019,9 +1075,12 @@ export const getPopularBillingItems = async (limitRaw?: unknown) => {
     // Count in the database: returns at most `limit` rows per type instead of
     // shipping every paid invoice's lines to Node. Ties keep first-sold order
     // (earliest invoice _id), matching the previous in-memory behaviour.
+    // "Popular" = sold most in the last 90 days. Bounded by the createdAt index,
+    // so cost doesn't grow with years of history.
+    const since = new Date(Date.now() - POPULAR_WINDOW_DAYS * 86_400_000);
     const topSold = (itemsField: "serviceItems" | "productItems", idField: string) =>
       Invoice.aggregate<{ _id: mongoose.Types.ObjectId; qty: number }>([
-        { $match: { status: "paid" } },
+        { $match: { createdAt: { $gte: since }, status: "paid" } },
         { $project: { [itemsField]: 1 } },
         { $unwind: { path: `$${itemsField}`, includeArrayIndex: "lineIndex" } },
         { $match: { [`${itemsField}.${idField}`]: { $ne: null } } },

@@ -23,6 +23,15 @@ interface SearchableSelectProps {
   className?: string
   disabled?: boolean
   'aria-invalid'?: boolean
+  /**
+   * Server-search mode: called with the typed text and `options` are taken as
+   * the server's results (no local filtering). Debounce in the caller.
+   */
+  onQueryChange?: (query: string) => void
+  /** Server-search mode: results are loading. */
+  loading?: boolean
+  /** Label for the current value when it isn't among `options` (server mode). */
+  selectedLabel?: string
 }
 
 /**
@@ -39,6 +48,9 @@ export function SearchableSelect({
   className,
   disabled,
   'aria-invalid': ariaInvalid,
+  onQueryChange,
+  loading,
+  selectedLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -47,14 +59,16 @@ export function SearchableSelect({
   const listId = useId()
 
   const selected = options.find((o) => o.value === value)
+  const triggerLabel = selected?.label ?? (value ? selectedLabel : undefined)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return options
+    // Server mode: the caller already filtered.
+    if (!q || onQueryChange) return options
     return options.filter((o) =>
       [o.label, o.group ?? '', o.hint ?? ''].join(' ').toLowerCase().includes(q),
     )
-  }, [options, query])
+  }, [options, query, onQueryChange])
 
   // Keep the highlighted option scrolled into view during keyboard navigation.
   useEffect(() => {
@@ -68,6 +82,7 @@ export function SearchableSelect({
     onValueChange(option.value)
     setOpen(false)
     setQuery('')
+    onQueryChange?.('')
   }
 
   return (
@@ -76,7 +91,10 @@ export function SearchableSelect({
       onOpenChange={(next) => {
         setOpen(next)
         setActiveIndex(0)
-        if (!next) setQuery('')
+        if (!next) {
+          setQuery('')
+          onQueryChange?.('')
+        }
       }}
     >
       <PopoverTrigger asChild disabled={disabled}>
@@ -91,8 +109,8 @@ export function SearchableSelect({
             className,
           )}
         >
-          <span className={cn('min-w-0 truncate', !selected && 'text-muted-foreground')}>
-            {selected?.label ?? placeholder}
+          <span className={cn('min-w-0 truncate', !triggerLabel && 'text-muted-foreground')}>
+            {triggerLabel ?? placeholder}
           </span>
           <ChevronDownIcon className="size-4 shrink-0 opacity-50" />
         </button>
@@ -112,6 +130,7 @@ export function SearchableSelect({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
+              onQueryChange?.(e.target.value)
               // New result set: highlight the first match.
               setActiveIndex(0)
             }}
@@ -144,7 +163,7 @@ export function SearchableSelect({
         >
           {filtered.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              {emptyText}
+              {loading ? 'Searching…' : emptyText}
             </p>
           ) : (
             filtered.map((option, index) => {

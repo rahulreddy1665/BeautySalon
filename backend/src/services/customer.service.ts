@@ -1,5 +1,8 @@
 import { CreateCustomerDto, UpdateCustomerDto } from "../dto/main.dto";
+import mongoose from "mongoose";
+
 import { Customer } from "../models/customer.model";
+import { Invoice } from "../models/invoice.model";
 
 export const createCustomer = async (data: CreateCustomerDto) => {
   try {
@@ -75,18 +78,6 @@ export const getCustomers = async (query: CustomerListQuery = {}) => {
   }
 };
 
-/**
- * Unpaginated list. Only for pickers not yet moved to server search
- * (appointment form, loyalty, global search). Prefer `getCustomers`.
- */
-export const getAllCustomers = async () => {
-  try {
-    return { statusCode: 200, data: await Customer.find().lean() };
-  } catch (error) {
-    return { statusCode: 500, data: error };
-  }
-};
-
 export const getCustomerById = async (id: string) => {
   try {
     return { statusCode: 200, data: await Customer.findById(id) };
@@ -133,52 +124,105 @@ export type CustomerImportRowResult = {
   phone?: string;
 };
 
-/** Upsert by phone. Phone is required; name and email are optional. */
+const IMPORT_CHUNK = 1000;
+
+/** Where a phone stands while the import runs (DB state + earlier rows in the file). */
+type ImportState = {
+  name: string;
+  email?: string;
+  lastName?: string;
+  /** Exists in the DB (before this import, or written by an earlier chunk). */
+  stored: boolean;
+  /** Has changes not yet written. */
+  dirty: boolean;
+  /** Result rows that produced the pending change (marked failed if the write fails). */
+  pendingRows: number[];
+};
+
+/**
+ * Upsert by phone. Phone is required; name and email are optional.
+ *
+ * Gives the same per-row results as processing rows one by one (a phone that
+ * appears twice is created by the first row and updated/skipped by later ones),
+ * but talks to the DB in chunks: one `$in` lookup + one `bulkWrite` per 1,000
+ * rows, instead of two round trips per row.
+ */
 export const importCustomers = async (
   rows: Array<{ name?: unknown; phone?: unknown; email?: unknown }>,
 ) => {
   const results: CustomerImportRowResult[] = [];
+  const states = new Map<number, ImportState>();
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const rowNum = i + 2;
-    const raw = rows[i] ?? {};
-    const name = String(raw.name ?? "").trim();
-    const email = String(raw.email ?? "").trim().toLowerCase();
-    const phoneRaw = String(raw.phone ?? "").trim();
+  for (let start = 0; start < rows.length; start += IMPORT_CHUNK) {
+    const chunk = rows.slice(start, start + IMPORT_CHUNK);
 
-    if (!name && !phoneRaw && !email) continue; // blank spreadsheet row
+    // 1. Validate + normalise (no DB).
+    const parsed = chunk.map((raw, k) => {
+      const rowNum = start + k + 2;
+      const name = String(raw?.name ?? "").trim();
+      const email = String(raw?.email ?? "").trim().toLowerCase();
+      const phoneRaw = String(raw?.phone ?? "").trim();
+      return { rowNum, name, email, phoneRaw, phone: normalizePhone(phoneRaw) };
+    });
 
-    const phone = normalizePhone(phoneRaw);
-    if (phone === null) {
-      results.push({
-        row: rowNum,
-        status: "error",
-        reason: phoneRaw
-          ? "Phone must be a valid 10-digit Indian mobile number"
-          : "Phone is required",
-        name,
-        phone: phoneRaw,
-      });
-      continue;
+    // 2. One lookup for every phone in this chunk we haven't seen yet.
+    const unseen = [
+      ...new Set(
+        parsed
+          .map((r) => r.phone)
+          .filter((p): p is number => p !== null && !states.has(p)),
+      ),
+    ];
+    if (unseen.length) {
+      const found = await Customer.find({ phone: { $in: unseen } })
+        .select("phone name email lastName")
+        .lean();
+      for (const c of found) {
+        states.set(Number(c.phone), {
+          // Same default the schema applies to a loaded document.
+          name: c.name ?? "",
+          email: c.email ?? undefined,
+          lastName: c.lastName ?? undefined,
+          stored: true,
+          dirty: false,
+          pendingRows: [],
+        });
+      }
     }
-    if (email && !EMAIL.test(email)) {
-      results.push({
-        row: rowNum,
-        status: "error",
-        reason: "Invalid email",
-        name,
-        phone: String(phone),
-      });
-      continue;
-    }
 
-    try {
-      const existing = await Customer.findOne({ phone });
-      if (existing) {
+    // 3. Decide each row in file order, exactly as the row-by-row version did.
+    for (const { rowNum, name, email, phoneRaw, phone } of parsed) {
+      if (!name && !phoneRaw && !email) continue; // blank spreadsheet row
+
+      if (phone === null) {
+        results.push({
+          row: rowNum,
+          status: "error",
+          reason: phoneRaw
+            ? "Phone must be a valid 10-digit Indian mobile number"
+            : "Phone is required",
+          name,
+          phone: phoneRaw,
+        });
+        continue;
+      }
+      if (email && !EMAIL.test(email)) {
+        results.push({
+          row: rowNum,
+          status: "error",
+          reason: "Invalid email",
+          name,
+          phone: String(phone),
+        });
+        continue;
+      }
+
+      const state = states.get(phone);
+      if (state) {
         // Blank cells never wipe existing values.
-        const nextName = name || existing.name;
-        const nextEmail = email || existing.email;
-        if (nextName === existing.name && nextEmail === existing.email) {
+        const nextName = name || state.name;
+        const nextEmail = email || state.email;
+        if (nextName === state.name && nextEmail === state.email) {
           results.push({
             row: rowNum,
             status: "skipped",
@@ -188,38 +232,68 @@ export const importCustomers = async (
           });
           continue;
         }
-        existing.name = nextName;
-        if (name) existing.lastName = "";
-        existing.email = nextEmail;
-        await existing.save();
-        results.push({
-          row: rowNum,
-          status: "updated",
-          name: nextName,
-          phone: String(phone),
-        });
+        state.name = nextName;
+        if (name) state.lastName = "";
+        state.email = nextEmail;
+        state.dirty = true;
+        state.pendingRows.push(results.length);
+        results.push({ row: rowNum, status: "updated", name: nextName, phone: String(phone) });
       } else {
-        await Customer.create({
+        states.set(phone, {
           name,
-          phone,
           email: email || undefined,
+          stored: false,
+          dirty: true,
+          pendingRows: [results.length],
         });
-        results.push({
-          row: rowNum,
-          status: "created",
-          name,
-          phone: String(phone),
-        });
+        results.push({ row: rowNum, status: "created", name, phone: String(phone) });
       }
-    } catch (error) {
-      results.push({
-        row: rowNum,
-        status: "error",
-        reason: error instanceof Error ? error.message : "Could not save",
-        name,
-        phone: String(phone),
-      });
     }
+
+    // 4. One write per phone (its final state), all in one bulkWrite.
+    const pending = [...states.entries()].filter(([, st]) => st.dirty);
+    if (pending.length === 0) continue;
+    const ops = pending.map(([phone, st]) => {
+      const fields: Record<string, unknown> = { name: st.name };
+      if (st.email !== undefined) fields.email = st.email;
+      if (st.lastName !== undefined) fields.lastName = st.lastName;
+      return st.stored
+        ? { updateOne: { filter: { phone }, update: { $set: fields } } }
+        : { insertOne: { document: { ...fields, phone } } };
+    });
+
+    const failedOps = new Map<number, string>();
+    try {
+      await Customer.bulkWrite(ops as Parameters<typeof Customer.bulkWrite>[0], {
+        ordered: false,
+      });
+    } catch (error) {
+      const writeErrors =
+        (error as { writeErrors?: Array<{ index: number; errmsg?: string }> }).writeErrors ?? [];
+      if (writeErrors.length === 0) {
+        // Whole batch failed (e.g. connection): every pending row failed.
+        pending.forEach((_, i) =>
+          failedOps.set(i, error instanceof Error ? error.message : "Could not save"),
+        );
+      }
+      for (const w of writeErrors) failedOps.set(w.index, w.errmsg ?? "Could not save");
+    }
+
+    pending.forEach(([phone, st], i) => {
+      const failure = failedOps.get(i);
+      if (failure) {
+        for (const idx of st.pendingRows) {
+          const r = results[idx]!;
+          results[idx] = { row: r.row, status: "error", reason: failure, name: r.name, phone: r.phone };
+        }
+        // Not written: forget it so later rows re-read the DB as it really is.
+        states.delete(phone);
+      } else {
+        st.stored = true;
+        st.dirty = false;
+      }
+      st.pendingRows = [];
+    });
   }
 
   const summary = {
@@ -230,4 +304,44 @@ export const importCustomers = async (
     total: results.length,
   };
   return { statusCode: 200, data: { results, summary } };
+};
+
+/**
+ * Visit count, lifetime spend and last visit over ALL of the customer's
+ * invoices, in one aggregation (uses the {customer, createdAt} index).
+ * Spend matches the visit table: amountPayable, falling back to grandTotal.
+ */
+export const getCustomerSummary = async (id: string) => {
+  try {
+    if (!mongoose.isValidObjectId(id)) {
+      return { statusCode: 404, data: null, message: "Customer not found" };
+    }
+    const [row] = await Invoice.aggregate<{
+      visits: number;
+      lifetimeSpend: number;
+      lastVisitAt: Date | null;
+    }>([
+      { $match: { customer: new mongoose.Types.ObjectId(id) } },
+      {
+        $group: {
+          _id: null,
+          visits: { $sum: 1 },
+          lifetimeSpend: {
+            $sum: { $ifNull: ["$amountPayable", { $ifNull: ["$grandTotal", 0] }] },
+          },
+          lastVisitAt: { $max: "$createdAt" },
+        },
+      },
+    ]);
+    return {
+      statusCode: 200,
+      data: {
+        visits: row?.visits ?? 0,
+        lifetimeSpend: Math.round((row?.lifetimeSpend ?? 0) * 100) / 100,
+        lastVisitAt: row?.lastVisitAt ?? null,
+      },
+    };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
 };

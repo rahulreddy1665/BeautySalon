@@ -74,6 +74,8 @@ const appointmentSchema = new Schema<IAppointment>(
 );
 
 appointmentSchema.index({ date: 1, status: 1 });
+// Matches the list endpoint's sort (date, then start time).
+appointmentSchema.index({ date: 1, startTime: 1 });
 appointmentSchema.index({ "services.staff": 1, date: 1, startTime: 1 });
 
 export const Appointment = mongoose.model<IAppointment>(

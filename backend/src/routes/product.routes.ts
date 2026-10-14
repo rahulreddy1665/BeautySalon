@@ -9,6 +9,7 @@ import {
   createProductController,
   deleteProductController,
   getProductByIdController,
+  getProductCatalogController,
   getProductsController,
   importProductsController,
   listStockLedgerController,
@@ -28,6 +29,13 @@ router.get(
   authenticate,
   requirePermission("product:read"),
   getProductsController,
+);
+
+router.get(
+  "/catalog",
+  authenticate,
+  requirePermission("product:read"),
+  getProductCatalogController,
 );
 
 router.post(

@@ -340,6 +340,8 @@ export const getAppointments = async (query: AppointmentListQuery = {}) => {
         .populate("services.service", "name price")
         .sort({ date: 1, startTime: 1 })
         .skip((page - 1) * limit)
+        // Not lean: hydration fills schema defaults (e.g. invoice: null) that
+        // clients receive today; lean would drop those keys from the response.
         .limit(limit),
       Appointment.countDocuments(filter),
     ]);

@@ -1,38 +1,33 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
-import { NAV_PERMISSION, ROUTES } from '@/app/constants'
+import { ROUTES } from '@/app/constants'
+import { permissionForPath, useHomePath } from '@/app/hooks/useHasPermission'
 import { useAppSelector } from '@/app/hooks/useRedux'
+import { ForbiddenPage } from '@/app/screens/NotFoundPage'
 
-function requiredPermissionForPath(pathname: string): string | null {
-  if (pathname === '/' || pathname === '') return NAV_PERMISSION['/'] ?? null
-  const entries = Object.entries(NAV_PERMISSION).sort((a, b) => b[0].length - a[0].length)
-  for (const [prefix, perm] of entries) {
-    if (prefix === '/') continue
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-      return perm
-    }
-  }
-  return null
-}
-
-/** Blocks routes when the user lacks the matching view permission. */
+/**
+ * Blocks routes the user's role can't view.
+ * - `/` without dashboard access → their first allowed page (not a dead end).
+ * - Any other blocked page → "No access" inside the app layout, so the sidebar
+ *   (already filtered by role) is still there to navigate away.
+ */
 export function PermissionGuard() {
   const user = useAppSelector((s) => s.auth.user)
   const location = useLocation()
+  const homePath = useHomePath()
 
   if (user?.role === 'admin') {
     return <Outlet />
   }
 
-  const needed = requiredPermissionForPath(location.pathname)
-  if (!needed) {
+  const needed = permissionForPath(location.pathname)
+  if (!needed || (user?.permissions ?? []).includes(needed)) {
     return <Outlet />
   }
 
-  const perms = user?.permissions ?? []
-  if (!perms.includes(needed)) {
-    return <Navigate to={ROUTES.forbidden} replace />
+  if (location.pathname === ROUTES.home && homePath !== ROUTES.home) {
+    return <Navigate to={homePath} replace />
   }
 
-  return <Outlet />
+  return <ForbiddenPage inline />
 }

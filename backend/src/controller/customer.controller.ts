@@ -5,7 +5,7 @@ import {
   createCustomer,
   deleteCustomer,
   getCustomerById,
-  getAllCustomers,
+  getCustomerSummary,
   getCustomers,
   importCustomers,
   updateCustomer,
@@ -52,18 +52,22 @@ export const getCustomersController = async (req: Request, res: Response) => {
   }
 };
 
-export const getAllCustomersController = async (_req: Request, res: Response) => {
+export const getCustomerSummaryController = async (
+  req: Request<{ id: string }>,
+  res: Response,
+) => {
   try {
-    const data: ApiResponseOptions = await getAllCustomers();
+    const data: ApiResponseOptions = await getCustomerSummary(req.params.id);
     return sendResponse(res, {
       statusCode: data.statusCode,
-      message: data.statusCode == 200 ? "Customer Get" : "Customer Get failed",
+      message:
+        data.statusCode == 200 ? "Customer summary" : "Customer summary failed",
       data: data.data,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
-      message: "Customer get failed",
+      message: "Customer summary failed",
       errors: error,
     });
   }

@@ -19,7 +19,7 @@ import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/app/components/ui/sheet'
 import { APPOINTMENTS, COMMON, ROUTES } from '@/app/constants'
-import { useAppointmentsQuery } from '@/app/hooks/queries/useAppointmentsQuery'
+import { useAppointmentsWindowQuery } from '@/app/hooks/queries/useAppointmentsQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
 import { useActiveStaffQuery } from '@/app/hooks/queries/useStaffQuery'
 import {
@@ -162,15 +162,12 @@ export function AppointmentsScreen() {
   const rangeEnd =
     view === 'day' ? selectedDate : view === 'month' ? monthGridEnd : view === 'list' ? listTo : weekEnd
 
-  const listParams = {
+  // Every appointment in the visible window; pages are fetched until `total`.
+  const appointmentsQuery = useAppointmentsWindowQuery({
     from: rangeStart,
     to: rangeEnd,
     staffId,
-    page: 1,
-    limit: view === 'day' ? 200 : 500,
-  }
-
-  const appointmentsQuery = useAppointmentsQuery(listParams)
+  })
   const staff = staffQuery.data ?? []
   const appointments = appointmentsQuery.data?.items ?? []
   const urlAppointmentId = searchParams.get('appointment') ?? searchParams.get('id')

@@ -14,14 +14,6 @@ import {
 } from '@/app/service/customers/customersApi'
 import { toErrorMessage } from '@/app/utils'
 
-/** Full customer list. Prefer `useCustomersPageQuery` for anything that grows. */
-export function useCustomersQuery() {
-  return useQuery({
-    queryKey: queryKeys.customers.list({ all: true }),
-    queryFn: () => customersApi.getAll(),
-  })
-}
-
 /** Server-paginated / searched customers. Keeps the previous page visible while the next loads. */
 export function useCustomersPageQuery(
   params: CustomerListParams,

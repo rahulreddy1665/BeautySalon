@@ -30,6 +30,9 @@ const balanceSchema = new Schema<ILoyaltyBalance>(
   { timestamps: true },
 );
 
+// Balances list sorts by points.
+balanceSchema.index({ points: -1 });
+
 const ledgerSchema = new Schema<ILoyaltyLedger>(
   {
     customer: {

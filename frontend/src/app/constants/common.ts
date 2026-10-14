@@ -79,6 +79,17 @@ export const COMMON = {
     copied: 'Copied',
   },
   nav: {
+    installApp: 'Install app',
+    installAppTitle: 'Install BeautySalon',
+    installSteps: {
+      chrome:
+        'Click the install icon at the right end of the address bar, or open the ⋮ menu → Cast, save and share → Install page as app.',
+      edge: 'Click the install icon in the address bar, or open the … menu → Apps → Install this site as an app.',
+      'safari-mac': 'In Safari, open the File menu and choose “Add to Dock”.',
+      'safari-ios': 'Tap the Share button, then “Add to Home Screen”.',
+      firefox: 'Firefox can’t install web apps. Open this site in Chrome, Edge or Safari to install it.',
+      other: 'Use your browser’s menu to install this site as an app (Chrome, Edge and Safari support this).',
+    },
     dashboard: 'Dashboard',
     appointments: 'Appointments',
     customers: 'Customers',

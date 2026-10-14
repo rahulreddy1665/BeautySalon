@@ -6,12 +6,16 @@ import { Link, useParams } from 'react-router-dom'
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { PageHeader } from '@/app/components/PageHeader'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { StatCard } from '@/app/components/StatCard'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { CUSTOMERS, COMMON } from '@/app/constants'
-import { useCustomerVisitsQuery } from '@/app/hooks/queries/useCustomerVisitsQuery'
+import {
+  useCustomerSummaryQuery,
+  useCustomerVisitsQuery,
+} from '@/app/hooks/queries/useCustomerVisitsQuery'
 import { useCustomerQuery } from '@/app/hooks/queries/useCustomersQuery'
 import { useLoyaltyBalanceQuery } from '@/app/hooks/queries/useLoyaltyQuery'
 import type { InvoiceRecord } from '@/app/service/invoices/invoicesApi'
@@ -57,23 +61,21 @@ function toVisitRows(invoices: InvoiceRecord[]): VisitRow[] {
 export function CustomerDetailScreen() {
   const { id } = useParams<{ id: string }>()
   const customerQuery = useCustomerQuery(id)
-  const visitsQuery = useCustomerVisitsQuery(id)
+  const [visitPage, setVisitPage] = useState(1)
+  const [visitPageSize, setVisitPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const visitsQuery = useCustomerVisitsQuery(id, visitPage, visitPageSize)
+  // Totals come from the server over every invoice, not from the visible page.
+  const summaryQuery = useCustomerSummaryQuery(id)
   const loyaltyQuery = useLoyaltyBalanceQuery(id)
   const [editOpen, setEditOpen] = useState(false)
 
   const visits = useMemo(
-    () => toVisitRows(visitsQuery.data ?? []),
+    () => toVisitRows(visitsQuery.data?.items ?? []),
     [visitsQuery.data],
   )
   const loyaltyPoints = loyaltyQuery.data?.points ?? 0
-  const lifetimeSpend = useMemo(
-    () =>
-      (visitsQuery.data ?? []).reduce(
-        (sum, inv) => sum + (Number(inv.amountPayable ?? inv.grandTotal) || 0),
-        0,
-      ),
-    [visitsQuery.data],
-  )
+  const visitCount = summaryQuery.data?.visits ?? visitsQuery.data?.total ?? 0
+  const lifetimeSpend = summaryQuery.data?.lifetimeSpend ?? 0
 
   if (customerQuery.isLoading) {
     return (
@@ -124,7 +126,7 @@ export function CustomerDetailScreen() {
       />
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
-        <StatCard label={CUSTOMERS.detail.visits} value={visits.length} />
+        <StatCard label={CUSTOMERS.detail.visits} value={visitCount} />
         <StatCard
           label={CUSTOMERS.detail.lifetimeSpend}
           value={lifetimeSpend}
@@ -173,13 +175,26 @@ export function CustomerDetailScreen() {
             />
           ) : null}
           {!visitsQuery.isLoading && !visitsQuery.isError ? (
-            <ResponsiveTable
-              data={visits}
-              columns={visitColumns}
-              mobileTitleKey="date"
-              emptyTitle={CUSTOMERS.detail.emptyVisits}
-              emptyDescription={CUSTOMERS.detail.emptyVisitsHint}
-            />
+            <div className="space-y-3">
+              <ResponsiveTable
+                data={visits}
+                columns={visitColumns}
+                mobileTitleKey="date"
+                emptyTitle={CUSTOMERS.detail.emptyVisits}
+                emptyDescription={CUSTOMERS.detail.emptyVisitsHint}
+              />
+              <Pagination
+                page={visitsQuery.data?.page ?? visitPage}
+                totalPages={visitsQuery.data?.totalPages ?? 1}
+                total={visitsQuery.data?.total ?? 0}
+                pageSize={visitPageSize}
+                onPageChange={setVisitPage}
+                onPageSizeChange={(size) => {
+                  setVisitPageSize(size)
+                  setVisitPage(1)
+                }}
+              />
+            </div>
           ) : null}
         </CardContent>
       </Card>

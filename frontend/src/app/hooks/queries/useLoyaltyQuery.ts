@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
@@ -31,6 +36,15 @@ export function useLoyaltyBalancesQuery(
     queryKey: [...queryKeys.loyalty.balances(), ids ?? 'all'] as const,
     queryFn: () => loyaltyApi.listBalances(ids),
     enabled: (options.enabled ?? true) && (ids === undefined || ids.length > 0),
+  })
+}
+
+/** One page of loyalty members (server-side search, sort and paging). */
+export function useLoyaltyMembersQuery(params: { page: number; limit: number; q?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.loyalty.all, 'members', params] as const,
+    queryFn: () => loyaltyApi.listMembers(params),
+    placeholderData: keepPreviousData,
   })
 }
 

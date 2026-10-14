@@ -58,6 +58,8 @@ export interface CreateBillPayload {
   loyaltyRedeemPoints?: number
   payment: PaymentSplit
   notes?: string
+  /** Salon date (YYYY-MM-DD) for a bill entered late; omit for today. */
+  billDate?: string
 }
 
 export interface BillRecord {
@@ -170,13 +172,14 @@ export const billingApi = {
       paymentMode,
       tip: payload.tip,
       loyaltyRedeemPoints: payload.loyaltyRedeemPoints,
+      billDate: payload.billDate,
     })
     return mapInvoiceToBill(invoice)
   },
 
   products: async (): Promise<CatalogItem[]> => {
-    const page = await productsApi.list({ page: 1, limit: 100, retailOnly: true })
-    return page.items.map((p) => ({
+    const products = await productsApi.catalog()
+    return products.map((p) => ({
       id: p._id,
       name: p.name,
       kind: 'product' as const,

@@ -39,6 +39,12 @@ export interface CustomerImportResult {
   }
 }
 
+export interface CustomerSummary {
+  visits: number
+  lifetimeSpend: number
+  lastVisitAt: string | null
+}
+
 export interface CustomerListParams {
   page?: number
   limit?: number
@@ -64,10 +70,12 @@ export const customersApi = {
     return data.data
   },
 
-  /** Unpaginated. Only for pickers not yet on server search; prefer `list`. */
-  getAll: async (): Promise<Customer[]> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<Customer[]>>('/customer/all')
-    return data.data ?? []
+  /** Totals over ALL of the customer's invoices (not just one page). */
+  getSummary: async (id: string): Promise<CustomerSummary> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<CustomerSummary>>(
+      `/customer/${id}/summary`,
+    )
+    return data.data
   },
 
   getById: async (id: string): Promise<Customer> => {

@@ -1,11 +1,15 @@
 import { nanoid } from '@reduxjs/toolkit'
-import { format } from 'date-fns'
+import { addDays, format, parseISO } from 'date-fns'
+import { CalendarClock } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import type { SuggestableService } from '@/app/components/CategorySuggestions'
 import { PageHeader } from '@/app/components/PageHeader'
+import { DatePicker } from '@/app/components/ui/date-picker'
+import { BACKDATE_MAX_DAYS } from '@/app/constants/billing'
+import { getSalonNow } from '@/app/utils/salonTime'
 import { Button } from '@/app/components/ui/button'
 import {
   DropdownMenu,
@@ -65,13 +69,18 @@ import {
   deleteDraft,
   saveDraft,
 } from '@/app/state/redux/slices/billingDraftsSlice'
-import { formatINR, toErrorMessage } from '@/app/utils'
+import { cn, formatINR, toErrorMessage } from '@/app/utils'
 
 export function NewBillScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const appointmentIdParam = searchParams.get('appointmentId') ?? undefined
   const dispatch = useAppDispatch()
+  // Bill date: today by default; can be moved back for a forgotten bill.
+  const todayKey = getSalonNow().dateKey
+  const [billDateKey, setBillDateKey] = useState(todayKey)
+  const todayDate = parseISO(`${todayKey}T12:00:00`)
+  const earliestBillDate = addDays(todayDate, -BACKDATE_MAX_DAYS)
   const cart = useAppSelector((state) => state.billingCart)
   const drafts = useAppSelector((state) => state.billingDrafts.drafts)
   const user = useAppSelector((state) => state.auth.user)
@@ -430,6 +439,7 @@ export function NewBillScreen() {
       return
     }
     try {
+      const backdated = billDateKey !== todayKey
       const customerName = cart.walkIn
         ? cart.customerName.trim() || 'Walk-in'
         : cart.customerName
@@ -460,6 +470,8 @@ export function NewBillScreen() {
           card: cart.paymentMode === 'card' ? totals.payable : 0,
         },
         notes: cart.notes,
+        // Only sent for a forgotten bill; today's bills use the server clock.
+        billDate: backdated ? billDateKey : undefined,
       })
       dispatch(resetCart())
       navigate(ROUTES.invoice(bill.id))
@@ -507,6 +519,9 @@ export function NewBillScreen() {
     onCashReceived: (n: number) => dispatch(setCashReceived(n)),
     onNotes: (notes: string) => dispatch(setNotes(notes)),
   }
+
+  const billDateValue = parseISO(`${billDateKey}T12:00:00`)
+  const isBackdated = billDateKey !== todayKey
 
   return (
     <div className="min-w-0 space-y-3 pb-24 xl:pb-3">
@@ -580,6 +595,46 @@ export function NewBillScreen() {
           </>
         }
       />
+
+      <div
+        className={cn(
+          'flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between',
+          isBackdated ? 'border-amber-400/60 bg-amber-50 dark:bg-amber-950/30' : 'border-border bg-card',
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-sm font-medium">{BILLING.new.billDate}</span>
+          <DatePicker
+            value={billDateValue}
+            onChange={(date) => {
+              if (date) setBillDateKey(format(date, 'yyyy-MM-dd'))
+            }}
+            className="w-44 md:w-44"
+            disabled={[{ after: todayDate }, { before: earliestBillDate }]}
+          />
+          {isBackdated ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 shrink-0"
+              onClick={() => setBillDateKey(todayKey)}
+            >
+              {BILLING.new.billDateToday}
+            </Button>
+          ) : null}
+        </div>
+        {isBackdated ? (
+          <p className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <CalendarClock className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            {BILLING.new.backdatedNotice.replace('{date}', format(billDateValue, 'dd MMM yyyy'))}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {BILLING.new.backdateLimit.replace('{days}', String(BACKDATE_MAX_DAYS))}
+          </p>
+        )}
+      </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
         <div className="min-w-0 space-y-3">

@@ -27,6 +27,24 @@ export function useAppointmentsQuery(params: AppointmentListParams) {
   })
 }
 
+/** All appointments in a date window (never truncated). */
+export function useAppointmentsWindowQuery(
+  params: Omit<AppointmentListParams, 'page' | 'limit'>,
+) {
+  return useQuery({
+    queryKey: queryKeys.appointments.list({
+      from: params.from ?? '',
+      to: params.to ?? '',
+      date: params.date ?? '',
+      staffId: params.staffId ?? '',
+      status: params.status ?? '',
+      window: true,
+    }),
+    queryFn: () => appointmentsApi.listWindow(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function useAppointmentQuery(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.appointments.detail(id ?? ''),

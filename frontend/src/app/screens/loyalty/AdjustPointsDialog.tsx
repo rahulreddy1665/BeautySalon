@@ -27,24 +27,18 @@ import {
   type LoyaltyAdjustFormValues,
 } from '@/app/helpers/loyaltyValidation'
 import { useAdjustLoyaltyMutation } from '@/app/hooks/queries/useLoyaltyQuery'
-import type { Customer } from '@/app/service/customers/customersApi'
+import { CustomerPicker } from '@/app/components/CustomerPicker'
 
 interface AdjustPointsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  customers: Customer[]
   /** When set, locks the customer select. */
   presetCustomerId?: string | null
-}
-
-function displayName(customer: Customer): string {
-  return [customer.name, customer.lastName].filter(Boolean).join(' ')
 }
 
 export function AdjustPointsDialog({
   open,
   onOpenChange,
-  customers,
   presetCustomerId,
 }: AdjustPointsDialogProps) {
   const mutation = useAdjustLoyaltyMutation()
@@ -92,24 +86,13 @@ export function AdjustPointsDialog({
           <DialogBody className="space-y-4">
             <div className="space-y-2">
               <Label>{LOYALTY.fields.customer}</Label>
-              <Select
-                value={form.watch('customerId')}
-                onValueChange={(value) =>
-                  form.setValue('customerId', value, { shouldValidate: true })
-                }
+              <CustomerPicker
+                value={form.watch('customerId') || undefined}
+                onChange={(id) => form.setValue('customerId', id, { shouldValidate: true })}
+                placeholder={LOYALTY.fields.chooseCustomer}
                 disabled={Boolean(presetCustomerId)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={LOYALTY.fields.chooseCustomer} />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer._id} value={customer._id}>
-                      {displayName(customer)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                aria-invalid={Boolean(form.formState.errors.customerId)}
+              />
               {form.formState.errors.customerId ? (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.customerId.message}

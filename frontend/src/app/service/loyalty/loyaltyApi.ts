@@ -40,6 +40,23 @@ export type UpdateLoyaltyRulesPayload = Partial<LoyaltyRules>
 
 const MAX_IDS_IN_URL = 100
 
+export interface LoyaltyMember {
+  customerId: string
+  name: string
+  lastName?: string
+  phone?: number
+  points: number
+  updatedAt: string | null
+}
+
+export interface LoyaltyMembersPage {
+  items: LoyaltyMember[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export const loyaltyApi = {
   getRules: async (): Promise<LoyaltyRules> => {
     const { data } =
@@ -65,6 +82,19 @@ export const loyaltyApi = {
       {
         params: filterIds ? { customerIds: filterIds.join(',') } : undefined,
       },
+    )
+    return data.data
+  },
+
+  /** Active customers with their points, highest first; searched and paged on the server. */
+  listMembers: async (params: {
+    page: number
+    limit: number
+    q?: string
+  }): Promise<LoyaltyMembersPage> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<LoyaltyMembersPage>>(
+      '/loyalty/members',
+      { params },
     )
     return data.data
   },

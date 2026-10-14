@@ -90,6 +90,22 @@ export const createProduct = async (
   }
 };
 
+/**
+ * Every billable (retail) product for the billing picker. Unpaginated on purpose:
+ * the picker needs the whole list, and a paged list silently dropped product 101+.
+ */
+export const getProductCatalog = async () => {
+  try {
+    const items = await Product.find({ type: "retail" })
+      .select("name price type trackStock stockQty")
+      .sort({ name: 1 })
+      .lean();
+    return { statusCode: 200, data: items };
+  } catch (error) {
+    return { statusCode: 500, data: error };
+  }
+};
+
 export const getProducts = async (query: ProductListQuery = {}) => {
   try {
     const page = Math.max(1, Number(query.page) || 1);

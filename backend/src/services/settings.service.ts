@@ -67,7 +67,34 @@ function isUnsafeSvg(content: string): boolean {
   );
 }
 
+/**
+ * Settings are read on most requests (billing, appointments, reports, loyalty…)
+ * and rarely change, so reads share one cached document for a short time.
+ * Single app instance, and every write below clears the cache immediately.
+ * The cached document is READ-ONLY: writers use loadSettingsForUpdate().
+ */
+const SETTINGS_TTL_MS = 30_000;
+let settingsCache: {
+  doc: Awaited<ReturnType<typeof loadSettingsForUpdate>>;
+  at: number;
+} | null = null;
+
+export function invalidateSettingsCache() {
+  settingsCache = null;
+}
+
+/** Cached read. Do not mutate the returned document. */
 export async function getOrCreateSettings() {
+  if (settingsCache && Date.now() - settingsCache.at < SETTINGS_TTL_MS) {
+    return settingsCache.doc;
+  }
+  const doc = await loadSettingsForUpdate();
+  settingsCache = { doc, at: Date.now() };
+  return doc;
+}
+
+/** Fresh, uncached document for code that modifies and saves settings. */
+async function loadSettingsForUpdate() {
   let doc = await Settings.findOne();
   if (!doc) {
     doc = await Settings.create(DEFAULT_SETTINGS);
@@ -168,7 +195,7 @@ export const updateBusinessSettings = async (
   data: Partial<IBusinessSettings>,
 ) => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     if (data.salonName !== undefined) {
       const name = String(data.salonName).trim();
       if (!name) {
@@ -238,6 +265,7 @@ export const updateBusinessSettings = async (
       doc.business.allowNegativeStock = Boolean(data.allowNegativeStock);
     }
     await doc.save();
+    invalidateSettingsCache();
     return { statusCode: 200, data: publicSettings(doc).business };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -246,7 +274,7 @@ export const updateBusinessSettings = async (
 
 export const updateTaxSettings = async (data: Partial<ITaxSettings>) => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     if (data.gstEnabled !== undefined) {
       doc.tax.gstEnabled = Boolean(data.gstEnabled);
     }
@@ -280,6 +308,7 @@ export const updateTaxSettings = async (data: Partial<ITaxSettings>) => {
       }
     }
     await doc.save();
+    invalidateSettingsCache();
     return { statusCode: 200, data: publicSettings(doc).tax };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -290,7 +319,7 @@ export const updateInvoiceSettings = async (
   data: Partial<IInvoiceSettings> & { nextNumber?: number },
 ) => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     if (data.prefix !== undefined) {
       const prefix = String(data.prefix).trim().toUpperCase();
       if (!/^[A-Z0-9-]{1,10}$/.test(prefix)) {
@@ -441,6 +470,7 @@ export const updateInvoiceSettings = async (
     }
 
     await doc.save();
+    invalidateSettingsCache();
     const seq = await InvoiceSequence.findOne({ key: "main" });
     const nextSeq = (seq?.seq ?? 0) + 1;
     return {
@@ -460,7 +490,7 @@ export const updateAppointmentSettings = async (
   data: Partial<IAppointmentSettings>,
 ) => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     if (data.startHour !== undefined) {
       const h = Math.floor(Number(data.startHour));
       if (!Number.isFinite(h) || h < 0 || h > 23) {
@@ -494,6 +524,7 @@ export const updateAppointmentSettings = async (
       };
     }
     await doc.save();
+    invalidateSettingsCache();
     return { statusCode: 200, data: publicSettings(doc).appointments };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -504,7 +535,7 @@ export const updateLoyaltySettings = async (
   data: Partial<ILoyaltySettings>,
 ) => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     if (data.enabled !== undefined) doc.loyalty.enabled = Boolean(data.enabled);
     if (data.earnPointsPer100Inr !== undefined) {
       const v = Math.floor(Number(data.earnPointsPer100Inr));
@@ -546,6 +577,7 @@ export const updateLoyaltySettings = async (
       doc.loyalty.pointsExpiryDays = v;
     }
     await doc.save();
+    invalidateSettingsCache();
     return { statusCode: 200, data: publicSettings(doc).loyalty };
   } catch (error) {
     return { statusCode: 500, data: error };
@@ -582,10 +614,11 @@ export const uploadLogo = async (file?: {
         };
       }
     }
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     doc.business.logoBase64 = file.buffer.toString("base64");
     doc.business.logoMimeType = mime;
     await doc.save();
+    invalidateSettingsCache();
     return {
       statusCode: 200,
       data: {
@@ -600,10 +633,11 @@ export const uploadLogo = async (file?: {
 
 export const removeLogo = async () => {
   try {
-    const doc = await getOrCreateSettings();
+    const doc = await loadSettingsForUpdate();
     doc.business.logoBase64 = null;
     doc.business.logoMimeType = null;
     await doc.save();
+    invalidateSettingsCache();
     return { statusCode: 200, data: { logoBase64: null, logoMimeType: null } };
   } catch (error) {
     return { statusCode: 500, data: error };
