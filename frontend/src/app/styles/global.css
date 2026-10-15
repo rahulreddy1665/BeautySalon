@@ -147,6 +147,13 @@
   --chart-cursor: #f0f0f2;
   --chart-track: #ececee;
 
+  /* Payment-mode donut: validated categorical trio (aqua, blue, orange) for the
+     #ffffff card — CVD ΔE ≥ 9.2, normal-vision ΔE ≥ 24. Cash sits at 2.8:1, so
+     every slice also has a visible text label in the legend. */
+  --pay-cash: #1baf7a;
+  --pay-upi: #2a78d6;
+  --pay-card: #eb6834;
+
   --status-booked: #1d4ed8;
   --status-booked-bg: #dbeafe;
   --status-confirmed: #854d0e;
@@ -227,6 +234,11 @@
   --chart-5: #a0a0a8;
   --chart-cursor: #262626;
   --chart-track: #262626;
+
+  /* Same three hues stepped for the #141414 card (validated separately). */
+  --pay-cash: #199e70;
+  --pay-upi: #3987e5;
+  --pay-card: #d95926;
 
   --status-booked: #93c5fd;
   --status-booked-bg: #1e3a5f;

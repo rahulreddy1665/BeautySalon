@@ -1,4 +1,5 @@
 import { addDays, format, isSameDay, parseISO, startOfWeek } from 'date-fns'
+import { memo } from 'react'
 
 import {
   appointmentCustomerLabel,
@@ -41,7 +42,8 @@ const WEEKDAY_KEYS = [
   'saturday',
 ] as const
 
-export function WeekCalendar({
+/** Memoised: re-renders only when its data changes, not on every parent update. */
+export const WeekCalendar = memo(function WeekCalendar({
   weekStart,
   appointments,
   selectedId,
@@ -57,7 +59,7 @@ export function WeekCalendar({
   const today = new Date()
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-border">
       <div
         className="grid min-w-[720px] overflow-y-hidden"
         style={{
@@ -196,4 +198,4 @@ export function WeekCalendar({
       </div>
     </div>
   )
-}
+})

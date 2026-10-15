@@ -12,19 +12,26 @@ function part(
   return parts.find((p) => p.type === type)?.value ?? ''
 }
 
+/**
+ * Built once and reused. Creating an Intl.DateTimeFormat is expensive, and the
+ * calendars call getSalonNow() for every time slot on every render; building a
+ * new one each call made the appointments screen lag on phones.
+ */
+const salonClockFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: SALON_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
 export function getSalonNow(now: Date = new Date()): {
   dateKey: string
   totalMinutes: number
 } {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: SALON_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(now)
+  const parts = salonClockFormat.formatToParts(now)
 
   const year = part(parts, 'year')
   const month = part(parts, 'month')

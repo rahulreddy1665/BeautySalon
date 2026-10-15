@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { MonthlyRevenueChart } from '@/app/components/charts/ReportCharts'
-import { ProgressGauge } from '@/app/components/dashboard/ProgressGauge'
+import { PaymentModeDonut } from '@/app/components/charts/PaymentModeDonut'
 import { EmptyState } from '@/app/components/EmptyState'
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
@@ -295,34 +295,18 @@ export function DashboardScreen() {
             </Card>
 
             <Card className="flex h-full flex-col gap-0 py-0">
-              <SectionCardHeader title={DASHBOARD.todaysProgress} />
-              <CardContent className="flex flex-1 flex-col gap-4 px-4 pb-4">
-                <ProgressGauge
-                  percent={data.todaysProgress.percent}
-                  label={`${data.todaysProgress.completed}/${data.todaysProgress.total}`}
-                  detail={DASHBOARD.appointmentsCompleted}
-                />
+              <SectionCardHeader title={DASHBOARD.todaysCollection} />
+              <CardContent className="flex flex-1 flex-col justify-center px-4 pb-4">
                 {showMoney && data.todaysProgress.paymentSplit ? (
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    {(
-                      [
-                        ['cash', DASHBOARD.cash, data.todaysProgress.paymentSplit.cash],
-                        ['upi', DASHBOARD.upi, data.todaysProgress.paymentSplit.upi],
-                        ['card', DASHBOARD.card, data.todaysProgress.paymentSplit.card],
-                      ] as const
-                    ).map(([key, label, amount]) => (
-                      <div
-                        key={key}
-                        className="rounded-xl border border-border bg-muted/40 px-2 py-2"
-                      >
-                        <p className="text-muted-foreground">{label}</p>
-                        <p className="mt-0.5 font-semibold tabular-nums">
-                          {formatINR(amount)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                  <PaymentModeDonut
+                    split={data.todaysProgress.paymentSplit}
+                    labels={{ cash: DASHBOARD.cash, upi: DASHBOARD.upi, card: DASHBOARD.card }}
+                    totalLabel={DASHBOARD.collectedToday}
+                    emptyLabel={DASHBOARD.noPaymentsToday}
+                  />
+                ) : (
+                  <EmptyState title={DASHBOARD.collectionHidden} />
+                )}
               </CardContent>
             </Card>
 

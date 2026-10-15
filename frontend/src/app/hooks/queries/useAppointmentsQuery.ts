@@ -45,6 +45,21 @@ export function useAppointmentsWindowQuery(
   })
 }
 
+/** First booked appointment for a staff member on or after `fromDate` (for "next: …" hints). */
+export function useNextStaffAppointmentQuery(
+  staffId: string | undefined,
+  fromDate: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.appointments.list({ next: true, staffId: staffId ?? '', fromDate }),
+    queryFn: () =>
+      appointmentsApi.list({ staffId, from: fromDate, status: 'booked', page: 1, limit: 1 }),
+    enabled: enabled && Boolean(staffId),
+    select: (page) => page.items[0] ?? null,
+  })
+}
+
 export function useAppointmentQuery(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.appointments.detail(id ?? ''),

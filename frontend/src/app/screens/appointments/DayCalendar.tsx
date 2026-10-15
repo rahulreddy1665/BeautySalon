@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 import type { StaffMember } from '@/app/service/staff/staffApi'
 import {
   appointmentCustomerLabel,
@@ -31,7 +33,8 @@ interface DayCalendarProps {
   onAppointmentClick: (appointment: Appointment) => void
 }
 
-export function DayCalendar({
+/** Memoised: re-renders only when its data changes, not on every parent update. */
+export const DayCalendar = memo(function DayCalendar({
   date,
   staff,
   appointments,
@@ -52,11 +55,14 @@ export function DayCalendar({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-border">
       <div
-        className="grid min-w-[640px] overflow-y-hidden"
+        className="grid overflow-y-hidden"
         style={{
           gridTemplateColumns: `56px repeat(${staff.length}, minmax(140px, 1fr))`,
+          // Only as wide as the columns shown: one staff fits a phone screen
+          // without sideways scrolling.
+          minWidth: 56 + staff.length * 140,
         }}
       >
         <div className="sticky left-0 z-20 border-b border-r border-border bg-card" />
@@ -174,4 +180,4 @@ export function DayCalendar({
       </div>
     </div>
   )
-}
+})
