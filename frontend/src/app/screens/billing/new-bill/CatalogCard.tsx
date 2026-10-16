@@ -109,7 +109,11 @@ export function CatalogCard({
         ) {
           return false
         }
-        return !q || item.name.toLowerCase().includes(q)
+        return (
+          !q ||
+          item.name.toLowerCase().includes(q) ||
+          (item.category ?? '').toLowerCase().includes(q)
+        )
       })
     },
     [mergedQuickAdd, categoryFilter],
@@ -174,10 +178,7 @@ export function CatalogCard({
           ref={searchRef}
           className="min-touch h-11 w-full"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            if (e.target.value.trim()) setCategoryFilter(null)
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder={
             tab === 'service' ? BILLING.new.searchService : BILLING.new.searchProduct
           }
@@ -233,12 +234,19 @@ export function CatalogCard({
                   ) : null}
                   <span className="block truncate text-sm font-medium">{item.name}</span>
                 </span>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {item.disabled && item.disabledLabel
-                    ? item.disabledLabel
-                    : item.stockLabel
-                      ? `${formatINR(item.price)} · ${item.stockLabel}`
-                      : formatINR(item.price)}
+                <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="shrink-0 tabular-nums">
+                    {item.disabled && item.disabledLabel
+                      ? item.disabledLabel
+                      : item.stockLabel
+                        ? `${formatINR(item.price)} · ${item.stockLabel}`
+                        : formatINR(item.price)}
+                  </span>
+                  {item.category?.trim() && !categoryFilter ? (
+                    <span className="truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                      {item.category.trim()}
+                    </span>
+                  ) : null}
                 </span>
               </span>
               <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold-deep">
