@@ -153,7 +153,8 @@ export const adjustLoyalty = async (data: {
     const entry = await LoyaltyLedger.create({
       customer: data.customerId,
       type: data.type,
-      points: data.type === "adjust" ? pts : data.type === "redeem" ? -pts : pts,
+      points:
+        data.type === "adjust" ? pts : data.type === "redeem" ? -pts : pts,
       reason,
       balanceAfter: next,
       createdBy: data.createdBy || null,
@@ -190,10 +191,7 @@ export const applyInvoiceLoyalty = async (opts: {
   const bal = await getOrCreateBalance(opts.customerId);
 
   if (opts.redeemPoints > 0) {
-    redeemedPoints = Math.min(
-      Math.floor(opts.redeemPoints),
-      bal.points,
-    );
+    redeemedPoints = Math.min(Math.floor(opts.redeemPoints), bal.points);
     if (redeemedPoints < rules.minRedeemPoints && opts.redeemPoints > 0) {
       // caller should validate; skip redeem if below min
       redeemedPoints = 0;
@@ -259,4 +257,91 @@ export const applyInvoiceLoyalty = async (opts: {
   }
 
   return { redeemedPoints, redeemedValue, earnedPoints };
+};
+
+/**
+ * Reverse loyalty transactions when an invoice is deleted.
+ * Restores redeemed points and deducts earned points.
+ */
+
+export const reverseInvoiceLoyalty = async (invoice: {
+  _id: mongoose.Types.ObjectId | string;
+  customer: mongoose.Types.ObjectId | string | null;
+  invoiceNumber: string;
+  loyaltyRedeemPoints: number;
+  loyaltyEarnedPoints: number;
+}) => {
+  try {
+    if (!invoice.customer) {
+      return {
+        statusCode: 200,
+        data: null,
+        message: "No customer loyalty to reverse",
+      };
+    }
+
+    const redeemedPoints = Number(invoice.loyaltyRedeemPoints) || 0;
+    const earnedPoints = Number(invoice.loyaltyEarnedPoints) || 0;
+
+    if (redeemedPoints === 0 && earnedPoints === 0) {
+      return {
+        statusCode: 200,
+        data: null,
+        message: "No loyalty points to adjust",
+      };
+    }
+
+    const customerId = String(invoice.customer);
+
+    const bal = await getOrCreateBalance(customerId);
+
+    // Restore redeemed points and deduct earned points
+    const adjustment = redeemedPoints - earnedPoints;
+    const nextBalance = bal.points + adjustment;
+
+    if (nextBalance < 0) {
+      return {
+        statusCode: 409,
+        data: {
+          currentBalance: bal.points,
+          earnedPoints,
+          redeemedPoints,
+          requiredBalance: earnedPoints - redeemedPoints,
+        },
+        message: "Insufficient loyalty balance to reverse this invoice",
+      };
+    }
+
+    bal.points = nextBalance;
+    await bal.save();
+
+    // Add reversal ledger entry
+    await LoyaltyLedger.create({
+      customer: customerId,
+      type: "adjust",
+      points: adjustment,
+      reason: `Invoice deleted: ${invoice.invoiceNumber}`,
+      balanceAfter: nextBalance,
+    });
+
+    return {
+      statusCode: 200,
+      message: "Invoice loyalty adjusted successfully",
+      data: {
+        customerId,
+        previousBalance: nextBalance - adjustment,
+        redeemedPointsRestored: redeemedPoints,
+        earnedPointsDeducted: earnedPoints,
+        adjustment,
+        currentBalance: nextBalance,
+      },
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      data: null,
+      message: "Loyalty adjustment failed",
+      errors: error,
+    };
+  }
 };

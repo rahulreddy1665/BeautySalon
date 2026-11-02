@@ -11,7 +11,7 @@ import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
-import { applyInvoiceLoyalty } from "./loyalty.service";
+import { applyInvoiceLoyalty, reverseInvoiceLoyalty } from "./loyalty.service";
 import {
   applyRounding,
   computeSectionTax,
@@ -86,7 +86,9 @@ function applyDiscount(
 async function highestExistingInvoiceSeq(
   invoice: Awaited<ReturnType<typeof getOrCreateSettings>>["invoice"],
 ): Promise<number> {
-  const prefix = String(invoice.prefix || "INV").trim().toUpperCase();
+  const prefix = String(invoice.prefix || "INV")
+    .trim()
+    .toUpperCase();
   const year = new Date().getFullYear();
   const pattern = invoice.includeYear
     ? new RegExp(`^${prefix}-${year}-(\\d+)$`)
@@ -185,7 +187,11 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
     for (const line of serviceInputs) {
       const qty = Math.floor(Number(line.qty));
       if (!Number.isFinite(qty) || qty < 1) {
-        return { statusCode: 400, data: null, message: "Service qty must be >= 1" };
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Service qty must be >= 1",
+        };
       }
       const service = await Service.findById(line.serviceId);
       if (!service) {
@@ -228,7 +234,11 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
     for (const line of productInputs) {
       const qty = Math.floor(Number(line.qty));
       if (!Number.isFinite(qty) || qty < 1) {
-        return { statusCode: 400, data: null, message: "Product qty must be >= 1" };
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Product qty must be >= 1",
+        };
       }
       const product = await Product.findById(line.productId);
       if (!product) {
@@ -452,7 +462,9 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       businessSnapshot: {
         salonName: b.salonName,
         gstin: b.gstin,
-        address: [b.address, b.city, b.state, b.pincode].filter(Boolean).join(", "),
+        address: [b.address, b.city, b.state, b.pincode]
+          .filter(Boolean)
+          .join(", "),
         phone: b.phone,
         email: b.email,
         invoiceFooterNote: b.invoiceFooterNote,
@@ -543,10 +555,13 @@ export const getInvoices = async (query: InvoiceListQuery = {}) => {
     if (query.search?.trim()) {
       const q = query.search.trim().toLowerCase();
       items = items.filter((inv) => {
-        const cust = inv.customer as { name?: string; lastName?: string } | null;
+        const cust = inv.customer as {
+          name?: string;
+          lastName?: string;
+        } | null;
         const name = cust
           ? `${cust.name ?? ""} ${cust.lastName ?? ""}`
-          : inv.walkInName ?? "";
+          : (inv.walkInName ?? "");
         return (
           inv.invoiceNumber.toLowerCase().includes(q) ||
           name.toLowerCase().includes(q)
@@ -616,7 +631,8 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
         serviceSales: 0,
         productSales: 0,
       };
-      if (kind === "service") row.serviceSales = round2(row.serviceSales + amount);
+      if (kind === "service")
+        row.serviceSales = round2(row.serviceSales + amount);
       else row.productSales = round2(row.productSales + amount);
       byStaff.set(staffId, row);
     };
@@ -647,5 +663,105 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
     return { statusCode: 200, data: rows };
   } catch (error) {
     return { statusCode: 500, data: error };
+  }
+};
+
+export const deleteInvoices = async (invoiceNumbers: string[]) => {
+  try {
+    if (!Array.isArray(invoiceNumbers) || invoiceNumbers.length === 0) {
+      return {
+        statusCode: 400,
+        message: "At least one invoice number is required",
+        data: null,
+      };
+    }
+
+    const uniqueNumbers = [
+      ...new Set(invoiceNumbers.map((number) => number.trim()).filter(Boolean)),
+    ];
+
+    if (uniqueNumbers.length !== invoiceNumbers.length) {
+      return {
+        statusCode: 400,
+        message: "Invalid or duplicate invoice numbers",
+        data: null,
+      };
+    }
+
+    // Validate all invoice numbers before deletion
+    const invoices = await Invoice.find({
+      invoiceNumber: { $in: uniqueNumbers },
+    }).select(
+      "_id invoiceNumber appointment customer loyaltyRedeemPoints loyaltyEarnedPoints",
+    );
+
+    const existingNumbers = invoices.map((invoice) => invoice.invoiceNumber);
+
+    const missingNumbers = uniqueNumbers.filter(
+      (number) => !existingNumbers.includes(number),
+    );
+
+    if (missingNumbers.length > 0) {
+      return {
+        statusCode: 404,
+        message: "Some invoice numbers were not found",
+        data: { missingNumbers },
+      };
+    }
+
+    // Reverse loyalty transactions before deleting invoices
+    for (const invoice of invoices) {
+      const reversal = await reverseInvoiceLoyalty({
+        _id: invoice._id,
+        customer: invoice.customer ?? null,
+        invoiceNumber: invoice.invoiceNumber,
+        loyaltyRedeemPoints: invoice.loyaltyRedeemPoints,
+        loyaltyEarnedPoints: invoice.loyaltyEarnedPoints,
+      });
+
+      if (reversal.statusCode !== 200) {
+        return {
+          statusCode: reversal.statusCode,
+          message: reversal.message,
+          data: reversal.data,
+        };
+      }
+    }
+
+    // Delete invoices
+    const result = await Invoice.deleteMany({
+      invoiceNumber: { $in: uniqueNumbers },
+    });
+
+    // Restore linked appointments
+    const appointmentIds = invoices
+      .map((invoice) => invoice.appointment)
+      .filter(Boolean);
+
+    if (appointmentIds.length > 0) {
+      await Appointment.updateMany(
+        { _id: { $in: appointmentIds } },
+        {
+          $set: { status: "booked" },
+          $unset: { invoice: 1 },
+        },
+      );
+    }
+
+    return {
+      statusCode: 200,
+      message: "Invoices deleted successfully",
+      data: {
+        deletedCount: result.deletedCount,
+        deletedInvoiceNumbers: uniqueNumbers,
+      },
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: "Invoice delete failed",
+      data: null,
+      errors: error,
+    };
   }
 };

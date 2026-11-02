@@ -4,6 +4,7 @@ import { authenticate } from "../middlewares/auth.middleware";
 import { requirePermission } from "../middlewares/permission.middleware";
 import {
   createInvoiceController,
+  deleteInvoice,
   getInvoiceByIdController,
   getInvoicesController,
   getStaffSalesController,
@@ -55,6 +56,13 @@ router.post(
   authenticate,
   requirePermission("invoice:create"),
   createInvoiceController,
+);
+
+router.post(
+  "/deleteInvoice",
+  authenticate,
+  // requirePermission("invoice:delete"),
+  deleteInvoice,
 );
 
 export default router;

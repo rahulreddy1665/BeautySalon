@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import {
   createInvoice,
+  deleteInvoices,
   getInvoiceById,
   getInvoices,
   getStaffSalesSummary,
@@ -101,6 +102,31 @@ export const getStaffSalesController = async (req: Request, res: Response) => {
     return sendResponse(res, {
       statusCode: 500,
       message: "Staff sales summary failed",
+      errors: error,
+    });
+  }
+};
+
+export const deleteInvoice = async (req: Request, res: Response) => {
+  try {
+    if (req.body.invoiceNumbers) {
+      const result = await deleteInvoices(req.body.invoiceNumbers);
+      return sendResponse(res, {
+        statusCode: result.statusCode,
+        message: result.message,
+        data: result.data,
+      });
+    }
+
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Invoice delete failed",
+      data: "",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Invoice delete failed",
       errors: error,
     });
   }
