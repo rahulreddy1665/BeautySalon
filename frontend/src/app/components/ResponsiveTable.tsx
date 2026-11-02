@@ -70,7 +70,9 @@ export function ResponsiveTable<TData extends object>({
             ? String(original[mobileTitleKey] ?? '')
             : String(titleCell?.getValue() ?? '')
 
-          const expandCell = row.getVisibleCells().find((cell) => cell.column.id === 'expand')
+          const expandCell = row
+            .getVisibleCells()
+            .find((cell) => cell.column.id === 'expand')
 
           return (
             <div
@@ -87,10 +89,7 @@ export function ResponsiveTable<TData extends object>({
                     : titleValue}
                 </div>
                 {expandCell
-                  ? flexRender(
-                      expandCell.column.columnDef.cell,
-                      expandCell.getContext(),
-                    )
+                  ? flexRender(expandCell.column.columnDef.cell, expandCell.getContext())
                   : null}
               </div>
               <dl className="grid gap-1.5">
@@ -100,7 +99,11 @@ export function ResponsiveTable<TData extends object>({
                   if (!mobileTitleKey && index === 0) return null
                   const header = cell.column.columnDef.header
                   if (typeof header === 'string' && header.trim() === '') return null
-                  const label = typeof header === 'string' ? header : cell.column.id
+                  const metaLabel = (
+                    cell.column.columnDef.meta as { label?: string } | undefined
+                  )?.label
+                  const label =
+                    typeof header === 'string' ? header : (metaLabel ?? cell.column.id)
 
                   return (
                     <div

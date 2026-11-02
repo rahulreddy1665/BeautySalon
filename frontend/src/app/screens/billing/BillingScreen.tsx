@@ -1,9 +1,7 @@
-
 import { format, parseISO } from 'date-fns'
-import { Search, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Check, Minus, Search, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import {
   DateRangeFilter,
@@ -19,7 +17,9 @@ import { Badge } from '@/app/components/ui/badge'
 import { Button } from '@/app/components/ui/button'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -32,16 +32,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
-import { BILLING, ROUTES } from '@/app/constants'
-import { useBillsPageQuery } from '@/app/hooks/queries/useBillingQuery'
+import { BILLING, COMMON, ROUTES } from '@/app/constants'
+import {
+  useBillsPageQuery,
+  useDeleteBillsMutation,
+} from '@/app/hooks/queries/useBillingQuery'
 import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import type { BillRecord } from '@/app/service/billing/billingApi'
-import { invoicesApi, type PaymentMode } from '@/app/service/invoices/invoicesApi'
-import { formatINR } from '@/app/utils'
+import type { PaymentMode } from '@/app/service/invoices/invoicesApi'
+import { cn, formatINR } from '@/app/utils'
 
 type BillRow = BillRecord & {
   dateLabel: string
   totalLabel: string
+}
+
+const plural = (n: number) => (n === 1 ? '1 bill' : `${n} bills`)
+
+/**
+ * Checkbox drawn in the app theme (native ones stay white in dark mode).
+ * Supports the "some selected" state for select-all.
+ */
+function SelectBox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: () => void
+  label: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+  return (
+    <span className="relative inline-flex size-4 shrink-0 align-middle">
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        aria-label={label}
+        className="peer size-4 cursor-pointer appearance-none rounded border border-input bg-background transition-colors checked:border-primary checked:bg-primary indeterminate:border-primary indeterminate:bg-primary hover:border-gold-deep/60 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+      />
+      <Check
+        className="pointer-events-none absolute inset-0 m-auto hidden size-3 text-primary-foreground peer-checked:block"
+        strokeWidth={3}
+      />
+      <Minus
+        className="pointer-events-none absolute inset-0 m-auto hidden size-3 text-primary-foreground peer-indeterminate:block"
+        strokeWidth={3}
+      />
+    </span>
+  )
 }
 
 export function BillingScreen() {
@@ -51,9 +97,10 @@ export function BillingScreen() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
+  // Selection and delete both key on invoice number — that is what the delete API takes.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [deleteTargets, setDeleteTargets] = useState<string[] | null>(null)
+  const deleteMutation = useDeleteBillsMutation()
 
   const debouncedSearch = useDebouncedValue(search.trim())
 
@@ -79,9 +126,9 @@ export function BillingScreen() {
     [data],
   )
 
-  // const pageIds = rows.map((bill) => bill.id)
-  // const allPageSelected =
-  //   pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
+  const pageIds = rows.map((bill) => bill.invoiceNo)
+  const selectedOnPage = pageIds.filter((id) => selectedIds.includes(id)).length
+  const allPageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length
 
   const toggleInvoice = (id: string) => {
     setSelectedIds((previous) =>
@@ -91,45 +138,43 @@ export function BillingScreen() {
     )
   }
 
-  // const toggleAllOnPage = () => {
-  //   setSelectedIds((previous) =>
-  //     allPageSelected
-  //       ? previous.filter((id) => !pageIds.includes(id))
-  //       : [...new Set([...previous, ...pageIds])],
-  //   )
-  // }
+  const toggleAllOnPage = () => {
+    setSelectedIds((previous) =>
+      allPageSelected
+        ? previous.filter((id) => !pageIds.includes(id))
+        : [...new Set([...previous, ...pageIds])],
+    )
+  }
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0 || deleting) return
-    setDeleting(true)
-    try {
-      await invoicesApi.deleteInvoices(selectedIds)
-      const deletedCount = selectedIds.length
-      setSelectedIds([])
-      setDeleteOpen(false)
-      toast.success(`${deletedCount} invoice(s) deleted successfully`)
-      await refetch()
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete invoices',
-      )
-    } finally {
-      setDeleting(false)
-    }
+  const confirmDelete = async () => {
+    if (!deleteTargets?.length) return
+    const targets = deleteTargets
+    await deleteMutation.mutateAsync(targets)
+    setSelectedIds((previous) => previous.filter((id) => !targets.includes(id)))
+    setDeleteTargets(null)
   }
 
   const columns: ColumnDef<BillRow>[] = [
     {
       id: 'select',
-      header: "",
+      meta: { label: BILLING.list.selectColumn },
+      header: () => (
+        <SelectBox
+          checked={allPageSelected}
+          indeterminate={selectedOnPage > 0 && !allPageSelected}
+          onChange={toggleAllOnPage}
+          label={BILLING.list.selectAllAria}
+        />
+      ),
       cell: ({ row }) => (
-        <input
-    type="checkbox"
-    checked={selectedIds.includes(row.original.invoiceNo)}
-    onChange={() => toggleInvoice(row.original.invoiceNo)}
-    aria-label={`Select invoice ${row.original.invoiceNo}`}
-    className="h-4 w-4 cursor-pointer"
-  />
+        <SelectBox
+          checked={selectedIds.includes(row.original.invoiceNo)}
+          onChange={() => toggleInvoice(row.original.invoiceNo)}
+          label={BILLING.list.selectInvoiceAria.replace(
+            '{invoice}',
+            row.original.invoiceNo,
+          )}
+        />
       ),
     },
     {
@@ -163,6 +208,25 @@ export function BillingScreen() {
       ),
     },
     { accessorKey: 'totalLabel', header: 'Total' },
+    {
+      id: 'actions',
+      header: COMMON.labels.actions,
+      cell: ({ row }) => (
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          aria-label={BILLING.list.deleteInvoiceAria.replace(
+            '{invoice}',
+            row.original.invoiceNo,
+          )}
+          onClick={() => setDeleteTargets([row.original.invoiceNo])}
+        >
+          <Trash2 className="size-4" strokeWidth={1.75} />
+        </Button>
+      ),
+    },
   ]
 
   return (
@@ -174,6 +238,7 @@ export function BillingScreen() {
         onChange={(next) => {
           setRange(next)
           setPage(1)
+          setSelectedIds([])
         }}
       />
 
@@ -188,6 +253,7 @@ export function BillingScreen() {
             onChange={(e) => {
               setSearch(e.target.value)
               setPage(1)
+              setSelectedIds([])
             }}
             placeholder="Search invoice, customer or phone"
             className="pl-8"
@@ -199,6 +265,7 @@ export function BillingScreen() {
           onValueChange={(value) => {
             setMode(value as PaymentMode | 'all')
             setPage(1)
+            setSelectedIds([])
           }}
         >
           <SelectTrigger className="w-full sm:w-36">
@@ -213,24 +280,58 @@ export function BillingScreen() {
         </Select>
       </div>
 
-      {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3">
-          <span className="text-sm font-medium">
-            {selectedIds.length} invoice(s) selected
-          </span>
-
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            disabled={deleting}
-            onClick={() => setDeleteOpen(true)}
+      {/* Fixed-height row: selection actions fade in without pushing the table down. */}
+      {rows.length > 0 && !isLoading && !isError ? (
+        <div className="flex h-9 items-center justify-between gap-2 px-1">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-muted-foreground md:hidden">
+              <SelectBox
+                checked={allPageSelected}
+                indeterminate={selectedOnPage > 0 && !allPageSelected}
+                onChange={toggleAllOnPage}
+                label={BILLING.list.selectAllAria}
+              />
+              {selectedIds.length === 0 ? BILLING.list.selectAllOnPage : null}
+            </label>
+            {selectedIds.length > 0 ? (
+              <span className="truncate font-medium text-gold-deep">
+                {BILLING.list.selectedCount.replace(
+                  '{count}',
+                  plural(selectedIds.length),
+                )}
+              </span>
+            ) : null}
+          </div>
+          <div
+            className={cn(
+              'flex shrink-0 items-center gap-2 transition-opacity',
+              selectedIds.length > 0 ? 'opacity-100' : 'pointer-events-none opacity-0',
+            )}
+            aria-hidden={selectedIds.length === 0}
           >
-            <Trash2 className="mr-2 size-4" />
-            Delete Selected ({selectedIds.length})
-          </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              tabIndex={selectedIds.length > 0 ? 0 : -1}
+              onClick={() => setSelectedIds([])}
+            >
+              {BILLING.list.clearSelection}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              tabIndex={selectedIds.length > 0 ? 0 : -1}
+              disabled={deleteMutation.isPending}
+              onClick={() => setDeleteTargets(selectedIds)}
+            >
+              <Trash2 className="size-4" strokeWidth={1.75} />
+              {BILLING.list.deleteSelected}
+            </Button>
+          </div>
         </div>
-      )}
+      ) : null}
 
       {isLoading ? <LoadingSkeleton rows={5} /> : null}
 
@@ -248,9 +349,7 @@ export function BillingScreen() {
             data={rows}
             columns={columns}
             mobileTitleKey="invoiceNo"
-            emptyTitle={
-              debouncedSearch ? 'No matching bills' : 'No bills in this range'
-            }
+            emptyTitle={debouncedSearch ? 'No matching bills' : 'No bills in this range'}
             emptyDescription={
               debouncedSearch
                 ? 'Try another invoice number, customer name or phone.'
@@ -272,41 +371,72 @@ export function BillingScreen() {
         </>
       ) : null}
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete Selected Invoices?</DialogTitle>
+      <Dialog
+        open={deleteTargets !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleteTargets(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="flex-row items-center gap-3 bg-muted/50">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive">
+              <Trash2 className="size-4" strokeWidth={1.75} />
+            </span>
+            <DialogTitle className="text-base">
+              {deleteTargets?.length === 1
+                ? BILLING.list.deleteOneTitle.replace('{invoice}', deleteTargets[0])
+                : BILLING.list.deleteManyTitle.replace(
+                    '{count}',
+                    plural(deleteTargets?.length ?? 0),
+                  )}
+            </DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete {selectedIds.length} selected
-              invoice(s)?
-            </p>
-
-            <p className="text-sm text-destructive">
-              This action cannot be undone. Associated loyalty points will also
-              be reversed.
-            </p>
-          </div>
-
+          <DialogBody className="space-y-3">
+            <DialogDescription>
+              {deleteTargets?.length === 1
+                ? BILLING.list.deleteOneBody
+                : BILLING.list.deleteManyBody}
+            </DialogDescription>
+            {deleteTargets && deleteTargets.length > 1 ? (
+              <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted/40 p-2.5">
+                {deleteTargets.slice(0, 8).map((invoiceNo) => (
+                  <span
+                    key={invoiceNo}
+                    className="rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium tabular-nums"
+                  >
+                    {invoiceNo}
+                  </span>
+                ))}
+                {deleteTargets.length > 8 ? (
+                  <span className="px-1 py-0.5 text-xs text-muted-foreground">
+                    {BILLING.list.deleteListMore.replace(
+                      '{count}',
+                      String(deleteTargets.length - 8),
+                    )}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </DialogBody>
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              disabled={deleting}
-              onClick={() => setDeleteOpen(false)}
+              className="w-full sm:w-auto"
+              disabled={deleteMutation.isPending}
+              onClick={() => setDeleteTargets(null)}
             >
-              Cancel
+              {COMMON.actions.cancel}
             </Button>
-
             <Button
               type="button"
               variant="destructive"
-              disabled={deleting}
-              onClick={() => void handleBulkDelete()}
+              className="w-full sm:w-auto"
+              disabled={deleteMutation.isPending}
+              onClick={() => void confirmDelete()}
             >
-              {deleting ? 'Deleting...' : `Delete ${selectedIds.length} Invoices`}
+              <Trash2 className="size-4" strokeWidth={1.75} />
+              {deleteMutation.isPending ? BILLING.list.deleting : COMMON.actions.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

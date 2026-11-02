@@ -8,6 +8,22 @@ export const BILLING = {
     emptyTitle: 'No bills yet',
     emptyHint: 'Start a walk-in bill or collect payment from an appointment.',
     searchPlaceholder: 'Search invoice or customer',
+    selectColumn: 'Select',
+    selectAllOnPage: 'Select all on this page',
+    selectAllAria: 'Select all bills on this page',
+    selectInvoiceAria: 'Select invoice {invoice}',
+    deleteInvoiceAria: 'Delete invoice {invoice}',
+    selectedCount: '{count} selected',
+    clearSelection: 'Clear',
+    deleteSelected: 'Delete selected',
+    deleteOneTitle: 'Delete invoice {invoice}?',
+    deleteManyTitle: 'Delete {count}?',
+    deleteOneBody:
+      'This cannot be undone. Loyalty points earned or redeemed on this bill will be reversed, and a linked appointment goes back to booked.',
+    deleteManyBody:
+      'This cannot be undone. Loyalty points earned or redeemed on these bills will be reversed, and linked appointments go back to booked.',
+    deleting: 'Deleting…',
+    deleteListMore: '+{count} more',
   },
   new: {
     billDate: 'Bill date',

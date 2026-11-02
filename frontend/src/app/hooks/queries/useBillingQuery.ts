@@ -59,3 +59,24 @@ export function useCreateBillMutation() {
     },
   })
 }
+
+/** Deletes bills by invoice number; the server reverses loyalty and reopens appointments. */
+export function useDeleteBillsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (invoiceNumbers: string[]) => invoicesApi.deleteInvoices(invoiceNumbers),
+    onSuccess: (_data, invoiceNumbers) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.billing.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.loyalty.all })
+      const n = invoiceNumbers.length
+      toast.success(n === 1 ? 'Bill deleted' : `${n} bills deleted`)
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Could not delete bills'))
+    },
+  })
+}
