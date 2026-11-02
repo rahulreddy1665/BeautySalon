@@ -20,7 +20,6 @@ export interface DashboardStat {
 export interface DashboardAppointmentRow {
   id: string
   startTime: string
-  endTime: string
   status: string
   customerName: string
   services: string[]

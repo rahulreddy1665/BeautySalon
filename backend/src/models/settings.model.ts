@@ -49,6 +49,8 @@ export interface IBusinessSettings {
   closingTime?: string;
   /** Days the salon is open */
   workingDays?: Weekday[];
+  /** When true, tracked product stock may go below zero. Default off. */
+  allowNegativeStock?: boolean;
 }
 
 export interface ITaxSettings {
@@ -126,6 +128,7 @@ export const DEFAULT_SETTINGS = {
       "friday",
       "saturday",
     ] as Weekday[],
+    allowNegativeStock: false,
   },
   tax: {
     gstEnabled: true,
@@ -191,6 +194,7 @@ const settingsSchema = new Schema<ISettings>(
       invoiceFooterNote: { type: String, trim: true, default: "Thank you, visit again" },
       openingTime: { type: String, trim: true, default: "09:00" },
       closingTime: { type: String, trim: true, default: "21:00" },
+      allowNegativeStock: { type: Boolean, default: false },
       workingDays: {
         type: [String],
         default: () => [

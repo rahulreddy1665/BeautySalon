@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import { Appointment } from "../models/appointment.model";
+import { Combo } from "../models/combo.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
@@ -24,11 +25,7 @@ const WEEKDAY_KEYS: Weekday[] = [
   "saturday",
 ];
 
-async function assertWithinBusinessHours(
-  date: string,
-  startMin: number,
-  endMin: number,
-) {
+async function assertWithinBusinessHours(date: string, startMin: number) {
   const settings = await getOrCreateSettings();
   const open =
     settings.business.openingTime ||
@@ -54,7 +51,7 @@ async function assertWithinBusinessHours(
     });
   }
 
-  if (startMin < openMin || endMin > closeMin) {
+  if (startMin < openMin || startMin >= closeMin) {
     const openLabel = formatAmPm(openMin);
     const closeLabel = formatAmPm(closeMin);
     throw Object.assign(
@@ -75,7 +72,10 @@ function formatAmPm(totalMinutes: number): string {
 }
 
 export interface AppointmentServiceInput {
-  serviceId: string;
+  /** Regular service line. Omit when expanding a combo. */
+  serviceId?: string;
+  /** Expand combo into component services (same staff). */
+  comboId?: string;
   staffId: string;
 }
 
@@ -119,96 +119,109 @@ function parseTimeToMinutes(time: string): number | null {
   return h * 60 + m;
 }
 
-function minutesToTime(total: number): string {
-  const h = Math.floor(total / 60) % 24;
-  const m = total % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+
+function badRequest(message: string) {
+  return Object.assign(new Error(message), { statusCode: 400 });
 }
 
-function rangesOverlap(
-  aStart: number,
-  aEnd: number,
-  bStart: number,
-  bEnd: number,
-): boolean {
-  return aStart < bEnd && bStart < aEnd;
+function assertObjectId(id: string | undefined, label: string): string {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    throw badRequest(`${label} not found: ${id ?? ""}`);
+  }
+  return id;
 }
 
+/**
+ * Resolves booking lines with a fixed number of queries regardless of how many
+ * lines there are: staff + combos in parallel, then every service (direct and
+ * combo components) in one `$in`. Previously each line did its own findById.
+ */
 async function buildServiceLines(services: AppointmentServiceInput[]) {
   if (!Array.isArray(services) || services.length === 0) {
-    throw Object.assign(new Error("At least one service is required"), {
-      statusCode: 400,
-    });
+    throw badRequest("At least one service is required");
   }
 
+  const staffIds = new Set<string>();
+  const comboIds = new Set<string>();
+  const directServiceIds = new Set<string>();
+  for (const item of services) {
+    staffIds.add(assertObjectId(item.staffId, "Staff"));
+    if (item.comboId) {
+      comboIds.add(assertObjectId(item.comboId, "Combo"));
+    } else if (item.serviceId) {
+      directServiceIds.add(assertObjectId(item.serviceId, "Service"));
+    } else {
+      throw badRequest("serviceId or comboId is required");
+    }
+  }
+
+  // Round trip 1: staff and combos together.
+  const [staffDocs, comboDocs] = await Promise.all([
+    Staff.find({ _id: { $in: [...staffIds] } })
+      .select("name isActive")
+      .lean(),
+    comboIds.size
+      ? Combo.find({
+          _id: { $in: [...comboIds] },
+          isDeleted: false,
+          isActive: true,
+        })
+          .select("services")
+          .lean()
+      : Promise.resolve([]),
+  ]);
+  const staffById = new Map(staffDocs.map((d) => [String(d._id), d]));
+  const comboById = new Map(comboDocs.map((d) => [String(d._id), d]));
+
+  // Round trip 2: every service referenced directly or through a combo.
+  const allServiceIds = new Set(directServiceIds);
+  for (const combo of comboDocs) {
+    for (const row of combo.services) allServiceIds.add(String(row.service));
+  }
+  const serviceDocs = await Service.find({ _id: { $in: [...allServiceIds] } })
+    .select("name")
+    .lean();
+  const serviceById = new Map(serviceDocs.map((d) => [String(d._id), d]));
+
+  // Build lines in request order; same validation and messages as before.
   const lines = [];
   for (const item of services) {
-    const service = await Service.findById(item.serviceId);
-    if (!service) {
-      throw Object.assign(new Error(`Service not found: ${item.serviceId}`), {
-        statusCode: 400,
-      });
-    }
-    const staff = await Staff.findById(item.staffId);
-    if (!staff) {
-      throw Object.assign(new Error(`Staff not found: ${item.staffId}`), {
-        statusCode: 400,
-      });
-    }
+    const staff = staffById.get(String(item.staffId));
+    if (!staff) throw badRequest(`Staff not found: ${item.staffId}`);
     if (!staff.isActive) {
-      throw Object.assign(
-        new Error(`Staff "${staff.name}" is inactive and cannot be booked`),
-        { statusCode: 400 },
-      );
+      throw badRequest(`Staff "${staff.name}" is inactive and cannot be booked`);
     }
+    const staffId = staff._id as mongoose.Types.ObjectId;
+
+    if (item.comboId) {
+      const combo = comboById.get(String(item.comboId));
+      if (!combo) throw badRequest(`Combo not found: ${item.comboId}`);
+      for (const row of combo.services) {
+        const service = serviceById.get(String(row.service));
+        if (!service) {
+          throw badRequest(`Service not found in combo: ${String(row.service)}`);
+        }
+        const qty = Math.max(1, Math.floor(Number(row.qty) || 1));
+        for (let i = 0; i < qty; i += 1) {
+          lines.push({
+            service: service._id as mongoose.Types.ObjectId,
+            name: service.name,
+            staff: staffId,
+          });
+        }
+      }
+      continue;
+    }
+
+    const service = serviceById.get(String(item.serviceId));
+    if (!service) throw badRequest(`Service not found: ${item.serviceId}`);
     lines.push({
       service: service._id as mongoose.Types.ObjectId,
       name: service.name,
-      durationMinutes: service.durationMinutes ?? 30,
-      staff: staff._id as mongoose.Types.ObjectId,
+      staff: staffId,
     });
   }
   return lines;
-}
-
-async function assertNoStaffConflict(opts: {
-  date: string;
-  startMin: number;
-  endMin: number;
-  staffIds: string[];
-  excludeId?: string;
-}) {
-  const filter: Record<string, unknown> = {
-    date: opts.date,
-    status: { $in: ["booked", "completed"] },
-    "services.staff": { $in: opts.staffIds },
-  };
-  if (opts.excludeId) filter._id = { $ne: opts.excludeId };
-
-  const existing = await Appointment.find(filter);
-  for (const appt of existing) {
-    const otherStart = parseTimeToMinutes(appt.startTime);
-    const otherEnd = parseTimeToMinutes(appt.endTime);
-    if (otherStart === null || otherEnd === null) continue;
-    if (!rangesOverlap(opts.startMin, opts.endMin, otherStart, otherEnd)) {
-      continue;
-    }
-    const conflictingStaff = appt.services.find((s) =>
-      opts.staffIds.includes(String(s.staff)),
-    );
-    const staffName = conflictingStaff
-      ? String(conflictingStaff.staff)
-      : "staff";
-    const staffDoc = conflictingStaff
-      ? await Staff.findById(conflictingStaff.staff)
-      : null;
-    throw Object.assign(
-      new Error(
-        `Conflicts with ${staffDoc?.name ?? staffName}'s appointment ${appt.startTime}–${appt.endTime} on ${appt.date}`,
-      ),
-      { statusCode: 409 },
-    );
-  }
 }
 
 function assertNotPast(date: string, startTime: string, allowPast: boolean) {
@@ -276,19 +289,8 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
 
     assertNotPast(data.date, data.startTime, false);
     const lines = await buildServiceLines(data.services);
-    const totalDuration = lines.reduce((sum, l) => sum + l.durationMinutes, 0);
-    const endMin = startMin + totalDuration;
-    const endTime = minutesToTime(endMin);
-    const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
 
-    await assertWithinBusinessHours(data.date, startMin, endMin);
-
-    await assertNoStaffConflict({
-      date: data.date,
-      startMin,
-      endMin,
-      staffIds,
-    });
+    await assertWithinBusinessHours(data.date, startMin);
 
     const customerFields = await resolveCustomerFields(data);
 
@@ -297,7 +299,6 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
       services: lines,
       date: data.date,
       startTime: data.startTime,
-      endTime,
       status: "booked",
       notes: data.notes?.trim() || undefined,
       createdBy: data.createdBy || null,
@@ -319,14 +320,15 @@ export const createAppointment = async (data: CreateAppointmentDto) => {
 export const getAppointments = async (query: AppointmentListQuery = {}) => {
   try {
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
+    const limit = Math.min(1000, Math.max(1, Number(query.limit) || 50));
     const filter: Record<string, unknown> = {};
 
-    if (query.date) filter.date = query.date;
     if (query.from || query.to) {
       filter.date = {};
       if (query.from) (filter.date as Record<string, string>).$gte = query.from;
       if (query.to) (filter.date as Record<string, string>).$lte = query.to;
+    } else if (query.date) {
+      filter.date = query.date;
     }
     if (query.status) filter.status = query.status;
     if (query.staffId) filter["services.staff"] = query.staffId;
@@ -335,9 +337,11 @@ export const getAppointments = async (query: AppointmentListQuery = {}) => {
       Appointment.find(filter)
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name isActive")
-        .populate("services.service", "name durationMinutes price")
+        .populate("services.service", "name price")
         .sort({ date: 1, startTime: 1 })
         .skip((page - 1) * limit)
+        // Not lean: hydration fills schema defaults (e.g. invoice: null) that
+        // clients receive today; lean would drop those keys from the response.
         .limit(limit),
       Appointment.countDocuments(filter),
     ]);
@@ -362,7 +366,7 @@ export const getAppointmentById = async (id: string) => {
     const appointment = await Appointment.findById(id)
       .populate("customer", "name lastName phone")
       .populate("services.staff", "name isActive")
-      .populate("services.service", "name durationMinutes price")
+      .populate("services.service", "name price")
       .populate("invoice");
     if (!appointment) {
       return { statusCode: 404, data: null, message: "Appointment not found" };
@@ -383,7 +387,7 @@ export const updateAppointment = async (
       return { statusCode: 404, data: null, message: "Appointment not found" };
     }
     if (
-      isAppointmentLocked(current.status, current.date, current.endTime)
+      isAppointmentLocked(current.status, current.date, current.startTime)
     ) {
       return fail(
         400,
@@ -410,24 +414,10 @@ export const updateAppointment = async (
       : current.services.map((s) => ({
           service: s.service,
           name: s.name,
-          durationMinutes: s.durationMinutes,
           staff: s.staff,
         }));
 
-    const totalDuration = lines.reduce((sum, l) => sum + l.durationMinutes, 0);
-    const endMin = startMin + totalDuration;
-    const endTime = minutesToTime(endMin);
-    const staffIds = [...new Set(lines.map((l) => String(l.staff)))];
-
-    await assertWithinBusinessHours(date, startMin, endMin);
-
-    await assertNoStaffConflict({
-      date,
-      startMin,
-      endMin,
-      staffIds,
-      excludeId: id,
-    });
+    await assertWithinBusinessHours(date, startMin);
 
     let customerFields: {
       customer: mongoose.Types.ObjectId | null;
@@ -456,7 +446,6 @@ export const updateAppointment = async (
       services: lines,
       date,
       startTime,
-      endTime,
       notes: data.notes !== undefined ? data.notes.trim() : current.notes,
     });
     await current.save();
@@ -488,10 +477,10 @@ export const changeAppointmentStatus = async (
         ErrorCodes.APPOINTMENT_LOCKED,
       );
     }
-    // Cancel is blocked once the slot has ended; no-show / completed still OK.
+    // Cancel is blocked once the start time has passed; no-show / completed still OK.
     if (
       status === "cancelled" &&
-      isAppointmentLocked(current.status, current.date, current.endTime)
+      isAppointmentLocked(current.status, current.date, current.startTime)
     ) {
       return fail(
         400,

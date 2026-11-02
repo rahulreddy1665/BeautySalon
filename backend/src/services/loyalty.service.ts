@@ -25,10 +25,17 @@ export const patchLoyaltyRules = async (
   data: Parameters<typeof updateLoyaltySettings>[0],
 ) => updateLoyaltySettings(data);
 
-async function getOrCreateBalance(customerId: string) {
-  let bal = await LoyaltyBalance.findOne({ customer: customerId });
+async function getOrCreateBalance(
+  customerId: string,
+  session?: mongoose.ClientSession,
+) {
+  let bal = await LoyaltyBalance.findOne({ customer: customerId }).session(
+    session ?? null,
+  );
   if (!bal) {
-    bal = await LoyaltyBalance.create({ customer: customerId, points: 0 });
+    [bal] = await LoyaltyBalance.create([{ customer: customerId, points: 0 }], {
+      session,
+    });
   }
   return bal;
 }
@@ -179,16 +186,20 @@ export const applyInvoiceLoyalty = async (opts: {
   earnBaseAmount: number;
   invoiceId: string;
   createdBy?: string | null;
+  /** Rules the caller already loaded (skips a settings lookup). */
+  rules?: Awaited<ReturnType<typeof getOrCreateSettings>>["loyalty"];
+  /** Run inside the caller's transaction. */
+  session?: mongoose.ClientSession;
 }) => {
-  const settings = await getOrCreateSettings();
-  const rules = settings.loyalty;
+  const rules = opts.rules ?? (await getOrCreateSettings()).loyalty;
+  const session = opts.session;
   if (!rules.enabled) {
     return { redeemedPoints: 0, redeemedValue: 0, earnedPoints: 0 };
   }
 
   let redeemedPoints = 0;
   let redeemedValue = 0;
-  const bal = await getOrCreateBalance(opts.customerId);
+  const bal = await getOrCreateBalance(opts.customerId, session);
 
   if (opts.redeemPoints > 0) {
     redeemedPoints = Math.min(Math.floor(opts.redeemPoints), bal.points);
@@ -222,16 +233,21 @@ export const applyInvoiceLoyalty = async (opts: {
     }
     if (redeemedPoints > 0) {
       bal.points -= redeemedPoints;
-      await bal.save();
-      await LoyaltyLedger.create({
-        customer: opts.customerId,
-        type: "redeem",
-        points: -redeemedPoints,
-        reason: "Redeemed on invoice",
-        balanceAfter: bal.points,
-        invoice: opts.invoiceId,
-        createdBy: opts.createdBy || null,
-      });
+      await bal.save({ session });
+      await LoyaltyLedger.create(
+        [
+          {
+            customer: opts.customerId,
+            type: "redeem",
+            points: -redeemedPoints,
+            reason: "Redeemed on invoice",
+            balanceAfter: bal.points,
+            invoice: opts.invoiceId,
+            createdBy: opts.createdBy || null,
+          },
+        ],
+        { session },
+      );
     }
   }
 
@@ -244,16 +260,21 @@ export const applyInvoiceLoyalty = async (opts: {
 
   if (earnedPoints > 0) {
     bal.points += earnedPoints;
-    await bal.save();
-    await LoyaltyLedger.create({
-      customer: opts.customerId,
-      type: "earn",
-      points: earnedPoints,
-      reason: "Earned on invoice",
-      balanceAfter: bal.points,
-      invoice: opts.invoiceId,
-      createdBy: opts.createdBy || null,
-    });
+    await bal.save({ session });
+    await LoyaltyLedger.create(
+      [
+        {
+          customer: opts.customerId,
+          type: "earn",
+          points: earnedPoints,
+          reason: "Earned on invoice",
+          balanceAfter: bal.points,
+          invoice: opts.invoiceId,
+          createdBy: opts.createdBy || null,
+        },
+      ],
+      { session },
+    );
   }
 
   return { redeemedPoints, redeemedValue, earnedPoints };
@@ -343,5 +364,118 @@ export const reverseInvoiceLoyalty = async (invoice: {
       message: "Loyalty adjustment failed",
       errors: error,
     };
+  }
+};
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export const listLoyaltyMembers = async (query: {
+  page?: unknown;
+  limit?: unknown;
+  q?: unknown;
+}) => {
+  try {
+    const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, Math.floor(Number(query.limit)) || 20),
+    );
+    const q = typeof query.q === "string" ? query.q.trim() : "";
+
+    // "First Last" (no trailing space when there is no last name) + " " + phone,
+    // the same text the screen used to search in the browser.
+    const fullName = {
+      $cond: [
+        { $gt: [{ $strLenCP: { $ifNull: ["$lastName", ""] } }, 0] },
+        { $concat: [{ $ifNull: ["$name", ""] }, " ", "$lastName"] },
+        { $ifNull: ["$name", ""] },
+      ],
+    };
+
+    const match: Record<string, unknown> = { isActive: { $ne: false } };
+    if (q) {
+      match.$expr = {
+        $regexMatch: {
+          input: {
+            $concat: [
+              fullName,
+              " ",
+              { $toString: { $ifNull: ["$phone", ""] } },
+            ],
+          },
+          regex: escapeRegex(q),
+          options: "i",
+        },
+      };
+    }
+
+    const [result] = await Customer.aggregate<{
+      items: Array<{
+        customerId: mongoose.Types.ObjectId;
+        name: string;
+        lastName?: string;
+        phone?: number;
+        points: number;
+        updatedAt: Date | null;
+      }>;
+      total: Array<{ n: number }>;
+    }>([
+      { $match: match },
+      { $project: { name: 1, lastName: 1, phone: 1 } },
+      {
+        $lookup: {
+          from: LoyaltyBalance.collection.name,
+          localField: "_id",
+          foreignField: "customer",
+          as: "balance",
+          pipeline: [{ $project: { points: 1, updatedAt: 1 } }],
+        },
+      },
+      {
+        $set: {
+          points: { $ifNull: [{ $first: "$balance.points" }, 0] },
+          updatedAt: { $ifNull: [{ $first: "$balance.updatedAt" }, null] },
+        },
+      },
+      { $sort: { points: -1, _id: 1 } },
+      {
+        $facet: {
+          items: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                customerId: "$_id",
+                name: 1,
+                lastName: 1,
+                phone: 1,
+                points: 1,
+                updatedAt: 1,
+              },
+            },
+          ],
+          total: [{ $count: "n" }],
+        },
+      },
+    ]).allowDiskUse(true);
+
+    const total = result?.total[0]?.n ?? 0;
+    return {
+      statusCode: 200,
+      data: {
+        items: (result?.items ?? []).map((r) => ({
+          ...r,
+          customerId: String(r.customerId),
+        })),
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  } catch (error) {
+    return { statusCode: 500, data: error };
   }
 };

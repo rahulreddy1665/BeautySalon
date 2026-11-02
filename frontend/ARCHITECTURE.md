@@ -103,8 +103,8 @@ ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens fo
 
 - **Full-bleed:** no outer page gap, radius, or frame. Sidebar flush left/top/bottom; top bar flush top/right; content fills the rest (`h-dvh`, content scrolls).
 - **lg+:** collapsible sidebar (`w-[260px]` / `72px`); logo row and top bar share **64px** height and one continuous bottom border; sidebar has a right border only.
-- **&lt; lg:** mobile top bar = **56px + safe-area-inset-top**; bottom nav adds **safe-area-inset-bottom**.
-- Sticky top bar: search | theme + calendar `IconButton`s (40×40) | contextual CTA (New bill / New appointment / Add customer — icon-only under `sm`).
+- **&lt; lg:** mobile top bar = **56px + safe-area-inset-top**. Left to right: logo mark, truncated page title, search icon, one labeled primary button (plus icon + “New bill” / “New appointment” / “Add customer”; label drops only under 340px). Theme and today’s appointments live in the More sheet. Bottom nav is Dashboard, Appointments, Billing, Customers, More. `/billing/new` hides that nav and shows a header back control so the checkout bar sits on the bottom edge.
+- **lg+:** collapsible sidebar and the existing header (search field, theme, calendar, text CTA) are unchanged.
 - Content padding: 16px mobile / 20px desktop. Page headers must **not** duplicate top-bar primary CTAs.
 - Safe areas: `pt-safe` / `pb-safe` / `env(safe-area-inset-*)`.
 - `min-h-dvh` / `h-dvh`, inputs ≥ 16px on mobile, touch targets ≥ 44px (`.min-touch`).
@@ -117,6 +117,14 @@ ESLint warns on some JSX text literals (`no-restricted-syntax`). Grep screens fo
 - Dual `<meta name="theme-color">` (light/dark) + runtime sync to card/sidebar white / `#141414`.
 - `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style=default`, `apple-touch-icon`.
 - Installed PWAs cache the manifest — users must remove/re-add the home-screen app after theme changes. HTTPS required outside localhost.
+
+## Routing
+
+`BrowserRouter` is the only navigation source. Each screen is a URL (`/`, `/appointments?date=&appointment=`, `/billing`, `/billing/new`, `/billing/:id`, `/customers`, `/reports/*`, `/settings/*`). Reload, back, and forward stay on that URL. `PersistGate` keeps the splash up until redux-persist rehydrates; route guards run after that. Login returns to `from.pathname + search + hash`. Unknown URLs render the 404 page; missing permission renders `/forbidden`. `frontend/public/_redirects` (`/* /index.html 200`) is copied into `dist` for Netlify. The service worker `navigateFallback` is `/index.html` and denylists `/api/` and `/assets/`. Axios logs out only on HTTP 401. Network errors and 5xx show the retry banner and retry with backoff. `GET /settings` uses a 60s timeout. A class `ErrorBoundary` wraps the app and each route outlet (Try again, Reload, Go to dashboard). Chunk or MIME load failures show “A new version is available”, unregister the service worker once (`sessionStorage` guard), and reload.
+
+## New bill on a phone
+
+Below `lg` the page is one column: customer, catalog, line cards, then an inline bill summary (same fields as the desktop panel, including notes, tax, loyalty, tip, and payment). A 64px bar is fixed to the bottom, above the safe area: Payable opens the summary sheet; Collect follows the payment mode and shortens to “Collect {amount}” under 400px. The bar is `lg:hidden`. From `lg` to just under `xl` the previous checkout bar stays; at `xl+` the right-hand sticky summary stays. Content padding uses `dvh` and the bar height plus the safe area. Focusing an input scrolls it above the bar.
 
 ## How to add a new responsive screen
 
@@ -170,11 +178,11 @@ Missing APIs are centralized under `src/app/service/mocks/`:
 | File | Used by |
 |------|---------|
 | `billingMock.ts` | Walk-in bills list (localStorage) until Billing FE fully switches |
-| `inventoryMock.ts` | Products, stock adjust, history (localStorage) |
+| `inventoryMock.ts` | Legacy only — live Products API + stock ledger supersede this |
 | `loyaltyMock.ts` | Points rules, balances, ledger (localStorage) |
 | `customerExtrasMock.ts` | Lifetime spend; points delegated to loyaltyMock |
 
-**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Reports (`/api/reports/*`), Staff, Designations, Services, Products (catalog), Appointments (`/api/appointment`), Invoices (+ share link), Settings, Loyalty rules/balances, Auth.
+**Live APIs (not mocked):** Dashboard (`/api/dashboard`), Reports (`/api/reports/*`), Staff, Designations, Services, Categories, Combos, Products (+ stock ledger), Appointments (`/api/appointment`), Invoices (+ share link + combo lines), Settings, Loyalty rules/balances, Auth.
 
 Appointments UI: day / week / month calendars; desktop right panel (`?appointment=id`, auto-select next upcoming); mobile bottom sheet; lock rules (past end / final status) via Asia/Kolkata; past slots disabled; edit URL of locked appointments is view-only. Create bill → `/billing/new?appointmentId=` → `POST /api/invoice` → appointment completed.
 
@@ -186,7 +194,8 @@ Appointments UI: day / week / month calendars; desktop right panel (`?appointmen
 - Money omitted when `canViewRevenue` is false; CSV export needs `canExport` or `report:export`.
 - CSV via server export payload + `utils/csv.ts` (`downloadCsv` with UTF-8 BOM for Excel ₹).
 - Definitions popover text lives in `constants/reports.ts`.
-- **No** inventory valuation, profit, discount, loyalty, tax, or daily-closing reports.
+- Product report includes current `stockQty` and units sold (no low-stock alerts).
+- **No** inventory valuation/COGS, profit, discount, loyalty, tax, or daily-closing reports.
 
 ### How to add a report
 
@@ -200,6 +209,11 @@ Appointments UI: day / week / month calendars; desktop right panel (`?appointmen
 
 Screens must not invent their own fake numbers. Prefer empty states. Legacy files under `service/mocks/` must not drive production UI.
 
+## Auth / login
+- Public branding: unauthenticated `GET /api/public/branding` returns only `{ salonName, logoUrl }` for the login screen (TanStack Query cached; falls back to `COMMON.appName` + default mark).
+- Login is a full-viewport split layout (dark brand panel + form card on `lg+`; mobile header sheet below). **Always light** on `/login` (FOUC script + `ThemeProvider` force light) — does not mutate Redux `themeMode`; after sign-in the saved theme applies. No theme toggle on login.
+- Decorative particles (`@tsparticles/slim` via lazy `LoginParticles`) fill the right half / mobile sheet only; tune counts/opacity/links in `LOGIN_PARTICLE_SETTINGS` inside `components/LoginParticles.tsx`. Skipped when `prefers-reduced-motion`. Auth token persists via redux-persist (`localStorage`); JWT expires in 24h (`JWT_EXPIRES_IN`). No forgot-password link — admin reset only. No login rate-limiting middleware in the repo yet.
+
 ## Auth & API client
 
 - Base URL: `VITE_API_BASE_URL` (`utils/env.ts`).
@@ -211,7 +225,12 @@ Screens must not invent their own fake numbers. Prefer empty states. Legacy file
 - Backend reloads designation/role permissions on each authenticated request (not stale JWT lists). Frontend `PermissionGuard` + nav filtering use the same keys.
 - Settings is a **hub** (`/settings`) with card links to `/settings/:section` (business, tax, invoice, appointments, loyalty, roles). Unsaved-changes guard + sticky Save on sub-pages. Cards hide when the user lacks permission; direct URLs show No access.
 - Invoice templates: Cream & Gold, Blush, Compact A5, Thermal. Palettes in `theme/invoice-themes.ts` (only allowed hex outside `theme/tokens`). Shared `InvoiceDocument` + snapshot on each invoice. Public share at `/i/:token` (no app shell, noindex). PDF via `html2pdf.js` (`utils/invoicePdf.ts`). WhatsApp share via `sendInvoiceToCustomer` (wa.me / native share); Cloud API stub on backend.
-- New bill: Services / Products section cards with one section discount each (no per-line discount UI). Line discount field stays 0 for API compatibility.
+- New bill (`/billing/new`): three numbered cards (Customer · Add services & products · Bill items) + sticky Bill summary. Per-line discounts; section discounts sent as 0. Drafts persist per device via `billingDrafts` (redux-persist); estimates are print-only. Tip allocations are computed on the server from distinct staff on the bill. Switching to Walk-in clears the saved customer, phone, and loyalty redemption. If the lines came from an appointment, the user can keep or clear them.
+- Appointments (`/appointments?view=&date=&staff=`): the URL is the selected day, view, and staff filter. The list query key is `from`/`to` for that day, Monday–Sunday, the month grid, or the list range, so a tab or date change refetches instead of reusing today's cache. Public invoice is `/i/:token` outside the auth shell and loads with `publicGet` (`GET /api/public/invoice/:token`, 60s timeout, no session logout).
+- Billing line grid (≥768): shared tracks `minmax(0,1fr) | staff 140/160px | qty 96 | price 72 | total 80 | delete 36`, `gap-x-2`. Item uses `line-clamp-2` + `title`. `<768` keeps stacked cards.
+- Same-category suggestions: `CategorySuggestions` under Services search (not Products). Chips from loaded catalog, ordered by name (no billed-frequency on services API). Services already covered by an added combo are excluded. Also used on New Appointment after a service is chosen.
+- Services page tabs: Services · Categories · Combos. Combos appear in billing quick-add with a COMBO badge; one bill line expands to per-component staff.
+- Products: retail | consumable, optional stock tracking + ledger; billing shows retail only. Settings → Business: Allow negative stock.
 - See `docs/API_NOTES.md` and `docs/KNOWN_GAPS.md` (no email/SMTP/2FA).
 
 ## Quality

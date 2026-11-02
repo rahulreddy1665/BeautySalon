@@ -255,3 +255,32 @@ export async function getOrCreateStaffRole() {
   }
   return role;
 }
+
+/**
+ * The signed-in user as login returns it, read fresh from the DB. Lets the app
+ * pick up role / permission changes without logging out.
+ */
+export const getCurrentUser = async (userId: string) => {
+  const user = await User.findById(userId)
+    .populate({ path: "role", populate: { path: "permissions" } })
+    .populate("designation");
+  if (!user || !user.isActive) {
+    return fail(401, ErrorMessages.UNAUTHORIZED, ErrorCodes.UNAUTHORIZED);
+  }
+  const role = user.role as unknown as { _id: unknown; name: string };
+  const resolved = await resolvePermissions(user as never);
+  return {
+    statusCode: 200,
+    data: {
+      mustChangePassword: Boolean(user.mustChangePassword),
+      user: publicUser({
+        ...user.toObject(),
+        role,
+        permissions: resolved.permissions,
+        canViewRevenue: resolved.canViewRevenue,
+        canExport: resolved.canExport,
+        maxDiscountPercent: resolved.maxDiscountPercent,
+      }),
+    },
+  };
+};

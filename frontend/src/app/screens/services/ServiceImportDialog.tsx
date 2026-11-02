@@ -1,6 +1,5 @@
 import { Download, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { DialogBody } from '@/app/components/ui/dialog'
 import { Button } from '@/app/components/ui/button'
@@ -16,6 +15,7 @@ import { Input } from '@/app/components/ui/input'
 import { useImportServicesMutation } from '@/app/hooks/queries/useServicesQuery'
 import type { ServiceImportRowResult } from '@/app/service/services/servicesApi'
 import { cn } from '@/app/utils'
+import { loadXlsx } from '@/app/utils/loadXlsx'
 
 interface ServiceImportDialogProps {
   open: boolean
@@ -27,16 +27,16 @@ type PreviewRow = {
   name: string
   category: string
   price: string
-  duration: string
   error?: string
 }
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await loadXlsx()
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
-    ['Name', 'Category', 'Price', 'Duration (min)'],
-    ['Haircut', 'Hair', 499, 45],
-    ['Blow dry', 'Hair', 350, ''],
+    ['Name', 'Category', 'Price'],
+    ['Haircut', 'Hair', 499],
+    ['Blow dry', 'Hair', 350],
   ])
   XLSX.utils.book_append_sheet(wb, ws, 'Services')
   XLSX.writeFile(wb, 'services-template.xlsx')
@@ -53,7 +53,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
   const parseFile = async (next: File) => {
     setFile(next)
     setResults(null)
-    const buffer = await next.arrayBuffer()
+    const [XLSX, buffer] = await Promise.all([loadXlsx(), next.arrayBuffer()])
     const wb = XLSX.read(buffer, { type: 'array' })
     const sheet = wb.Sheets[wb.SheetNames[0] ?? '']
     if (!sheet) {
@@ -76,7 +76,6 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
         const name = String(pick('name', 'service name', 'service')).trim()
         const category = String(pick('category', 'service category')).trim()
         const priceRaw = pick('price', 'price (inr)', 'amount')
-        const durationRaw = pick('duration (min)', 'duration', 'durationminutes')
         const price = Number(priceRaw)
         let error: string | undefined
         if (!name || !category) error = 'Name and category required'
@@ -87,7 +86,6 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
           name,
           category,
           price: String(priceRaw ?? ''),
-          duration: String(durationRaw ?? ''),
           error,
         }
       }),
@@ -115,14 +113,13 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
         <DialogHeader>
           <DialogTitle>Import services</DialogTitle>
           <DialogDescription>
-            Upload a spreadsheet. Blank duration defaults to 30 minutes. Bad rows are
-            reported without stopping the rest.
+            Upload a spreadsheet. Bad rows are reported without stopping the rest.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={downloadTemplate}>
+            <Button type="button" size="sm" variant="outline" onClick={() => void downloadTemplate()}>
               <Download className="size-4" strokeWidth={1.75} />
               Download template
             </Button>
@@ -152,7 +149,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                     <th className="px-2 py-1.5">Name</th>
                     <th className="px-2 py-1.5">Category</th>
                     <th className="px-2 py-1.5">Price</th>
-                    <th className="px-2 py-1.5">Duration</th>
+                    <th className="px-2 py-1.5">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,7 +169,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                         {row.error ? (
                           <span className="text-destructive">{row.error}</span>
                         ) : (
-                          <span className="tabular-nums">{row.duration || '30'}</span>
+                          <span className="text-muted-foreground">OK</span>
                         )}
                       </td>
                     </tr>

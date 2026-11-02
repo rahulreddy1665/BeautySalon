@@ -1,30 +1,61 @@
 import { Request, Response } from "express";
 import * as XLSX from "xlsx";
 
+import type { AuthRequest } from "../middlewares/auth.middleware";
 import {
   createProduct,
   deleteProduct,
   getProductById,
+  getProductCatalog,
   getProducts,
   importProducts,
   updateProduct,
 } from "../services/product.service";
+import {
+  addStock,
+  adjustStock,
+  listStockLedger,
+  useStock,
+} from "../services/stock.service";
 import { sendResponse } from "../middlewares/response.middleware";
 
-export const createProductController = async (req: Request, res: Response) => {
+export const createProductController = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   try {
-    const data = await createProduct(req.body);
+    const data = await createProduct(req.body, {
+      createdBy: req.user?.id ?? null,
+    });
     return sendResponse(res, {
       statusCode: data.statusCode,
       message:
         (data as { message?: string }).message ??
         (data.statusCode == 200 ? "Product created" : "Product created failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
       statusCode: 500,
       message: "Product created failed",
+      errors: error,
+    });
+  }
+};
+
+export const getProductCatalogController = async (_req: Request, res: Response) => {
+  try {
+    const data = await getProductCatalog();
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message: data.statusCode == 200 ? "Product catalog" : "Product catalog failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Product catalog failed",
       errors: error,
     });
   }
@@ -36,6 +67,11 @@ export const getProductsController = async (req: Request, res: Response) => {
       search: typeof req.query.search === "string" ? req.query.search : undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
+      type:
+        typeof req.query.type === "string"
+          ? (req.query.type as "retail" | "consumable" | "all")
+          : undefined,
+      retailOnly: req.query.retailOnly as string | undefined,
     });
     return sendResponse(res, {
       statusCode: data.statusCode,
@@ -76,17 +112,20 @@ export const getProductByIdController = async (
 };
 
 export const updateProductController = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
 ) => {
   try {
-    const data = await updateProduct(req.params.id, req.body);
+    const data = await updateProduct(String(req.params.id), req.body, {
+      createdBy: req.user?.id ?? null,
+    });
     return sendResponse(res, {
       statusCode: data.statusCode,
       message:
         (data as { message?: string }).message ??
         (data.statusCode == 200 ? "Product Update" : "Product Update failed"),
       data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -119,7 +158,10 @@ export const deleteProductController = async (
   }
 };
 
-export const importProductsController = async (req: Request, res: Response) => {
+export const importProductsController = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   try {
     const file = req.file;
     if (!file) {
@@ -158,6 +200,9 @@ export const importProductsController = async (req: Request, res: Response) => {
       return {
         name: pick("name", "product name", "product"),
         price: pick("price", "price (inr)", "amount"),
+        type: pick("type", "product type"),
+        unit: pick("unit", "uom"),
+        openingStock: pick("opening stock", "openingstock", "stock", "qty"),
       };
     });
 
@@ -165,7 +210,11 @@ export const importProductsController = async (req: Request, res: Response) => {
       mapped.map((r) => ({
         name: r.name !== undefined ? String(r.name) : undefined,
         price: r.price,
+        type: r.type,
+        unit: r.unit,
+        openingStock: r.openingStock,
       })),
+      { createdBy: req.user?.id ?? null },
     );
 
     return sendResponse(res, {
@@ -177,6 +226,111 @@ export const importProductsController = async (req: Request, res: Response) => {
     return sendResponse(res, {
       statusCode: 500,
       message: "Product import failed",
+      errors: error,
+    });
+  }
+};
+
+export const addStockController = async (req: AuthRequest, res: Response) => {
+  try {
+    const data = await addStock({
+      productId: String(req.params.id),
+      quantity: Number(req.body?.quantity),
+      note: req.body?.note,
+      createdBy: req.user?.id ?? null,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        (data as { message?: string }).message ??
+        (data.statusCode === 200 ? "Stock added" : "Failed"),
+      data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
+      errors: error,
+    });
+  }
+};
+
+export const useStockController = async (req: AuthRequest, res: Response) => {
+  try {
+    const data = await useStock({
+      productId: String(req.params.id),
+      quantity: Number(req.body?.quantity),
+      reason: String(req.body?.reason ?? ""),
+      staffId: req.body?.staffId ?? null,
+      createdBy: req.user?.id ?? null,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        (data as { message?: string }).message ??
+        (data.statusCode === 200 ? "Stock used" : "Failed"),
+      data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
+      errors: error,
+    });
+  }
+};
+
+export const adjustStockController = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const data = await adjustStock({
+      productId: String(req.params.id),
+      countedQty: Number(req.body?.countedQty ?? req.body?.quantity),
+      reason: String(req.body?.reason ?? ""),
+      createdBy: req.user?.id ?? null,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        (data as { message?: string }).message ??
+        (data.statusCode === 200 ? "Stock adjusted" : "Failed"),
+      data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
+      errors: error,
+    });
+  }
+};
+
+export const listStockLedgerController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await listStockLedger(String(req.params.id), {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        (data as { message?: string }).message ??
+        (data.statusCode === 200 ? "OK" : "Failed"),
+      data: data.data,
+      errors: (data as { errors?: unknown }).errors ?? null,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
       errors: error,
     });
   }

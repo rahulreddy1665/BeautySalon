@@ -5,17 +5,17 @@ export interface SalonService {
   _id: string
   name: string
   category: string
+  categoryId?: string | { _id: string; name?: string; isActive?: boolean } | null
   price: number
-  durationMinutes: number
   createdAt?: string
   updatedAt?: string
 }
 
 export interface ServiceInput {
   name: string
-  category: string
+  categoryId?: string
+  category?: string
   price: number
-  durationMinutes?: number
 }
 
 export interface PaginatedServices {
@@ -29,6 +29,7 @@ export interface PaginatedServices {
 export interface ServiceListParams {
   search?: string
   category?: string
+  categoryId?: string
   page?: number
   limit?: number
 }
@@ -48,6 +49,8 @@ export interface ServiceImportResult {
     updated: number
     skipped: number
     error: number
+    categoriesCreated?: number
+    newCategories?: string[]
   }
 }
 
@@ -60,10 +63,11 @@ export const servicesApi = {
     return data.data
   },
 
-  /** Convenience for billing/appointments — first page large enough for catalogs. */
+  /** Full, unpaginated catalog for billing/appointment pickers. */
   getAll: async (): Promise<SalonService[]> => {
-    const page = await servicesApi.list({ page: 1, limit: 100 })
-    return page.items
+    const { data } =
+      await apiClient.get<ApiSuccessResponse<SalonService[]>>('/service/catalog')
+    return data.data ?? []
   },
 
   getCategories: async (): Promise<string[]> => {

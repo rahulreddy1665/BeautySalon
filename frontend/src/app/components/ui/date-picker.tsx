@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 
 import { Button } from '@/app/components/ui/button'
 import { Calendar } from '@/app/components/ui/calendar'
@@ -12,6 +12,7 @@ interface DatePickerProps {
   onChange: (date: Date | undefined) => void
   placeholder?: string
   className?: string
+  disabled?: ComponentProps<typeof Calendar>['disabled']
 }
 
 export function DatePicker({
@@ -19,6 +20,7 @@ export function DatePicker({
   onChange,
   placeholder = 'Pick a date',
   className,
+  disabled,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false)
 
@@ -42,6 +44,7 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={value}
+          disabled={disabled}
           onSelect={(date) => {
             onChange(date)
             setOpen(false)

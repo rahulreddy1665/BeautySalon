@@ -26,6 +26,9 @@ export interface AuthRequest extends Request {
 const CHANGE_PASSWORD_PATHS = new Set([
   "/api/auth/change-password",
   "/auth/change-password",
+  // Read-only: the app refreshes the signed-in user on load, even on set-password.
+  "/api/auth/me",
+  "/auth/me",
 ]);
 
 function pathAllowsMustChange(req: AuthRequest): boolean {

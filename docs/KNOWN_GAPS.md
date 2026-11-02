@@ -5,19 +5,24 @@
 | Area | Status | Notes |
 |------|--------|-------|
 | Profit / expenses module | Out of scope | No expense API — removed from reports hub |
-| Inventory valuation (qty/cost) | Out of scope | Products are catalog-only (name/price); no stock fields in reports |
+| Low-stock alerts / dashboard widgets | Out of scope | Product stock exists (ledger + badges); no alerts or notifications |
+| Purchase orders / suppliers | Out of scope | Manual Add stock only; no PO or supplier master |
+| Recipe-based consumable auto-usage | Out of scope | Consumables are manual Use stock only — not deducted per service |
+| Inventory valuation (COGS / cost) | Out of scope | `stockQty` + units sold on product report; no cost/valuation |
+| Invoice cancel / void / return | Gap | No void endpoint — sale stock is not restored |
 | Staff incentives / commissions | Gap | No incentive engine — staff report omits “incentive earned” |
-| Tip attribution to staff | Gap | Tip is invoice-level only; UI tip-staff is not persisted — staff `tipsReceived` is null |
+| Tip attribution to staff | Done | `tip.allocations[]` equal-split on create; staff report reads allocations (legacy tipStaff fallback) |
 | Customer birthdate / birthdays | Gap | Customer has phone + `createdAt`; no birthdate field |
 | Lifetime spend on customer | Partial | Reports compute spend in range; loyalty balance when loyalty enabled |
 | Login / password-change rate limit | Gap | No rate-limiting middleware in the repo |
-| Public invoice share-link rate limit | Gap | Same — no rate-limiting middleware; public `GET /api/public/invoice/:token` is unauthenticated |
+| Public branding / invoice share-link rate limit | Gap | Same — no rate-limiting middleware; public `GET /api/public/branding` and `GET /api/public/invoice/:token` are unauthenticated |
 | Invoice PDF fidelity | Known tradeoff | `html2pdf.js` matches the on-screen template; some text may be rasterized vs native Print → Save as PDF |
 | WhatsApp Cloud API | Prepared stub | `backend/src/services/send-invoice.service.ts` `sendInvoiceToCustomer` is a no-op; free flow uses wa.me / navigator.share |
 | HSN/SAC, IGST | Deferred | Intra-state CGST/SGST only |
 | Recurring appointments / SMS / drag-drop | Out of scope | Per product decision |
 | Salon timezone setting | Gap | Reports / locks use **Asia/Kolkata** (no timezone field on settings yet) |
 | Scheduled / emailed reports | Out of scope | No jobs or email |
+| New bill drafts | By design | Drafts persist in redux-persist on this device only — not synced to the server |
 | PWA icons | Placeholder | Manifest theme is top-bar white; icon PNGs still need brand art |
 
 ## Auth / account (by design)

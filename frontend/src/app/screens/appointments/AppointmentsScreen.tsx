@@ -2,6 +2,7 @@ import {
   addDays,
   addMonths,
   endOfMonth,
+  endOfWeek,
   format,
   parseISO,
   startOfMonth,
@@ -9,19 +10,32 @@ import {
   subDays,
   subMonths,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ErrorState } from '@/app/components/ErrorState'
 import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { Button } from '@/app/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/app/components/ui/sheet'
 import { APPOINTMENTS, COMMON, ROUTES } from '@/app/constants'
-import { useAppointmentsQuery } from '@/app/hooks/queries/useAppointmentsQuery'
+import {
+  useAppointmentsWindowQuery,
+  useNextStaffAppointmentQuery,
+} from '@/app/hooks/queries/useAppointmentsQuery'
 import { useSalonSettingsQuery } from '@/app/hooks/queries/useSettingsQuery'
 import { useActiveStaffQuery } from '@/app/hooks/queries/useStaffQuery'
-import type { Appointment } from '@/app/service/appointments/appointmentsApi'
+import {
+  appointmentCustomerLabel,
+  type Appointment,
+} from '@/app/service/appointments/appointmentsApi'
 import {
   AppointmentConfirmDialog,
   type ConfirmKind,
@@ -30,11 +44,19 @@ import { AppointmentSidePanel } from '@/app/screens/appointments/AppointmentSide
 import { DayCalendar } from '@/app/screens/appointments/DayCalendar'
 import { MonthCalendar } from '@/app/screens/appointments/MonthCalendar'
 import { WeekCalendar } from '@/app/screens/appointments/WeekCalendar'
-import { DEFAULT_CALENDAR_HOURS } from '@/app/screens/appointments/calendarConfig'
+import {
+  DEFAULT_CALENDAR_HOURS,
+  formatCompactTime,
+} from '@/app/screens/appointments/calendarConfig'
 import { cn } from '@/app/utils'
 import { getSalonNow, parseHhMm } from '@/app/utils/salonTime'
 
-type ViewMode = 'day' | 'week' | 'month'
+type ViewMode = 'day' | 'week' | 'month' | 'list'
+
+/** Shared empty arrays keep props referentially stable for the memoised calendars. */
+const NO_APPOINTMENTS: Appointment[] = []
+const NO_STAFF: never[] = []
+const ALL_STAFF = 'all'
 
 function todayKey(): string {
   return getSalonNow().dateKey
@@ -66,18 +88,48 @@ function isDesktopViewport(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
 }
 
-export function AppointmentsScreen() {
-  const navigate = useNavigate()
+/**
+ * URL state as plain values. Reading them through a hook (instead of straight
+ * off the URLSearchParams object) lets the memoised handlers below depend on
+ * immutable primitives.
+ */
+function useAppointmentsUrlState() {
   const [searchParams, setSearchParams] = useSearchParams()
   const dateParam = searchParams.get('date')
-  const selectedDate = isValidDateKey(dateParam) ? dateParam : todayKey()
-  const viewParam = searchParams.get('view') as ViewMode | null
-  const view: ViewMode =
-    viewParam === 'week' || viewParam === 'month' || viewParam === 'day'
+  const viewParam = searchParams.get('view')
+  const fromParam = searchParams.get('from')
+  const toParam = searchParams.get('to')
+  return {
+    searchParams,
+    setSearchParams,
+    selectedDate: isValidDateKey(dateParam) ? dateParam : todayKey(),
+    view: (viewParam === 'week' ||
+    viewParam === 'month' ||
+    viewParam === 'day' ||
+    viewParam === 'list'
       ? viewParam
-      : typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+      : isDesktopViewport()
         ? 'week'
-        : 'day'
+        : 'day') as ViewMode,
+    staffId: searchParams.get('staff') || undefined,
+    listFromParam: isValidDateKey(fromParam) ? fromParam : null,
+    listToParam: isValidDateKey(toParam) ? toParam : null,
+    urlAppointmentId: searchParams.get('appointment') ?? searchParams.get('id'),
+  }
+}
+
+export function AppointmentsScreen() {
+  const navigate = useNavigate()
+  const {
+    searchParams,
+    setSearchParams,
+    selectedDate,
+    view,
+    staffId,
+    listFromParam,
+    listToParam,
+    urlAppointmentId,
+  } = useAppointmentsUrlState()
 
   const [mobilePanel, setMobilePanel] = useState(false)
   const [confirm, setConfirm] = useState<{
@@ -87,9 +139,11 @@ export function AppointmentsScreen() {
 
   const staffQuery = useActiveStaffQuery()
   const settingsQuery = useSalonSettingsQuery()
-  const calendarHours = (() => {
-    const business = settingsQuery.data?.business
-    const appt = settingsQuery.data?.appointments
+  const business = settingsQuery.data?.business
+  const apptSettings = settingsQuery.data?.appointments
+  // Memoised so the calendars (memo components) don't re-render for an equal object.
+  const calendarHours = useMemo(() => {
+    const appt = apptSettings
     const slotMinutes = appt?.slotMinutes ?? DEFAULT_CALENDAR_HOURS.slotMinutes
 
     if (business?.openingTime && business?.closingTime) {
@@ -114,7 +168,7 @@ export function AppointmentsScreen() {
       }
     }
     return DEFAULT_CALENDAR_HOURS
-  })()
+  }, [business, apptSettings])
 
   const closedWeekdays = useMemo(() => {
     const working = settingsQuery.data?.business?.workingDays ?? []
@@ -130,25 +184,50 @@ export function AppointmentsScreen() {
     return all.filter((d) => !working.includes(d as never))
   }, [settingsQuery.data?.business?.workingDays])
 
-  const weekStart = format(
-    startOfWeek(parseISO(selectedDate), { weekStartsOn: 1 }),
+  const anchor = parseISO(`${selectedDate}T12:00:00`)
+  const weekStart = format(startOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const weekEnd = format(endOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const monthGridStart = format(
+    startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 }),
     'yyyy-MM-dd',
   )
-  const weekEnd = format(addDays(parseISO(weekStart), 6), 'yyyy-MM-dd')
-  const monthStart = format(startOfMonth(parseISO(selectedDate)), 'yyyy-MM-dd')
-  const monthEnd = format(endOfMonth(parseISO(selectedDate)), 'yyyy-MM-dd')
+  const monthGridEnd = format(
+    endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 }),
+    'yyyy-MM-dd',
+  )
+  const listFrom = listFromParam ?? weekStart
+  const listTo = listToParam ?? weekEnd
+  const rangeStart =
+    view === 'day' ? selectedDate : view === 'month' ? monthGridStart : view === 'list' ? listFrom : weekStart
+  const rangeEnd =
+    view === 'day' ? selectedDate : view === 'month' ? monthGridEnd : view === 'list' ? listTo : weekEnd
 
-  const listParams =
-    view === 'day'
-      ? { date: selectedDate, page: 1, limit: 200 }
-      : view === 'week'
-        ? { from: weekStart, to: weekEnd, page: 1, limit: 500 }
-        : { from: monthStart, to: monthEnd, page: 1, limit: 500 }
-
-  const appointmentsQuery = useAppointmentsQuery(listParams)
-  const staff = staffQuery.data ?? []
-  const appointments = appointmentsQuery.data?.items ?? []
-  const urlAppointmentId = searchParams.get('appointment') ?? searchParams.get('id')
+  // Every appointment in the visible window; pages are fetched until `total`.
+  const appointmentsQuery = useAppointmentsWindowQuery({
+    from: rangeStart,
+    to: rangeEnd,
+    staffId,
+  })
+  const staff = staffQuery.data ?? NO_STAFF
+  const appointments = appointmentsQuery.data?.items ?? NO_APPOINTMENTS
+  // Day view filtered to one person with nothing booked that day: point them to
+  // that person's next appointment instead of showing a silently empty grid.
+  const staffDayEmpty =
+    view === 'day' &&
+    Boolean(staffId) &&
+    !appointmentsQuery.isFetching &&
+    appointmentsQuery.isSuccess &&
+    !appointments.some((a) => a.date === selectedDate)
+  const nextStaffQuery = useNextStaffAppointmentQuery(
+    staffId,
+    format(addDays(parseISO(`${selectedDate}T12:00:00`), 1), 'yyyy-MM-dd'),
+    staffDayEmpty,
+  )
+  // Day view: one column for the selected staff member, or everyone.
+  const dayStaff = useMemo(
+    () => (staffId ? staff.filter((s) => s._id === staffId) : staff),
+    [staff, staffId],
+  )
   const selected = appointments.find((a) => a._id === urlAppointmentId) ?? null
 
   useEffect(() => {
@@ -192,34 +271,38 @@ export function AppointmentsScreen() {
   }
 
   const setDate = (next: string) => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev)
-        params.set('date', next)
-        params.delete('new')
-        return params
-      },
-      { replace: true },
-    )
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      params.set('date', next)
+      params.set('view', view)
+      params.delete('new')
+      params.delete('appointment')
+      params.delete('id')
+      return params
+    })
   }
 
   const setView = (next: ViewMode) => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev)
-        params.set('view', next)
-        return params
-      },
-      { replace: true },
-    )
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      params.set('view', next)
+      params.set('date', selectedDate)
+      params.delete('appointment')
+      params.delete('id')
+      return params
+    })
   }
 
+  const weekStartDate = parseISO(`${weekStart}T12:00:00`)
+  const weekEndDate = parseISO(`${weekEnd}T12:00:00`)
   const rangeLabel =
-    view === 'day'
-      ? format(parseISO(selectedDate), 'dd MMM yyyy')
-      : view === 'week'
-        ? `${format(parseISO(weekStart), 'dd MMM')} – ${format(parseISO(weekEnd), 'dd MMM yyyy')}`
-        : format(parseISO(selectedDate), 'MMMM yyyy')
+    view === 'week' || view === 'list'
+      ? weekStartDate.getMonth() === weekEndDate.getMonth()
+        ? `${format(weekStartDate, 'MMM d')} – ${format(weekEndDate, 'd, yyyy')}`
+        : `${format(weekStartDate, 'MMM d')} – ${format(weekEndDate, 'MMM d, yyyy')}`
+      : view === 'month'
+        ? format(anchor, 'MMM yyyy')
+        : format(anchor, 'd MMM yyyy')
 
   const shift = (dir: -1 | 1) => {
     if (view === 'day') {
@@ -231,7 +314,7 @@ export function AppointmentsScreen() {
           'yyyy-MM-dd',
         ),
       )
-    } else if (view === 'week') {
+    } else if (view === 'week' || view === 'list') {
       setDate(
         format(
           dir === 1
@@ -252,17 +335,67 @@ export function AppointmentsScreen() {
     }
   }
 
-  const openNew = (date: string, startTime: string, staffId?: string) => {
-    const q = new URLSearchParams({ date, time: startTime })
-    if (staffId) q.set('staffId', staffId)
-    navigate(`${ROUTES.appointments}/new?${q.toString()}`)
-  }
+  // Stable handlers (useCallback) so the memoised calendars don't re-render on
+  // unrelated updates, e.g. opening the mobile details sheet.
+  const selectAppt = useCallback(
+    (appt: Appointment) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev)
+          params.set('appointment', appt._id)
+          params.delete('id')
+          return params
+        },
+        { replace: true },
+      )
+      if (!isDesktopViewport()) setMobilePanel(true)
+    },
+    [setSearchParams, setMobilePanel],
+  )
 
-  const selectAppt = (appt: Appointment) => {
-    setAppointmentId(appt._id)
-    if (!isDesktopViewport()) {
-      setMobilePanel(true)
-    }
+  const onDaySlotClick = useCallback(
+    (slotStaffId: string, startTime: string) =>
+      navigate(
+        `${ROUTES.appointments}/new?${new URLSearchParams({
+          date: selectedDate,
+          time: startTime,
+          staffId: slotStaffId,
+        }).toString()}`,
+      ),
+    [navigate, selectedDate],
+  )
+
+  const onWeekSlotClick = useCallback(
+    (date: string, startTime: string) => {
+      const q = new URLSearchParams({ date, time: startTime })
+      if (staffId) q.set('staffId', staffId)
+      navigate(`${ROUTES.appointments}/new?${q.toString()}`)
+    },
+    [navigate, staffId],
+  )
+
+  const onMonthDayClick = useCallback(
+    (date: string) =>
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev)
+        params.set('date', date)
+        params.set('view', 'day')
+        params.delete('appointment')
+        params.delete('id')
+        return params
+      }),
+    [setSearchParams],
+  )
+
+  const setStaffFilter = (next: string) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next === ALL_STAFF) params.delete('staff')
+      else params.set('staff', next)
+      params.delete('appointment')
+      params.delete('id')
+      return params
+    })
   }
 
   const salonName = settingsQuery.data?.business?.salonName?.trim() || COMMON.appName
@@ -272,7 +405,7 @@ export function AppointmentsScreen() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-full bg-muted p-0.5">
-            {(['day', 'week', 'month'] as const).map((mode) => (
+            {(['day', 'week', 'month', 'list'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -286,46 +419,68 @@ export function AppointmentsScreen() {
                   ? APPOINTMENTS.list.viewDay
                   : mode === 'week'
                     ? APPOINTMENTS.list.viewWeek
-                    : APPOINTMENTS.list.viewMonth}
+                    : mode === 'month'
+                      ? APPOINTMENTS.list.viewMonth
+                      : APPOINTMENTS.list.viewList}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:flex-none">
             <Button
               type="button"
               size="icon-sm"
               variant="outline"
-              className="rounded-full"
+              className="shrink-0 rounded-full"
               aria-label={APPOINTMENTS.list.prev}
               onClick={() => shift(-1)}
             >
               <ChevronLeft className="size-4" strokeWidth={1.75} />
             </Button>
-            <p className="min-w-[9rem] text-center text-sm font-semibold">{rangeLabel}</p>
+            <p className="min-w-0 flex-1 truncate text-center text-xs font-semibold sm:text-sm">
+              {rangeLabel}
+            </p>
             <Button
               type="button"
               size="icon-sm"
               variant="outline"
-              className="rounded-full"
+              className="shrink-0 rounded-full"
               aria-label={APPOINTMENTS.list.next}
               onClick={() => shift(1)}
             >
               <ChevronRight className="size-4" strokeWidth={1.75} />
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8"
-              onClick={() => setDate(todayKey())}
-            >
-              {APPOINTMENTS.list.today}
-            </Button>
           </div>
+        </div>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          {/* Inline, fixed-size indicator: refetches no longer push the calendar down. */}
+          <Loader2
+            className={cn(
+              'size-4 shrink-0 animate-spin text-muted-foreground',
+              !appointmentsQuery.isFetching && 'invisible',
+            )}
+            aria-label={APPOINTMENTS.list.loadingRange}
+          />
+          <Select value={staffId ?? ALL_STAFF} onValueChange={setStaffFilter}>
+            <SelectTrigger
+              size="sm"
+              className="w-full sm:w-44"
+              aria-label={APPOINTMENTS.list.staffFilter}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_STAFF}>{APPOINTMENTS.list.allStaff}</SelectItem>
+              {staff.map((member) => (
+                <SelectItem key={member._id} value={member._id}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {staffQuery.isLoading || appointmentsQuery.isLoading ? (
+      {staffQuery.isLoading || (appointmentsQuery.isLoading && !appointmentsQuery.isPlaceholderData) ? (
         <LoadingSkeleton rows={8} />
       ) : null}
 
@@ -341,21 +496,54 @@ export function AppointmentsScreen() {
       ) : null}
 
       {!staffQuery.isLoading &&
-      !appointmentsQuery.isLoading &&
+      !(appointmentsQuery.isLoading && !appointmentsQuery.isPlaceholderData) &&
       !staffQuery.isError &&
       !appointmentsQuery.isError ? (
         <div className="grid gap-3 lg:grid-cols-[1fr_340px]">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-3">
+            {staffDayEmpty ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm">
+                <p className="min-w-0">
+                  {APPOINTMENTS.list.staffDayEmpty
+                    .replace('{name}', staff.find((m) => m._id === staffId)?.name ?? '')
+                    .replace('{date}', format(anchor, 'd MMM'))}{' '}
+                  {nextStaffQuery.data ? (
+                    <span className="text-muted-foreground">
+                      {APPOINTMENTS.list.staffNext.replace(
+                        '{when}',
+                        `${format(parseISO(`${nextStaffQuery.data.date}T12:00:00`), 'EEE d MMM')}, ${formatCompactTime(nextStaffQuery.data.startTime)}`,
+                      )}
+                    </span>
+                  ) : nextStaffQuery.isSuccess ? (
+                    <span className="text-muted-foreground">
+                      {APPOINTMENTS.list.staffNoUpcoming.replace(
+                        '{name}',
+                        staff.find((m) => m._id === staffId)?.name ?? '',
+                      )}
+                    </span>
+                  ) : null}
+                </p>
+                {nextStaffQuery.data ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => setDate(nextStaffQuery.data!.date)}
+                  >
+                    {APPOINTMENTS.list.goToDay}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {view === 'day' ? (
               <DayCalendar
                 date={selectedDate}
-                staff={staff}
+                staff={dayStaff}
                 appointments={appointments}
                 selectedId={selected?._id}
                 hours={calendarHours}
-                onSlotClick={(staffId, startTime) =>
-                  openNew(selectedDate, startTime, staffId)
-                }
+                onSlotClick={onDaySlotClick}
                 onAppointmentClick={selectAppt}
               />
             ) : null}
@@ -366,19 +554,43 @@ export function AppointmentsScreen() {
                 selectedId={selected?._id}
                 hours={calendarHours}
                 closedWeekdays={closedWeekdays}
-                onSlotClick={(date, startTime) => openNew(date, startTime)}
+                onSlotClick={onWeekSlotClick}
                 onAppointmentClick={selectAppt}
               />
             ) : null}
             {view === 'month' ? (
               <MonthCalendar
-                month={format(parseISO(selectedDate), 'yyyy-MM')}
+                month={format(anchor, 'yyyy-MM')}
                 appointments={appointments}
-                onDayClick={(date) => {
-                  setDate(date)
-                  setView('day')
-                }}
+                onDayClick={onMonthDayClick}
               />
+            ) : null}
+            {view === 'list' ? (
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {appointments.length === 0 ? (
+                  <li className="px-3 py-6 text-sm text-muted-foreground">
+                    {APPOINTMENTS.list.emptySlot}
+                  </li>
+                ) : (
+                  appointments.map((appt) => (
+                    <li key={appt._id}>
+                      <button
+                        type="button"
+                        className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                        onClick={() => selectAppt(appt)}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {appointmentCustomerLabel(appt)}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          {format(parseISO(`${appt.date}T12:00:00`), 'd MMM')}{' '}
+                          {formatCompactTime(appt.startTime)}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
             ) : null}
           </div>
 

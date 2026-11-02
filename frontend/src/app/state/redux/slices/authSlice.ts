@@ -28,6 +28,10 @@ const authSlice = createSlice({
       state.user = action.payload.user
       state.isAuthenticated = true
     },
+    /** Refresh the signed-in user (role / permissions) without touching the token. */
+    setUser: (state, action: PayloadAction<AuthUser>) => {
+      if (state.isAuthenticated) state.user = action.payload
+    },
     clearCredentials: (state) => {
       state.token = null
       state.user = null
@@ -36,5 +40,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { setCredentials, clearCredentials } = authSlice.actions
+export const { setCredentials, setUser, clearCredentials } = authSlice.actions
 export default authSlice.reducer

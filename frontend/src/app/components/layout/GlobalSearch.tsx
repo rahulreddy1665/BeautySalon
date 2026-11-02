@@ -26,25 +26,12 @@ async function runSearch(
   const hits: Hit[] = []
 
   if (canCustomers) {
-    const all = await customersApi.getAll()
-    const lower = query.toLowerCase()
-    for (const c of all) {
+    // Server-side search (name, email, phone digits): 8 rows, not the whole list.
+    const page = await customersApi.list({ q: query, page: 1, limit: 8 })
+    for (const c of page.items) {
       const name = [c.name, c.lastName].filter(Boolean).join(' ')
       const phone = String(c.phone ?? '')
-      const id = c._id
-      if (
-        name.toLowerCase().includes(lower) ||
-        phone.includes(query.replace(/\D/g, '')) ||
-        id.toLowerCase().includes(lower)
-      ) {
-        hits.push({
-          kind: 'customer',
-          id,
-          title: name || phone,
-          subtitle: phone,
-        })
-      }
-      if (hits.length >= 8) break
+      hits.push({ kind: 'customer', id: c._id, title: name || phone, subtitle: phone })
     }
   }
 
@@ -181,7 +168,7 @@ export function GlobalSearch({ className }: { className?: string }) {
         }}
         onFocus={() => q.trim().length >= 2 && setOpen(true)}
         placeholder={COMMON.nav.searchPlaceholder}
-        className="h-10 rounded-full border-border bg-muted/60 pl-9 lg:h-10"
+        className="h-10 w-full min-w-0 max-w-full rounded-full border-border bg-muted/60 pl-9 lg:h-10"
         aria-autocomplete="list"
         aria-controls={listId}
         aria-expanded={open}
@@ -191,7 +178,7 @@ export function GlobalSearch({ className }: { className?: string }) {
 
   return (
     <>
-      <div ref={wrapRef} className={cn('relative hidden min-w-0 md:block', className)}>
+      <div ref={wrapRef} className={cn('relative hidden min-w-0 max-lg:hidden lg:block', className)}>
         {field}
         {showResults ? (
           <div
@@ -214,7 +201,7 @@ export function GlobalSearch({ className }: { className?: string }) {
         type="button"
         variant="outline"
         size="icon-sm"
-        className="min-touch size-9 rounded-full md:hidden"
+        className="size-10 shrink-0 rounded-full lg:hidden"
         aria-label={COMMON.nav.searchPlaceholder}
         onClick={() => setSheetOpen(true)}
       >
@@ -222,11 +209,11 @@ export function GlobalSearch({ className }: { className?: string }) {
       </Button>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="top" className="rounded-b-2xl pt-safe">
+        <SheetContent side="top" className="w-full max-w-full overflow-x-hidden rounded-b-2xl pt-safe">
           <SheetHeader>
             <SheetTitle className="text-sm">{COMMON.nav.searchPlaceholder}</SheetTitle>
           </SheetHeader>
-          <div className="mt-2 space-y-2">
+          <div className="mt-2 min-w-0 space-y-2 px-4 pb-4">
             {field}
             {loading ? (
               <p className="px-1 text-sm text-muted-foreground">

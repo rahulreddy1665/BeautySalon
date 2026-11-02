@@ -6,7 +6,7 @@
 
 import { BILLING, SETTINGS } from '@/app/constants'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
-import { downloadBlob, generateInvoicePdf } from '@/app/utils/invoicePdf'
+import { releaseCaptureLock } from '@/app/utils/invoicePdf'
 import { fillWhatsAppMessage, normalizeWhatsAppPhone } from '@/app/utils/phone'
 
 const CACHE_PREFIX = 'invoice-share-url:'
@@ -19,9 +19,20 @@ function cacheUrl(invoiceId: string, url: string) {
   }
 }
 
+/** Keep the token path, but always prefix the frontend the staff is using. */
+function withFrontendOrigin(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return url
+  }
+}
+
 function readCachedUrl(invoiceId: string): string | null {
   try {
-    return sessionStorage.getItem(`${CACHE_PREFIX}${invoiceId}`)
+    const cached = sessionStorage.getItem(`${CACHE_PREFIX}${invoiceId}`)
+    return cached ? withFrontendOrigin(cached) : null
   } catch {
     return null
   }
@@ -39,8 +50,9 @@ async function ensureShareUrl(invoiceId: string): Promise<string> {
   const cached = readCachedUrl(invoiceId)
   const result = await invoicesApi.createShareLink(invoiceId)
   if (result.url) {
-    cacheUrl(invoiceId, result.url)
-    return result.url
+    const url = withFrontendOrigin(result.url)
+    cacheUrl(invoiceId, url)
+    return url
   }
   if (result.reused && cached) return cached
   // Active link exists but plaintext was lost — renew once.
@@ -48,8 +60,9 @@ async function ensureShareUrl(invoiceId: string): Promise<string> {
   if (!renewed.url) {
     throw new Error(BILLING.invoice.shareFailed)
   }
-  cacheUrl(invoiceId, renewed.url)
-  return renewed.url
+  const url = withFrontendOrigin(renewed.url)
+  cacheUrl(invoiceId, url)
+  return url
 }
 
 export type SendInvoiceInput = {
@@ -60,7 +73,8 @@ export type SendInvoiceInput = {
   salonName: string
   amountLabel: string
   whatsappTemplate?: string
-  sheetElement: HTMLElement | null
+  /** Opened in the click handler so the browser still allows navigation. */
+  popup: Window | null
 }
 
 export type SendInvoiceOutcome =
@@ -93,43 +107,20 @@ export async function sendInvoiceToCustomer(
     },
   )
 
-  const fileName = `${input.invoiceNumber}.pdf`
-  let pdfFile: File | null = null
-  if (input.sheetElement) {
-    const pdf = await generateInvoicePdf(input.sheetElement, fileName)
-    if (pdf.ok) {
-      pdfFile = new File([pdf.blob], fileName, { type: 'application/pdf' })
-    }
-  }
-
-  const nav = navigator as Navigator & {
-    canShare?: (data?: ShareData) => boolean
-  }
-
-  if (
-    pdfFile &&
-    typeof nav.share === 'function' &&
-    typeof nav.canShare === 'function' &&
-    nav.canShare({ files: [pdfFile] })
-  ) {
-    try {
-      await nav.share({
-        files: [pdfFile],
-        title: input.invoiceNumber,
-        text: message,
-      })
-      return { mode: 'native-share' }
-    } catch {
-      /* user cancelled or share failed — fall through */
-    }
-  }
-
-  if (pdfFile) {
-    downloadBlob(pdfFile, fileName)
-  }
-
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-  window.open(waUrl, '_blank', 'noopener,noreferrer')
+  const popup = input.popup
+  if (popup && !popup.closed) {
+    try {
+      popup.opener = null
+      popup.location.replace(waUrl)
+    } catch {
+      window.open(waUrl, '_blank', 'noopener,noreferrer')
+    }
+  } else {
+    window.open(waUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  releaseCaptureLock()
   return {
     mode: 'wa-me',
     instruction: BILLING.invoice.whatsappDownloaded,

@@ -1,9 +1,16 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-/** Catalog product — name + price only (no stock). */
+export type ProductType = "retail" | "consumable";
+
 export interface IProduct extends Document {
   name: string;
   price: number;
+  type: ProductType;
+  /** When false, stockQty is ignored ("Not tracked"). */
+  trackStock: boolean;
+  /** Derived from ledger; updated only via stock operations. */
+  stockQty: number;
+  unit?: string;
 }
 
 const productSchema = new Schema<IProduct>(
@@ -18,6 +25,25 @@ const productSchema = new Schema<IProduct>(
       type: Number,
       required: true,
       min: 0,
+    },
+    type: {
+      type: String,
+      enum: ["retail", "consumable"],
+      default: "retail",
+      index: true,
+    },
+    trackStock: {
+      type: Boolean,
+      default: false,
+    },
+    stockQty: {
+      type: Number,
+      default: 0,
+    },
+    unit: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   { timestamps: true },

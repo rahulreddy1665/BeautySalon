@@ -8,6 +8,14 @@ export interface CartLineDiscount {
   value: number
 }
 
+export interface CartLineComponent {
+  serviceId: string
+  name: string
+  listPrice: number
+  staffId?: string
+  staffName?: string
+}
+
 export interface CartLine {
   id: string
   catalogId: string
@@ -18,6 +26,8 @@ export interface CartLine {
   staffId?: string
   staffName?: string
   discount: CartLineDiscount
+  /** Combo component staff assignments (kind === 'combo'). */
+  components?: CartLineComponent[]
 }
 
 export interface SectionDiscount {
@@ -98,6 +108,7 @@ const billingCartSlice = createSlice({
       state.customerName = action.payload.name
       state.walkInPhone = ''
       state.appointmentId = null
+      state.loyaltyRedeemPoints = 0
     },
     beginCustomerSearch: (state) => {
       state.walkIn = false
@@ -174,6 +185,11 @@ const billingCartSlice = createSlice({
       const line = state.lines.find((item) => item.id === action.payload.id)
       if (line) Object.assign(line, action.payload.patch)
     },
+    clearLines: (state) => {
+      state.lines = []
+      state.loyaltyRedeemPoints = 0
+      state.tip = 0
+    },
     removeLine: (state, action: PayloadAction<string>) => {
       state.lines = state.lines.filter((item) => item.id !== action.payload)
     },
@@ -206,6 +222,7 @@ const billingCartSlice = createSlice({
     setNotes: (state, action: PayloadAction<string>) => {
       state.notes = action.payload
     },
+    loadCart: (_state, action: PayloadAction<BillingCartState>) => action.payload,
   },
 })
 
@@ -220,6 +237,7 @@ export const {
   addLine,
   updateLine,
   removeLine,
+  clearLines,
   setServiceDiscount,
   setProductDiscount,
   setLoyaltyRedeemPoints,
@@ -229,6 +247,7 @@ export const {
   setPaymentMode,
   setCashReceived,
   setNotes,
+  loadCart,
 } = billingCartSlice.actions
 
 export default billingCartSlice.reducer
@@ -288,16 +307,65 @@ function applyRounding(amount: number, rule: DisplayTotalsInput['rounding']) {
   return { rounded, roundOff: round2(rounded - amount) }
 }
 
+/** Per-line gross / discount / net for bill item rows and summary breakdown. */
+export function lineDisplayAmounts(line: CartLine) {
+  const gross = round2(line.unitPrice * line.qty)
+  const disc = applyDiscount(gross, line.discount)
+  return { gross, disc, net: round2(gross - disc) }
+}
+
+/**
+ * Preview tip split matching backend: equal shares across distinct staff
+ * (services then products, first-seen). Remainder cents go to the first staff.
+ */
+export function previewTipAllocations(
+  tip: number,
+  lines: CartLine[],
+): Array<{ staffId: string; staffName: string; amount: number }> {
+  if (tip <= 0) return []
+  const seen = new Set<string>()
+  const staff: Array<{ staffId: string; staffName: string }> = []
+  const ordered = [
+    ...lines.filter((l) => l.kind === 'service' || l.kind === 'combo'),
+    ...lines.filter((l) => l.kind === 'product'),
+  ]
+  for (const line of ordered) {
+    if (line.kind === 'combo') {
+      for (const comp of line.components ?? []) {
+        if (!comp.staffId || seen.has(comp.staffId)) continue
+        seen.add(comp.staffId)
+        staff.push({
+          staffId: comp.staffId,
+          staffName: comp.staffName?.trim() || comp.staffId,
+        })
+      }
+      continue
+    }
+    if (!line.staffId || seen.has(line.staffId)) continue
+    seen.add(line.staffId)
+    staff.push({
+      staffId: line.staffId,
+      staffName: line.staffName?.trim() || line.staffId,
+    })
+  }
+  if (staff.length === 0) return []
+  const n = staff.length
+  const baseCents = Math.floor(Math.round(tip * 100) / n)
+  const base = baseCents / 100
+  const allocations = staff.map((s) => ({ ...s, amount: base }))
+  const remainder = round2(tip - round2(base * n))
+  if (allocations[0]) {
+    allocations[0].amount = round2(allocations[0].amount + remainder)
+  }
+  return allocations
+}
+
 /** Display-only estimate matching server order. */
 export function selectCartTotals(cart: BillingCartState, tax?: DisplayTotalsInput) {
-  const serviceLines = cart.lines.filter((l) => l.kind === 'service')
+  const serviceLines = cart.lines.filter((l) => l.kind === 'service' || l.kind === 'combo')
   const productLines = cart.lines.filter((l) => l.kind === 'product')
 
-  const lineNet = (line: CartLine) => {
-    const gross = round2(line.unitPrice * line.qty)
-    const disc = applyDiscount(gross, line.discount)
-    return { gross, disc, net: round2(gross - disc) }
-  }
+  const lineNet = (line: CartLine) => lineDisplayAmounts(line)
 
   let serviceGross = 0
   let serviceLineDisc = 0
@@ -351,9 +419,13 @@ export function selectCartTotals(cart: BillingCartState, tax?: DisplayTotalsInpu
     : netAfterDiscounts
 
   const maxRedeemValue = round2((netAfterDiscounts * (tax?.maxRedeemPercent ?? 0)) / 100)
-  const loyaltyRedeemValue = round2(
-    Math.min(cart.loyaltyRedeemPoints * cart.pointsValueRatio, maxRedeemValue),
+  const ratio = Math.max(cart.pointsValueRatio, 0.01)
+  const maxRedeemPointsByBill = Math.floor(maxRedeemValue / ratio)
+  const loyaltyRedeemPoints = Math.min(
+    Math.max(0, Math.floor(cart.loyaltyRedeemPoints)),
+    maxRedeemPointsByBill,
   )
+  const loyaltyRedeemValue = round2(loyaltyRedeemPoints * ratio)
   const afterLoyalty = round2(Math.max(0, afterTax - loyaltyRedeemValue))
   const { rounded, roundOff } = applyRounding(afterLoyalty, tax?.rounding ?? 'none')
   const tip = cart.tip
@@ -372,6 +444,8 @@ export function selectCartTotals(cart: BillingCartState, tax?: DisplayTotalsInpu
     cgst,
     sgst,
     taxTotal,
+    maxRedeemValue,
+    maxRedeemPointsByBill,
     loyaltyRedeemValue,
     roundOff,
     tip,

@@ -56,6 +56,10 @@
   --color-danger-soft: var(--danger-soft);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-login-panel: var(--login-panel);
+  --color-login-panel-foreground: var(--login-panel-foreground);
+  --color-login-panel-muted: var(--login-panel-muted);
+  --color-login-ring: var(--login-ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -129,6 +133,12 @@
   --sidebar: #ffffff;
   --sidebar-foreground: #1a1a1a;
 
+  /* Login brand panel — near-black in both themes */
+  --login-panel: #0b0b0b;
+  --login-panel-foreground: #f2f2f2;
+  --login-panel-muted: #a0a0a8;
+  --login-ring: rgba(242, 242, 242, 0.12);
+
   --chart-1: #ffd700;
   --chart-2: #8a6d00;
   --chart-3: #166534;
@@ -136,6 +146,13 @@
   --chart-5: #6b6b73;
   --chart-cursor: #f0f0f2;
   --chart-track: #ececee;
+
+  /* Payment-mode donut: validated categorical trio (aqua, blue, orange) for the
+     #ffffff card — CVD ΔE ≥ 9.2, normal-vision ΔE ≥ 24. Cash sits at 2.8:1, so
+     every slice also has a visible text label in the legend. */
+  --pay-cash: #1baf7a;
+  --pay-upi: #2a78d6;
+  --pay-card: #eb6834;
 
   --status-booked: #1d4ed8;
   --status-booked-bg: #dbeafe;
@@ -208,6 +225,8 @@
   --sidebar: #141414;
   --sidebar-foreground: #f2f2f2;
 
+  /* Login tokens live on :root only — /login always renders light. */
+
   --chart-1: #ffd700;
   --chart-2: #fde68a;
   --chart-3: #86efac;
@@ -215,6 +234,11 @@
   --chart-5: #a0a0a8;
   --chart-cursor: #262626;
   --chart-track: #262626;
+
+  /* Same three hues stepped for the #141414 card (validated separately). */
+  --pay-cash: #199e70;
+  --pay-upi: #3987e5;
+  --pay-card: #d95926;
 
   --status-booked: #93c5fd;
   --status-booked-bg: #1e3a5f;
@@ -273,6 +297,16 @@
     textarea {
       font-size: 14px;
     }
+  }
+
+  /* Native date/time picker glyphs — tint to brand gold so they stay visible in dark mode */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 1;
+    /* Approximates --gold (#FFD700) from the default black indicator */
+    filter: invert(82%) sepia(70%) saturate(1600%) hue-rotate(359deg) brightness(104%)
+      contrast(104%);
   }
 }
 

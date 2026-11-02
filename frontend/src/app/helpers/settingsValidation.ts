@@ -77,6 +77,7 @@ export const businessSettingsSchema = z
       .optional()
       .or(z.literal('')),
     invoiceFooterNote: z.string().trim().max(200).optional().or(z.literal('')),
+    allowNegativeStock: z.boolean().optional(),
   })
   .refine(
     (v) => {

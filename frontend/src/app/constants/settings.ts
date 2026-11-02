@@ -42,6 +42,9 @@ export const SETTINGS = {
     closingTime: 'Closing time',
     workingDays: 'Working days',
     weeklyOff: 'Weekly off',
+    allowNegativeStock: 'Allow negative stock',
+    allowNegativeStockHint:
+      'When on, tracked products can be sold or used below zero.',
     save: 'Save business profile',
   },
   tax: {

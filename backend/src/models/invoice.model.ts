@@ -56,6 +56,25 @@ export interface IProductItem {
   lineTotal: number;
 }
 
+export interface IComboComponentSnapshot {
+  service: mongoose.Types.ObjectId;
+  name: string;
+  listPrice: number;
+  allocatedAmount: number;
+  staff: mongoose.Types.ObjectId;
+}
+
+export interface IComboItem {
+  combo: mongoose.Types.ObjectId;
+  name: string;
+  price: number;
+  qty: number;
+  discount: ILineDiscount;
+  lineTotal: number;
+  listTotal: number;
+  components: IComboComponentSnapshot[];
+}
+
 export interface ITaxSnapshot {
   gstEnabled: boolean;
   pricesIncludeGst: boolean;
@@ -84,6 +103,7 @@ export interface IInvoice extends Document {
   appointment?: mongoose.Types.ObjectId | null;
   serviceItems: IServiceItem[];
   productItems: IProductItem[];
+  comboItems: IComboItem[];
   serviceSubtotal: number;
   productSubtotal: number;
   serviceDiscountTotal: number;
@@ -107,6 +127,9 @@ export interface IInvoice extends Document {
     phone?: string;
     email?: string;
     invoiceFooterNote?: string;
+    /** Logo store id (content hash). New invoices only store this. */
+    logoId?: string | null;
+    /** Legacy: older invoices embedded the logo; filled in on read for new ones. */
     logoBase64?: string | null;
     logoMimeType?: string | null;
   };
@@ -145,6 +168,34 @@ const productItemSchema = new Schema<IProductItem>(
     staff: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
     discount: { type: discountSchema, default: () => ({ type: "amount", value: 0 }) },
     lineTotal: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const comboComponentSchema = new Schema<IComboComponentSnapshot>(
+  {
+    service: { type: Schema.Types.ObjectId, ref: "Service", required: true },
+    name: { type: String, required: true },
+    listPrice: { type: Number, required: true },
+    allocatedAmount: { type: Number, required: true },
+    staff: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
+  },
+  { _id: false },
+);
+
+const comboItemSchema = new Schema<IComboItem>(
+  {
+    combo: { type: Schema.Types.ObjectId, ref: "Combo", required: true },
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    qty: { type: Number, required: true, min: 1 },
+    discount: {
+      type: discountSchema,
+      default: () => ({ type: "amount", value: 0 }),
+    },
+    lineTotal: { type: Number, required: true },
+    listTotal: { type: Number, required: true },
+    components: { type: [comboComponentSchema], default: [] },
   },
   { _id: false },
 );
@@ -189,6 +240,7 @@ const invoiceSchema = new Schema<IInvoice>(
     },
     serviceItems: { type: [serviceItemSchema], default: [] },
     productItems: { type: [productItemSchema], default: [] },
+    comboItems: { type: [comboItemSchema], default: [] },
     serviceSubtotal: { type: Number, required: true },
     productSubtotal: { type: Number, required: true },
     serviceDiscountTotal: { type: Number, required: true },
@@ -233,6 +285,7 @@ const invoiceSchema = new Schema<IInvoice>(
       phone: { type: String, default: "" },
       email: { type: String, default: "" },
       invoiceFooterNote: { type: String, default: "" },
+      logoId: { type: String, default: null },
       logoBase64: { type: String, default: null },
       logoMimeType: { type: String, default: null },
     },
@@ -253,8 +306,20 @@ const invoiceSchema = new Schema<IInvoice>(
 
 invoiceSchema.index({ createdAt: -1 });
 invoiceSchema.index({ appointment: 1 }, { sparse: true });
+// Customer history / visit counts / "last visit" lookups.
+invoiceSchema.index({ customer: 1, createdAt: -1 });
 
 export const Invoice = mongoose.model<IInvoice>("Invoice", invoiceSchema);
+
+/**
+ * Projection for anything that loads invoices as a list (reports, dashboard,
+ * billing history). Each invoice snapshots the salon logo as base64 (~300 KB),
+ * which list views never use. Only single-invoice views need the snapshots.
+ */
+export const INVOICE_LIST_PROJECTION = "-businessSnapshot -templateSnapshot";
+
+/** Just enough to compute revenue (invoiceRevenue) and tips. */
+export const INVOICE_TOTALS_PROJECTION = "amountPayable grandTotal tip";
 
 /** @deprecated Prefer InvoiceSequence — kept so old year counters don't break reads */
 export interface IInvoiceCounter extends Document {

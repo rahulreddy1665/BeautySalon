@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
@@ -13,8 +13,50 @@ import { toErrorMessage } from '@/app/utils'
 
 export function useAppointmentsQuery(params: AppointmentListParams) {
   return useQuery({
-    queryKey: queryKeys.appointments.list(params as Record<string, unknown>),
+    queryKey: queryKeys.appointments.list({
+      from: params.from ?? '',
+      to: params.to ?? '',
+      date: params.date ?? '',
+      staffId: params.staffId ?? '',
+      status: params.status ?? '',
+      page: params.page ?? 1,
+      limit: params.limit ?? 50,
+    }),
     queryFn: () => appointmentsApi.list(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** All appointments in a date window (never truncated). */
+export function useAppointmentsWindowQuery(
+  params: Omit<AppointmentListParams, 'page' | 'limit'>,
+) {
+  return useQuery({
+    queryKey: queryKeys.appointments.list({
+      from: params.from ?? '',
+      to: params.to ?? '',
+      date: params.date ?? '',
+      staffId: params.staffId ?? '',
+      status: params.status ?? '',
+      window: true,
+    }),
+    queryFn: () => appointmentsApi.listWindow(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** First booked appointment for a staff member on or after `fromDate` (for "next: …" hints). */
+export function useNextStaffAppointmentQuery(
+  staffId: string | undefined,
+  fromDate: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.appointments.list({ next: true, staffId: staffId ?? '', fromDate }),
+    queryFn: () =>
+      appointmentsApi.list({ staffId, from: fromDate, status: 'booked', page: 1, limit: 1 }),
+    enabled: enabled && Boolean(staffId),
+    select: (page) => page.items[0] ?? null,
   })
 }
 

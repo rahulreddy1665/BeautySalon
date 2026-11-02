@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { APPOINTMENTS, COMMON, REPORTS } from '@/app/constants'
 import { APPOINTMENT_STATUSES } from '@/app/constants/enums'
 import { useAppointmentsReportQuery } from '@/app/hooks/queries/useReportsQuery'
@@ -28,7 +29,6 @@ import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi } from '@/app/service/reports/reportsApi'
 import { downloadCsv } from '@/app/utils'
@@ -37,7 +37,6 @@ type ApptRow = {
   id: string
   date: string
   startTime: string
-  endTime: string
   status: string
   customerName: string
   staffNames: string[]
@@ -65,7 +64,7 @@ const columns: ColumnDef<ApptRow>[] = [
   {
     id: 'time',
     header: REPORTS.appointments.table.time,
-    cell: ({ row }) => `${row.original.startTime}–${row.original.endTime}`,
+    cell: ({ row }) => row.original.startTime,
   },
   {
     accessorKey: 'status',
@@ -94,6 +93,7 @@ export function AppointmentsReportScreen() {
   const { range, from, to, setRange } = useReportRangeParams()
   const canExport = useCanExportReports()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [status, setStatus] = useState<string>('all')
   const [staffId, setStaffId] = useState<string>('all')
   const staffQuery = useStaffListQuery({ page: 1, limit: 100 })
@@ -102,7 +102,7 @@ export function AppointmentsReportScreen() {
     from,
     to,
     page,
-    limit: 25,
+    limit: pageSize,
     status: status === 'all' ? undefined : status,
     staffId: staffId === 'all' ? undefined : staffId,
   })
@@ -228,8 +228,8 @@ export function AppointmentsReportScreen() {
       }
       chart={
         !query.isLoading && !query.isError && data && !empty ? (
-          <div className="grid gap-3 lg:grid-cols-3">
-            <Card>
+          <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+            <Card className="min-w-0 overflow-hidden">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.statusTitle}</CardTitle>
               </CardHeader>
@@ -242,7 +242,7 @@ export function AppointmentsReportScreen() {
                 />
               </CardContent>
             </Card>
-            <Card className="lg:col-span-1">
+            <Card className="min-w-0 overflow-hidden lg:col-span-1">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.walkInTitle}</CardTitle>
               </CardHeader>
@@ -253,7 +253,7 @@ export function AppointmentsReportScreen() {
                 />
               </CardContent>
             </Card>
-            <Card className="lg:col-span-3">
+            <Card className="min-w-0 overflow-hidden lg:col-span-3">
               <CardHeader className="pb-1">
                 <CardTitle>{REPORTS.appointments.chart.busyTitle}</CardTitle>
               </CardHeader>
@@ -285,11 +285,16 @@ export function AppointmentsReportScreen() {
                   mobileTitleKey="customerName"
                   emptyTitle={REPORTS.appointments.emptyTitle}
                 />
-                <ReportPagination
+                <Pagination
                   page={page}
                   totalPages={totalPages}
                   total={data.table.total}
+                  pageSize={pageSize}
                   onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size)
+                    setPage(1)
+                  }}
                 />
               </CardContent>
             </Card>

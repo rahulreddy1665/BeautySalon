@@ -27,6 +27,10 @@ export const COMMON = {
     next: 'Next',
     previous: 'Previous',
   },
+  pagination: {
+    showing: '{from}–{to} of {total}',
+    rowsPerPage: 'Rows per page',
+  },
   labels: {
     name: 'Name',
     phone: 'Phone',
@@ -63,7 +67,11 @@ export const COMMON = {
     noAccessHint: 'Ask an admin if you need permission.',
     notFound: 'Page not found',
     notFoundHint: 'That screen does not exist.',
+    tryAgain: 'Try again',
+    reload: 'Reload',
     goHome: 'Go to dashboard',
+    newVersion: 'A new version is available',
+    serverUnreachable: "Can't reach the server, retrying",
   },
   toasts: {
     saved: 'Saved',
@@ -71,6 +79,17 @@ export const COMMON = {
     copied: 'Copied',
   },
   nav: {
+    installApp: 'Install app',
+    installAppTitle: 'Install BeautySalon',
+    installSteps: {
+      chrome:
+        'Click the install icon at the right end of the address bar, or open the ⋮ menu → Cast, save and share → Install page as app.',
+      edge: 'Click the install icon in the address bar, or open the … menu → Apps → Install this site as an app.',
+      'safari-mac': 'In Safari, open the File menu and choose “Add to Dock”.',
+      'safari-ios': 'Tap the Share button, then “Add to Home Screen”.',
+      firefox: 'Firefox can’t install web apps. Open this site in Chrome, Edge or Safari to install it.',
+      other: 'Use your browser’s menu to install this site as an app (Chrome, Edge and Safari support this).',
+    },
     dashboard: 'Dashboard',
     appointments: 'Appointments',
     customers: 'Customers',

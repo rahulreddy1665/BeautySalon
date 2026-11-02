@@ -1,14 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
 import { billingApi, type CreateBillPayload } from '@/app/service/billing/billingApi'
+import { invoicesApi } from '@/app/service/invoices/invoicesApi'
 import { toErrorMessage } from '@/app/utils'
 
-export function useBillsQuery(params: Record<string, unknown> = {}) {
+/** Paginated bills; keeps the current page on screen while the next one loads. */
+export function useBillsPageQuery(params: Record<string, unknown>) {
   return useQuery({
-    queryKey: queryKeys.billing.list(params),
-    queryFn: () => billingApi.list(params),
+    queryKey: queryKeys.billing.list({ ...params, paged: true }),
+    queryFn: () => billingApi.listPage(params),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -24,6 +32,13 @@ export function useBillingProductsQuery() {
   return useQuery({
     queryKey: queryKeys.billing.products(),
     queryFn: () => billingApi.products(),
+  })
+}
+
+export function usePopularBillingItemsQuery(limit = 12) {
+  return useQuery({
+    queryKey: queryKeys.billing.popular(limit),
+    queryFn: () => invoicesApi.popular(limit),
   })
 }
 

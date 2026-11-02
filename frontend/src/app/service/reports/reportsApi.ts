@@ -184,7 +184,6 @@ export interface AppointmentsReportData {
     id: string
     date: string
     startTime: string
-    endTime: string
     status: string
     customerName: string
     staffNames: string[]

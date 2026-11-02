@@ -1,12 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-  <rect width="64" height="64" rx="8" fill="currentColor" opacity="0.14"/>
-  <text
-    x="32"
-    y="41"
-    text-anchor="middle"
-    font-family="Inter, system-ui, sans-serif"
-    font-size="22"
-    font-weight="700"
-    fill="currentColor"
-  >BS</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#0b0b0b"/>
+  <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAM1BMVEUTDgdpTBJcRBVCLw0LCwseFAZ3WBYQDAUXDwYNCQRPORA0JAkpGgaJaiFvWyiZfDCtjzzjZzScAAAACXBIWXMAAAPoAAAD6AG1e1JrAAABLElEQVQ4y7WT23LFIAhFuRREwZj//9qiJw8m6Uxf2j2ZhMhyCzrC1y+CPwHqVFmC1CdagxuwBm0NF4M3UOqcXZ2Og7yaXSYbkPkimGk6xohF3B0yH9qwp+g4+fK4gLIWMHUZqNrc6JRVxw5ApVb87NoHhR1HsRuQEhUJllJ8kPj4WGxAZbIISyhcwzqXOwC1oXakg3H0rqRvgHN17adqdtKUeBWxA66NiJnYmcPR4QFAFhmYgUCguJpZHssGWCGtmFshObtigwnsDiamVFvPGiILzt+ng5n0PvssgSjyAqaFUVecm20z/wJMXMypeXpc+YcD0+qRlTAP7AlYYW44pUioDHcApkPkypF95icf2IEZW+5i45Zarx8AuekGrNgeegHwK3BHYAf++fJ+A27LFVl4/qNFAAAAAElFTkSuQmCC" width="32" height="32"/>
 </svg>

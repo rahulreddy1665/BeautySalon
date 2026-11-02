@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Search, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -8,15 +8,16 @@ import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { CUSTOMERS } from '@/app/constants'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useCustomersPageQuery } from '@/app/hooks/queries/useCustomersQuery'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
 import type { Customer } from '@/app/service/customers/customersApi'
 import { CustomerFormSheet } from '@/app/screens/customers/CustomerFormSheet'
-
-const PAGE_SIZE = 20
+import { CustomerImportDialog } from '@/app/screens/customers/CustomerImportDialog'
 
 function displayName(customer: Customer): string {
-  return [customer.name, customer.lastName].filter(Boolean).join(' ')
+  return [customer.name, customer.lastName].filter(Boolean).join(' ') || 'Unnamed'
 }
 
 const columns: ColumnDef<Customer & { fullName: string; phoneLabel: string }>[] = [
@@ -41,12 +42,20 @@ const columns: ColumnDef<Customer & { fullName: string; phoneLabel: string }>[] 
 ]
 
 export function CustomersScreen() {
-  const { data, isLoading, isError, error, refetch } = useCustomersQuery()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Wait for a pause in typing before hitting the server.
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const { data, isLoading, isError, error, refetch } = useCustomersPageQuery({
+    page,
+    limit: pageSize,
+    q: debouncedSearch || undefined,
+  })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const wantsNew = searchParams.get('new') === '1'
   const createOpen = sheetOpen || wantsNew
 
@@ -62,31 +71,33 @@ export function CustomersScreen() {
     )
   }
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = (data ?? []).map((customer) => ({
-      ...customer,
-      fullName: displayName(customer),
-      phoneLabel: String(customer.phone ?? ''),
-    }))
-
-    if (!q) return rows
-
-    return rows.filter((customer) => {
-      const haystack = [customer.fullName, customer.phoneLabel, customer.email ?? '']
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(q)
-    })
-  }, [data, search])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, pageCount - 1)
-  const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  const pageRows = useMemo(
+    () =>
+      (data?.items ?? []).map((customer) => ({
+        ...customer,
+        fullName: displayName(customer),
+        phoneLabel: String(customer.phone ?? ''),
+      })),
+    [data],
+  )
 
   return (
     <div className="min-w-0 space-y-3">
-      <PageHeader description={CUSTOMERS.list.description} />
+      <PageHeader
+        description={CUSTOMERS.list.description}
+        actions={
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="size-4" strokeWidth={1.75} />
+            {CUSTOMERS.list.import}
+          </Button>
+        }
+      />
 
       <div className="relative max-w-md">
         <Search
@@ -97,7 +108,7 @@ export function CustomersScreen() {
           value={search}
           onChange={(event) => {
             setSearch(event.target.value)
-            setPage(0)
+            setPage(1)
           }}
           placeholder={CUSTOMERS.list.searchPlaceholder}
           className="pl-8"
@@ -129,36 +140,17 @@ export function CustomersScreen() {
             }
           />
 
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {filtered.length} customer{filtered.length === 1 ? '' : 's'}
-              {search ? ' matching' : ''}
-              {' · '}
-              Client-side page {safePage + 1} of {pageCount}
-            </span>
-            <div className="flex gap-1.5">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8"
-                disabled={safePage <= 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8"
-                disabled={safePage >= pageCount - 1}
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={data?.page ?? page}
+            totalPages={data?.totalPages ?? 1}
+            total={data?.total ?? 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
 
           {/* Quick edit from list via detail; keep create sheet here */}
           <CustomerFormSheet
@@ -176,6 +168,8 @@ export function CustomersScreen() {
           />
         </>
       ) : null}
+
+      <CustomerImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { addDays, format, isSameDay, parseISO, startOfWeek } from 'date-fns'
+import { memo } from 'react'
 
 import {
   appointmentCustomerLabel,
@@ -12,13 +13,14 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
+  formatCompactTime,
   formatHourLabel,
   minutesToTime,
   type CalendarHours,
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
-import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
+import { isAppointmentPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface Props {
   weekStart: string
@@ -40,7 +42,8 @@ const WEEKDAY_KEYS = [
   'saturday',
 ] as const
 
-export function WeekCalendar({
+/** Memoised: re-renders only when its data changes, not on every parent update. */
+export const WeekCalendar = memo(function WeekCalendar({
   weekStart,
   appointments,
   selectedId,
@@ -56,7 +59,7 @@ export function WeekCalendar({
   const today = new Date()
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-border">
       <div
         className="grid min-w-[720px] overflow-y-hidden"
         style={{
@@ -76,7 +79,7 @@ export function WeekCalendar({
                 closed && 'bg-muted/50',
               )}
             >
-              <p className="text-[10px] uppercase text-muted-foreground">
+              <p className="truncate text-[10px] uppercase text-muted-foreground">
                 {format(day, 'EEE')}
               </p>
               <p
@@ -95,7 +98,7 @@ export function WeekCalendar({
           {slots.map((mins) => (
             <div
               key={mins}
-              className="border-b border-border px-1 text-[10px] text-muted-foreground tabular-nums"
+              className="border-b border-r border-border px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums"
               style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
             >
               {mins % 60 === 0 ? formatHourLabel(mins) : ''}
@@ -108,7 +111,7 @@ export function WeekCalendar({
           const closed = closedWeekdays.includes(WEEKDAY_KEYS[day.getDay()] ?? '')
           const dayAppts = appointments.filter(
             (a) =>
-              a.date === key && appointmentOverlapsHours(a.startTime, a.endTime, hours),
+              a.date === key && appointmentOverlapsHours(a.startTime, hours),
           )
           return (
             <div
@@ -145,9 +148,9 @@ export function WeekCalendar({
                 )
               })}
               {dayAppts.map((appt) => {
-                const past = isAppointmentEndPast(appt.date, appt.endTime)
+                const past = isAppointmentPast(appt.date, appt.startTime)
                 const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
-                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const rawHeight = appointmentHeightPx()
                 const height = Math.min(
                   Math.max(rawHeight - 2, 28),
                   Math.max(0, gridHeight - top),
@@ -161,19 +164,31 @@ export function WeekCalendar({
                       appointmentStatusClasses(appt.status, selectedId === appt._id),
                       past && 'opacity-60',
                     )}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTime(appt.startTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onAppointmentClick(appt)
                     }}
                   >
-                    <p className="truncate font-semibold">
-                      {appointmentCustomerLabel(appt)}
-                    </p>
-                    <p className="truncate opacity-80">{appt.services[0]?.name}</p>
-                    <p className="truncate opacity-70">
-                      {appointmentStaffName(appt.services[0]!)}
-                    </p>
+                    {height < 40 ? (
+                      <p className="truncate leading-tight">
+                        {appointmentCustomerLabel(appt)}{' '}
+                        {formatCompactTime(appt.startTime)}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="truncate font-semibold">
+                          {appointmentCustomerLabel(appt)}
+                        </p>
+                        <p className="truncate opacity-80">
+                          {formatCompactTime(appt.startTime)}
+                        </p>
+                        <p className="truncate opacity-70">
+                          {appointmentStaffName(appt.services[0]!)}
+                        </p>
+                      </>
+                    )}
                   </button>
                 )
               })}
@@ -183,4 +198,4 @@ export function WeekCalendar({
       </div>
     </div>
   )
-}
+})

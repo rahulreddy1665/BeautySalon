@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
+  ArrowLeft,
   BarChart3,
   CalendarDays,
   ChevronRight,
@@ -12,13 +14,17 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Receipt,
   Scissors,
   Settings,
   UserRound,
   Users,
+  MonitorDown,
 } from 'lucide-react'
 
+import { ErrorBoundary } from '@/app/components/ErrorBoundary'
+import { LoadingSkeleton } from '@/app/components/LoadingSkeleton'
 import { GlobalSearch } from '@/app/components/layout/GlobalSearch'
 import { Logo } from '@/app/components/Logo'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
@@ -43,7 +49,7 @@ import {
   SheetTrigger,
 } from '@/app/components/ui/sheet'
 import { COMMON, ROUTES } from '@/app/constants'
-import { useNavBadgesQuery } from '@/app/hooks/queries/useNavBadgesQuery'
+import { useInstallApp } from '@/app/hooks/useInstallApp'
 import { permissionForPath, useHasPermission } from '@/app/hooks/useHasPermission'
 import { useAppDispatch, useAppSelector } from '@/app/hooks/useRedux'
 import { clearCredentials } from '@/app/state/redux/slices/authSlice'
@@ -58,7 +64,6 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   end?: boolean
-  badge?: 'appointments' | 'customers' | 'services'
 }
 
 const generalNav: NavItem[] = [
@@ -67,19 +72,16 @@ const generalNav: NavItem[] = [
     to: '/appointments',
     label: COMMON.nav.appointments,
     icon: CalendarDays,
-    badge: 'appointments',
   },
   {
     to: '/customers',
     label: COMMON.nav.customers,
     icon: Users,
-    badge: 'customers',
   },
   {
     to: '/services',
     label: COMMON.nav.services,
     icon: Scissors,
-    badge: 'services',
   },
   { to: '/inventory', label: COMMON.nav.products, icon: Package },
   { to: '/staff', label: COMMON.nav.staff, icon: UserRound },
@@ -98,8 +100,8 @@ const managementNav: NavItem[] = [
 const mobilePrimary: NavItem[] = [
   { to: '/', label: COMMON.nav.dashboard, icon: LayoutDashboard, end: true },
   { to: '/appointments', label: COMMON.nav.appointments, icon: CalendarDays },
-  { to: '/customers', label: COMMON.nav.customers, icon: Users },
   { to: '/billing', label: COMMON.nav.billing, icon: Receipt },
+  { to: '/customers', label: COMMON.nav.customers, icon: Users },
 ]
 
 const mobileMore: NavItem[] = [
@@ -107,6 +109,22 @@ const mobileMore: NavItem[] = [
   ...financeNav.filter((i) => i.to !== '/billing'),
   ...managementNav,
 ]
+
+function pageTitle(pathname: string): string {
+  if (pathname === '/' || pathname === '') return COMMON.nav.dashboard
+  if (pathname.startsWith('/appointments')) return COMMON.nav.appointments
+  if (pathname.startsWith('/customers')) return COMMON.nav.customers
+  if (pathname.startsWith('/billing/new')) return COMMON.nav.newBill
+  if (pathname.startsWith('/billing')) return COMMON.nav.billing
+  if (pathname.startsWith('/staff')) return COMMON.nav.staff
+  if (pathname.startsWith('/services')) return COMMON.nav.services
+  if (pathname.startsWith('/inventory')) return COMMON.nav.products
+  if (pathname.startsWith('/loyalty')) return COMMON.nav.loyalty
+  if (pathname.startsWith('/reports')) return COMMON.nav.reports
+  if (pathname.startsWith('/settings')) return COMMON.nav.settings
+  if (pathname.startsWith('/account')) return COMMON.nav.account
+  return COMMON.appName
+}
 
 function initials(name?: string | null): string {
   if (!name) return '?'
@@ -128,25 +146,13 @@ function useVisibleNav(items: readonly NavItem[]): NavItem[] {
   })
 }
 
-function NavBadge({ value }: { value: number | null | undefined }) {
-  if (value == null || value <= 0) return null
-  const label = value > 99 ? '99+' : String(value)
-  return (
-    <span className="ml-auto rounded-full bg-gold-soft px-1.5 py-0.5 text-[10px] font-semibold text-gold-deep tabular-nums">
-      {label}
-    </span>
-  )
-}
-
 function SidebarLink({
   item,
   collapsed,
-  badgeValue,
   onNavigate,
 }: {
   item: NavItem
   collapsed: boolean
-  badgeValue?: number | null
   onNavigate?: () => void
 }) {
   return (
@@ -164,12 +170,7 @@ function SidebarLink({
       }
     >
       <item.icon className="size-4 shrink-0" strokeWidth={1.75} />
-      {!collapsed ? (
-        <>
-          <span className="truncate">{item.label}</span>
-          <NavBadge value={badgeValue} />
-        </>
-      ) : null}
+      {!collapsed ? <span className="truncate">{item.label}</span> : null}
     </NavLink>
   )
 }
@@ -178,16 +179,10 @@ function NavGroup({
   label,
   items,
   collapsed,
-  badges,
 }: {
   label: string
   items: NavItem[]
   collapsed: boolean
-  badges: {
-    appointments?: number | null
-    customers?: number | null
-    services?: number | null
-  }
 }) {
   if (items.length === 0) return null
   return (
@@ -204,15 +199,6 @@ function NavGroup({
           key={item.to}
           item={item}
           collapsed={collapsed}
-          badgeValue={
-            item.badge === 'appointments'
-              ? badges.appointments
-              : item.badge === 'customers'
-                ? badges.customers
-                : item.badge === 'services'
-                  ? badges.services
-                  : null
-          }
         />
       ))}
     </div>
@@ -225,6 +211,8 @@ function ContextualCta() {
   const canAppt = useHasPermission('appointment:create')
   const canCustomer = useHasPermission('customer:create')
   const path = location.pathname
+
+  if (path === '/billing/new' || path.startsWith('/billing/new/')) return null
 
   let to: string | null = null
   let label: string | null = null
@@ -242,25 +230,25 @@ function ContextualCta() {
 
   return (
     <>
-      <Button asChild size="sm" className="hidden h-10 rounded-full px-4 sm:inline-flex">
+      <Button asChild size="sm" className="hidden h-10 rounded-full px-4 lg:inline-flex">
         <Link to={to}>{label}</Link>
       </Button>
-      <IconButton asChild className="sm:hidden" aria-label={label}>
-        <Link to={to}>
-          {path.startsWith('/appointments') ? (
-            <CalendarDays strokeWidth={1.75} />
-          ) : path.startsWith('/customers') ? (
-            <Users strokeWidth={1.75} />
-          ) : (
-            <Receipt strokeWidth={1.75} />
-          )}
+      <Button
+        asChild
+        size="sm"
+        className="inline-flex h-10 shrink-0 rounded-full px-3 whitespace-nowrap lg:hidden"
+      >
+        <Link to={to} aria-label={label}>
+          <Plus className="size-4 shrink-0" strokeWidth={1.75} />
+          <span className="max-[340px]:sr-only">{label}</span>
         </Link>
-      </IconButton>
+      </Button>
     </>
   )
 }
 
 function UserMenu({ compact }: { compact?: boolean }) {
+  const installApp = useInstallApp()
   const dispatch = useAppDispatch()
   const user = useAppSelector((s) => s.auth.user)
   const themeMode = useAppSelector((s) => s.settings.themeMode)
@@ -272,8 +260,10 @@ function UserMenu({ compact }: { compact?: boolean }) {
         <button
           type="button"
           className={cn(
-            'flex w-full items-center gap-2 rounded-xl border border-border bg-card p-2 text-left hover:bg-muted/60',
-            compact && 'size-9 justify-center rounded-full border-0 p-0',
+            'flex items-center gap-2 text-left hover:bg-muted/60',
+            compact
+              ? 'size-9 justify-center rounded-full'
+              : 'w-full rounded-xl border border-border bg-card p-2',
           )}
         >
           <Avatar className="size-9">
@@ -303,6 +293,23 @@ function UserMenu({ compact }: { compact?: boolean }) {
             {COMMON.nav.account}
           </Link>
         </DropdownMenuItem>
+        {installApp.available ? (
+          <DropdownMenuItem
+            onClick={() => {
+              if (installApp.canPrompt) {
+                void installApp.install()
+                return
+              }
+              toast.info(COMMON.nav.installAppTitle, {
+                description: COMMON.nav.installSteps[installApp.browser],
+                duration: 10000,
+              })
+            }}
+          >
+            <MonitorDown className="size-4" strokeWidth={1.75} />
+            {COMMON.nav.installApp}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           {COMMON.nav.theme}
@@ -334,6 +341,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
 export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const [moreOpen, setMoreOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -342,18 +350,18 @@ export function AppLayout() {
       return false
     }
   })
-  const badgesQuery = useNavBadgesQuery()
-  const badges = {
-    appointments: badgesQuery.data?.appointmentsToday,
-    customers: badgesQuery.data?.customersTotal,
-    services: badgesQuery.data?.servicesTotal,
-  }
-
   const visibleGeneral = useVisibleNav(generalNav)
   const visibleFinance = useVisibleNav(financeNav)
   const visibleManagement = useVisibleNav(managementNav)
   const visiblePrimary = useVisibleNav(mobilePrimary)
   const visibleMore = useVisibleNav(mobileMore)
+  const isNewBill = location.pathname === ROUTES.billingNew
+  const mobileBackTo = isNewBill
+    ? ROUTES.billing
+    : location.pathname === ROUTES.account
+      ? ROUTES.home
+      : null
+  const themeMode = useAppSelector((s) => s.settings.themeMode)
 
   useEffect(() => {
     try {
@@ -385,29 +393,31 @@ export function AppLayout() {
             label={COMMON.nav.groupGeneral}
             items={visibleGeneral}
             collapsed={collapsed}
-            badges={badges}
           />
           <NavGroup
             label={COMMON.nav.groupFinance}
             items={visibleFinance}
             collapsed={collapsed}
-            badges={badges}
           />
           <NavGroup
             label={COMMON.nav.groupManagement}
             items={visibleManagement}
             collapsed={collapsed}
-            badges={badges}
           />
         </nav>
 
-        <div className="border-t border-border p-2">
+        <div
+          className={cn(
+            'border-t border-border p-2',
+            collapsed && 'flex justify-center',
+          )}
+        >
           <UserMenu compact={collapsed} />
         </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] shrink-0 items-center gap-2 border-b border-border bg-card pt-[env(safe-area-inset-top,0px)] px-3 md:px-4 lg:h-16 lg:pt-0">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top,0px)] md:px-4 lg:h-16 lg:pt-0">
           <IconButton
             className="hidden lg:inline-flex"
             aria-label={collapsed ? COMMON.nav.expandSidebar : COMMON.nav.collapseSidebar}
@@ -420,15 +430,32 @@ export function AppLayout() {
             )}
           </IconButton>
 
+          {mobileBackTo ? (
+            <IconButton
+              className="lg:hidden"
+              aria-label={COMMON.actions.back}
+              onClick={() => navigate(mobileBackTo)}
+            >
+              <ArrowLeft strokeWidth={1.75} />
+            </IconButton>
+          ) : null}
+
           <div className="lg:hidden">
             <Logo size="sm" showText={false} />
           </div>
 
-          <GlobalSearch className="max-w-md flex-1" />
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold lg:hidden">
+            {pageTitle(location.pathname)}
+          </p>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <ThemeToggle />
+          <GlobalSearch className="min-w-0 max-w-md lg:flex-1" />
+
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:ml-auto">
+            <div className="hidden lg:contents">
+              <ThemeToggle />
+            </div>
             <IconButton
+              className="hidden lg:inline-flex"
               aria-label={COMMON.nav.todayCalendar}
               onClick={() =>
                 navigate(`${ROUTES.appointments}?date=${getSalonNow().dateKey}`)
@@ -443,13 +470,27 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)] md:px-5 md:py-5 lg:pb-5">
-          <Outlet />
+        <main
+          className={cn(
+            'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 md:px-5 md:py-5 lg:pb-5',
+            isNewBill
+              ? 'pb-[calc(4rem+1.5rem+env(safe-area-inset-bottom,0px))]'
+              : 'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+0.75rem)]',
+          )}
+        >
+          <ErrorBoundary key={location.pathname}>
+            <Suspense fallback={<LoadingSkeleton rows={6} />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] lg:hidden',
+          isNewBill && 'hidden',
+        )}
         aria-label="Mobile navigation"
       >
         {visiblePrimary.map((item) => (
@@ -494,6 +535,40 @@ export function AppLayout() {
               </SheetTitle>
             </SheetHeader>
             <div className="mt-2 space-y-0.5">
+              <button
+                type="button"
+                className="flex h-10 w-full items-center gap-2 rounded-full px-3 text-left text-sm hover:bg-muted/70"
+                onClick={() => {
+                  setMoreOpen(false)
+                  navigate(`${ROUTES.appointments}?date=${getSalonNow().dateKey}`)
+                }}
+              >
+                <CalendarDays className="size-4" strokeWidth={1.75} />
+                {COMMON.nav.todayCalendar}
+              </button>
+              <p className="px-3 pt-2 text-xs text-muted-foreground">
+                {COMMON.nav.theme}
+              </p>
+              <div className="flex gap-1.5 px-3 pb-1">
+                {(['light', 'dark', 'system'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={cn(
+                      'h-10 flex-1 rounded-full border border-border text-xs',
+                      themeMode === mode &&
+                        'border-primary bg-gold-soft font-medium text-gold-deep',
+                    )}
+                    onClick={() => dispatch(setThemeMode(mode))}
+                  >
+                    {mode === 'light'
+                      ? COMMON.nav.themeLight
+                      : mode === 'dark'
+                        ? COMMON.nav.themeDark
+                        : COMMON.nav.themeSystem}
+                  </button>
+                ))}
+              </div>
               {visibleMore.map((item) => (
                 <NavLink
                   key={item.to}

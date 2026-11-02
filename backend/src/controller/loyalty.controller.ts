@@ -6,6 +6,7 @@ import {
   getLoyaltyRules,
   listLoyaltyBalances,
   listLoyaltyLedger,
+  listLoyaltyMembers,
   patchLoyaltyRules,
 } from "../services/loyalty.service";
 import { sendResponse } from "../middlewares/response.middleware";
@@ -136,6 +137,27 @@ export const adjustLoyaltyController = async (req: Request, res: Response) => {
     return sendResponse(res, {
       statusCode: 500,
       message: "Adjust failed",
+      errors: error,
+    });
+  }
+};
+
+export const listMembersController = async (req: Request, res: Response) => {
+  try {
+    const data = await listLoyaltyMembers({
+      page: req.query.page,
+      limit: req.query.limit,
+      q: req.query.q,
+    });
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message: data.statusCode == 200 ? "Loyalty members" : "Failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Failed",
       errors: error,
     });
   }

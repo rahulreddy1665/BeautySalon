@@ -10,13 +10,13 @@ import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTabl
 import { StatCard } from '@/app/components/StatCard'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { COMMON, REPORTS } from '@/app/constants'
 import { useProductsReportQuery } from '@/app/hooks/queries/useReportsQuery'
 import { useCanExportReports } from '@/app/hooks/useCanExportReports'
 import { useReportRangeParams } from '@/app/hooks/useReportRangeParams'
 import {
   ReportPageLayout,
-  ReportPagination,
 } from '@/app/screens/reports/ReportPageLayout'
 import { reportsApi } from '@/app/service/reports/reportsApi'
 import { downloadCsv, formatMoneyOrDash, formatNumber } from '@/app/utils'
@@ -103,9 +103,10 @@ export function ProductsReportScreen() {
   const { range, from, to, setRange } = useReportRangeParams()
   const canExport = useCanExportReports()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [chartMode, setChartMode] = useState<'revenue' | 'count'>('revenue')
 
-  const query = useProductsReportQuery({ from, to, page, limit: 25 })
+  const query = useProductsReportQuery({ from, to, page, limit: pageSize })
   const data = query.data
   const empty = Boolean(data && data.table.total === 0)
   const totalPages = data
@@ -228,11 +229,16 @@ export function ProductsReportScreen() {
                     mobileTitleKey="name"
                     emptyTitle={REPORTS.products.emptyTitle}
                   />
-                  <ReportPagination
+                  <Pagination
                     page={page}
                     totalPages={totalPages}
                     total={data.table.total}
+                    pageSize={pageSize}
                     onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size)
+                      setPage(1)
+                    }}
                   />
                 </CardContent>
               </Card>

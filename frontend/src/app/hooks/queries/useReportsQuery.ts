@@ -19,6 +19,7 @@ export function useSalesReportQuery(params: {
   chartSeries?: string
   sort?: string
   order?: string
+  allBills?: boolean
 }) {
   return useQuery({
     queryKey: queryKeys.reports.sales(params),

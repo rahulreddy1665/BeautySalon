@@ -1,8 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
 import {
   loyaltyApi,
   type AdjustLoyaltyPayload,
@@ -17,14 +21,30 @@ export function useLoyaltyRulesQuery() {
   })
 }
 
-export function useLoyaltyBalancesQuery() {
-  const customersQuery = useCustomersQuery()
-  const ids = (customersQuery.data ?? []).map((c) => c._id)
+/**
+ * Loyalty balances. Omit `customerIds` for every balance (only customers with
+ * points have one), or pass the few IDs on screen. Never pass the whole customer
+ * list: the IDs go in the URL and long URLs are rejected by the proxy.
+ */
+export function useLoyaltyBalancesQuery(
+  customerIds?: string[],
+  options: { enabled?: boolean } = {},
+) {
+  const ids = customerIds ? [...new Set(customerIds)].sort() : undefined
 
   return useQuery({
-    queryKey: [...queryKeys.loyalty.balances(), ids] as const,
+    queryKey: [...queryKeys.loyalty.balances(), ids ?? 'all'] as const,
     queryFn: () => loyaltyApi.listBalances(ids),
-    enabled: !customersQuery.isLoading && !customersQuery.isError,
+    enabled: (options.enabled ?? true) && (ids === undefined || ids.length > 0),
+  })
+}
+
+/** One page of loyalty members (server-side search, sort and paging). */
+export function useLoyaltyMembersQuery(params: { page: number; limit: number; q?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.loyalty.all, 'members', params] as const,
+    queryFn: () => loyaltyApi.listMembers(params),
+    placeholderData: keepPreviousData,
   })
 }
 

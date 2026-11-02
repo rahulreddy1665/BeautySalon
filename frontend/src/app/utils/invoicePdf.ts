@@ -23,6 +23,18 @@ function pageFormat(templateId: string | null): {
   return { format: 'a4', margin: [10, 10, 10, 10] }
 }
 
+/** Drop the off-screen capture frame that otherwise steals the cursor after a tab switch. */
+export function releaseCaptureLock(): void {
+  document.querySelectorAll('iframe.html2canvas-container').forEach((node) => {
+    node.remove()
+  })
+  document.documentElement.style.overflow = ''
+  document.body.style.overflow = ''
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = ''
+  }
+}
+
 function prepareClone(source: HTMLElement): {
   host: HTMLElement
   clone: HTMLElement
@@ -58,6 +70,10 @@ export async function generateInvoicePdf(
   const templateId = element.getAttribute('data-template')
   const { format, margin } = pageFormat(templateId)
   const { host, clone } = prepareClone(element)
+  const onHide = () => {
+    if (document.visibilityState === 'hidden') releaseCaptureLock()
+  }
+  document.addEventListener('visibilitychange', onHide)
 
   try {
     const background =
@@ -108,7 +124,9 @@ export async function generateInvoicePdf(
   } catch {
     return { ok: false, reason: 'failed', fileName }
   } finally {
+    document.removeEventListener('visibilitychange', onHide)
     host.remove()
+    releaseCaptureLock()
   }
 }
 

@@ -5,6 +5,7 @@ import {
   createService,
   deleteService,
   getServiceById,
+  getServiceCatalog,
   getServiceCategories,
   getServices,
   importServices,
@@ -37,6 +38,10 @@ export const getServicesController = async (req: Request, res: Response) => {
       search: typeof req.query.search === "string" ? req.query.search : undefined,
       category:
         typeof req.query.category === "string" ? req.query.category : undefined,
+      categoryId:
+        typeof req.query.categoryId === "string"
+          ? req.query.categoryId
+          : undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
@@ -49,6 +54,27 @@ export const getServicesController = async (req: Request, res: Response) => {
     return sendResponse(res, {
       statusCode: 500,
       message: "Service get failed",
+      errors: error,
+    });
+  }
+};
+
+export const getServiceCatalogController = async (
+  _req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await getServiceCatalog();
+    return sendResponse(res, {
+      statusCode: data.statusCode,
+      message:
+        data.statusCode == 200 ? "Service catalog" : "Service catalog failed",
+      data: data.data,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      message: "Service catalog failed",
       errors: error,
     });
   }
@@ -186,12 +212,6 @@ export const importServicesController = async (req: Request, res: Response) => {
         name: pick("name", "service name", "service"),
         category: pick("category", "service category"),
         price: pick("price", "price (inr)", "amount"),
-        durationMinutes: pick(
-          "duration (min)",
-          "duration",
-          "durationminutes",
-          "duration_minutes",
-        ),
       };
     });
 
@@ -200,7 +220,6 @@ export const importServicesController = async (req: Request, res: Response) => {
         name: r.name !== undefined ? String(r.name) : undefined,
         category: r.category !== undefined ? String(r.category) : undefined,
         price: r.price,
-        durationMinutes: r.durationMinutes,
       })),
     );
 

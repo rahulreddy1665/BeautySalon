@@ -1,14 +1,29 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/app/hooks/queries/queryKeys'
-import { customersApi, type CustomerInput } from '@/app/service/customers/customersApi'
+import {
+  customersApi,
+  type CustomerInput,
+  type CustomerListParams,
+} from '@/app/service/customers/customersApi'
 import { toErrorMessage } from '@/app/utils'
 
-export function useCustomersQuery() {
+/** Server-paginated / searched customers. Keeps the previous page visible while the next loads. */
+export function useCustomersPageQuery(
+  params: CustomerListParams,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
-    queryKey: queryKeys.customers.list(),
-    queryFn: () => customersApi.getAll(),
+    queryKey: queryKeys.customers.list(params as Record<string, unknown>),
+    queryFn: () => customersApi.list(params),
+    placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   })
 }
 
@@ -65,6 +80,23 @@ export function useDeleteCustomerMutation() {
     },
     onError: (error) => {
       toast.error(toErrorMessage(error, 'Could not remove customer'))
+    },
+  })
+}
+
+export function useImportCustomersMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (file: File) => customersApi.importFile(file),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customers.all })
+      toast.success(
+        `Import done · ${result.summary.created} created · ${result.summary.updated} updated · ${result.summary.error} errors`,
+      )
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Import failed'))
     },
   })
 }

@@ -9,6 +9,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
+import { memo } from 'react'
 
 import {
   appointmentCustomerLabel,
@@ -22,7 +23,12 @@ interface Props {
   onDayClick: (date: string) => void
 }
 
-export function MonthCalendar({ month, appointments, onDayClick }: Props) {
+/** Memoised: re-renders only when its data changes, not on every parent update. */
+export const MonthCalendar = memo(function MonthCalendar({
+  month,
+  appointments,
+  onDayClick,
+}: Props) {
   const anchor = parseISO(`${month}-01`)
   const start = startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 })
   const end = endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 })
@@ -86,4 +92,4 @@ export function MonthCalendar({ month, appointments, onDayClick }: Props) {
       </div>
     </div>
   )
-}
+})

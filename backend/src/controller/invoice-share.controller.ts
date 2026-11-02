@@ -13,7 +13,8 @@ export const createShareLinkController = async (
 ) => {
   try {
     const renew = Boolean(req.body?.renew);
-    const data = await createOrReuseShareLink(req.params.id, { renew });
+    const origin = typeof req.body?.origin === "string" ? req.body.origin : undefined;
+    const data = await createOrReuseShareLink(req.params.id, { renew, origin });
     return sendResponse(res, {
       statusCode: data.statusCode,
       message: data.message ?? "Share link",

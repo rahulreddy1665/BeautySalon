@@ -9,13 +9,16 @@ import { productsApi } from '@/app/service/products/productsApi'
 
 export type { PaymentMode }
 export type BillStatus = string
-export type LineKind = 'service' | 'product'
+export type LineKind = 'service' | 'product' | 'combo'
 
 export interface CatalogItem {
   id: string
   name: string
   kind: LineKind
   price: number
+  trackStock?: boolean
+  stockQty?: number
+  allowNegative?: boolean
 }
 
 export interface BillLineInput {
@@ -27,6 +30,13 @@ export interface BillLineInput {
   staffId?: string
   staffName?: string
   discount?: { type: 'percent' | 'amount'; value: number }
+  components?: Array<{
+    serviceId: string
+    name: string
+    listPrice: number
+    staffId?: string
+    staffName?: string
+  }>
 }
 
 export interface PaymentSplit {
@@ -48,6 +58,8 @@ export interface CreateBillPayload {
   loyaltyRedeemPoints?: number
   payment: PaymentSplit
   notes?: string
+  /** Salon date (YYYY-MM-DD) for a bill entered late; omit for today. */
+  billDate?: string
 }
 
 export interface BillRecord {
@@ -97,14 +109,23 @@ export function mapInvoiceToBill(inv: InvoiceRecord): BillRecord {
   }
 }
 
+export interface BillsPage {
+  items: BillRecord[]
+  total: number
+  page: number
+  totalPages: number
+}
+
 export const billingApi = {
-  list: async (params: Record<string, unknown> = {}): Promise<BillRecord[]> => {
-    const page = await invoicesApi.list({
-      page: 1,
-      limit: 100,
-      ...params,
-    })
-    return page.items.map(mapInvoiceToBill)
+  /** One server page of bills; search, filters and paging all run on the server. */
+  listPage: async (params: Record<string, unknown> = {}): Promise<BillsPage> => {
+    const page = await invoicesApi.list(params)
+    return {
+      items: page.items.map(mapInvoiceToBill),
+      total: page.total,
+      page: page.page,
+      totalPages: page.totalPages,
+    }
   },
 
   getById: async (id: string): Promise<InvoiceRecord> => {
@@ -135,22 +156,36 @@ export const billingApi = {
           qty: line.qty,
           discount: line.discount ?? { type: 'amount' as const, value: 0 },
         })),
+      comboItems: payload.lines
+        .filter((line) => line.kind === 'combo')
+        .map((line) => ({
+          comboId: line.catalogId,
+          qty: line.qty,
+          discount: line.discount ?? { type: 'amount' as const, value: 0 },
+          components: (line.components ?? []).map((c) => ({
+            serviceId: c.serviceId,
+            staffId: c.staffId!,
+          })),
+        })),
       serviceDiscount: payload.serviceDiscount,
       productDiscount: payload.productDiscount,
       paymentMode,
       tip: payload.tip,
       loyaltyRedeemPoints: payload.loyaltyRedeemPoints,
+      billDate: payload.billDate,
     })
     return mapInvoiceToBill(invoice)
   },
 
   products: async (): Promise<CatalogItem[]> => {
-    const items = await productsApi.getAll()
-    return items.map((p) => ({
+    const products = await productsApi.catalog()
+    return products.map((p) => ({
       id: p._id,
       name: p.name,
       kind: 'product' as const,
       price: p.price,
+      trackStock: p.trackStock,
+      stockQty: p.stockQty,
     }))
   },
 }

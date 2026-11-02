@@ -2,8 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="BeautySalon" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)" />
@@ -16,6 +18,18 @@
     <script>
       ;(function () {
         try {
+          var path = window.location.pathname || ''
+          var isLogin = path === '/login' || path.indexOf('/login/') === 0
+          // Login is always light — ignore saved / system dark to avoid a dark flash.
+          if (isLogin) {
+            document.documentElement.classList.remove('dark')
+            var loginDesktop = window.matchMedia('(min-width: 1024px)').matches
+            var loginColor = loginDesktop ? '#FFFFFF' : '#0b0b0b'
+            document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
+              meta.setAttribute('content', loginColor)
+            })
+            return
+          }
           var key = 'persist:beauty-salon'
           var raw = localStorage.getItem(key)
           var mode = 'system'

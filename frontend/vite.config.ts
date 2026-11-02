@@ -14,7 +14,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
         name: 'BeautySalon',
         short_name: 'BeautySalon',
@@ -22,21 +22,49 @@ export default defineConfig({
         theme_color: '#FFFFFF',
         background_color: '#F6F6F7',
         display: 'standalone',
+        // Stable identity so the installed app survives start_url changes.
+        id: '/',
         start_url: '/',
         scope: '/',
+        categories: ['business', 'productivity'],
+        // Desktop: reopening the app focuses the open window instead of a second copy.
+        launch_handler: { client_mode: 'focus-existing' },
+        // Right-click the taskbar / Dock icon (desktop) or long-press (Android).
+        shortcuts: [
+          {
+            name: 'New bill',
+            short_name: 'New bill',
+            url: '/billing/new',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'New appointment',
+            short_name: 'Appointment',
+            url: '/appointments/new',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Billing history',
+            short_name: 'Bills',
+            url: '/billing',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: 'icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
-            src: '/icons/icon-512.png',
+            src: 'icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any',
           },
           {
-            src: '/icons/icon-512-maskable.png',
+            src: 'icons/icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -46,6 +74,7 @@ export default defineConfig({
       workbox: {
         // App-shell caching only — never cache API responses.
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/assets\//],
         globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2}'],
         runtimeCaching: [],
         // Structure reserved for a future push handler (not implemented).

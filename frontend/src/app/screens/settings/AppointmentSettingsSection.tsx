@@ -65,7 +65,7 @@ export function AppointmentSettingsSection({
       )}
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-4 min-[360px]:grid-cols-2 lg:grid-cols-3">
             <FormField
               label="Start hour (0–23)"
               htmlFor="startHour"

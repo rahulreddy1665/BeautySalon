@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 
 import { authenticate } from "../middlewares/auth.middleware";
 import { requirePermission } from "../middlewares/permission.middleware";
@@ -6,9 +7,16 @@ import {
   createCustomerController,
   deleteCustomerController,
   getCustomerByIdController,
+  getCustomerSummaryController,
   getCustomersController,
+  importCustomersController,
   updateCustomerController,
 } from "../controller/customer.controller";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const router = Router();
 
@@ -17,6 +25,13 @@ router.get(
   authenticate,
   requirePermission("customer:read"),
   getCustomersController,
+);
+
+router.get(
+  "/:id/summary",
+  authenticate,
+  requirePermission("customer:read"),
+  getCustomerSummaryController,
 );
 
 router.get(
@@ -31,6 +46,14 @@ router.post(
   authenticate,
   requirePermission("customer:create"),
   createCustomerController,
+);
+
+router.post(
+  "/import",
+  authenticate,
+  requirePermission("customer:create"),
+  upload.single("file"),
+  importCustomersController,
 );
 
 router.patch(

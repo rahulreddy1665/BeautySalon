@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useSyncExternalStore } from 'react'
 import {
   Bar,
   BarChart,
@@ -19,6 +19,18 @@ import {
 } from '@/app/components/charts/ChartTooltip'
 import { REPORTS } from '@/app/constants'
 import { formatINR, formatMoneyOrDash, formatNumber } from '@/app/utils'
+
+function useNarrowChart(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia('(max-width: 1023px)')
+      media.addEventListener('change', onChange)
+      return () => media.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia('(max-width: 1023px)').matches,
+    () => false,
+  )
+}
 
 interface RevenueTrendChartProps {
   data: { date: string; revenue: number }[]
@@ -81,7 +93,7 @@ export function SalesSeriesChart({
 }: SalesSeriesChartProps) {
   const colors = useChartTheme()
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div style={{ width: '100%', height,marginTop:'50px' }} className="min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={colors.border} vertical={false} />
@@ -190,7 +202,7 @@ interface SplitPieChartProps {
 export function ServiceProductSplitChart({
   service,
   product,
-  height = 180,
+  height = 148,
 }: SplitPieChartProps) {
   const colors = useChartTheme()
   const data = [
@@ -199,45 +211,47 @@ export function ServiceProductSplitChart({
   ]
 
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            innerRadius={44}
-            outerRadius={64}
-            paddingAngle={2}
-          >
-            {data.map((entry) => (
-              <Cell key={entry.name} fill={entry.color} stroke={colors.card} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={chartTooltipContentStyle(colors)}
-            content={
-              <ChartTooltipContent
-                formatter={(value, name) => [
-                  formatINR(Number(value)),
-                  String(name ?? ''),
-                ]}
-              />
-            }
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="mt-2 flex justify-center gap-4 text-xs text-muted-foreground">
+    <div className="min-w-0">
+      <div style={{ width: '100%', height }} className="min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={42}
+              outerRadius={58}
+              paddingAngle={2}
+            >
+              {data.map((entry) => (
+                <Cell key={entry.name} fill={entry.color} stroke={colors.card} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={chartTooltipContentStyle(colors)}
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [
+                    formatINR(Number(value)),
+                    String(name ?? ''),
+                  ]}
+                />
+              }
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="inline-block size-2.5 rounded-sm"
+            className="inline-block size-2.5 shrink-0 rounded-sm"
             style={{ background: colors.chart4 }}
           />
           Services {formatINR(service)}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="inline-block size-2.5 rounded-sm"
+            className="inline-block size-2.5 shrink-0 rounded-sm"
             style={{ background: colors.chart5 }}
           />
           Products {formatINR(product)}
@@ -323,16 +337,27 @@ interface DualSeriesChartProps {
 
 export function NewReturningChart({ data, height = 220 }: DualSeriesChartProps) {
   const colors = useChartTheme()
+  const narrow = useNarrowChart()
+  const tickSkip = narrow ? Math.max(0, Math.ceil(data.length / 4) - 1) : 0
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div className="min-w-0 overflow-hidden">
+      <div style={{ width: '100%', height }} className="min-w-0">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          barCategoryGap="28%"
+          margin={{ top: 8, right: 8, left: 0, bottom: narrow ? 4 : 0 }}
+        >
           <CartesianGrid stroke={colors.border} vertical={false} />
           <XAxis
             dataKey="key"
-            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            tick={{ fill: colors.mutedFg, fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: colors.border }}
             tickLine={false}
+            interval={tickSkip}
+            angle={narrow ? -40 : 0}
+            textAnchor={narrow ? 'end' : 'middle'}
+            height={narrow ? 52 : 30}
           />
           <YAxis
             tick={{ fill: colors.mutedFg, fontSize: 11 }}
@@ -358,17 +383,38 @@ export function NewReturningChart({ data, height = 220 }: DualSeriesChartProps) 
           <Bar
             dataKey="newCount"
             name="newCount"
+            stackId="customers"
             fill={colors.chart1}
-            radius={[4, 4, 0, 0]}
+            maxBarSize={40}
+            radius={[0, 0, 0, 0]}
           />
           <Bar
             dataKey="returningCount"
             name="returningCount"
+            stackId="customers"
             fill={colors.chart4}
+            maxBarSize={40}
             radius={[4, 4, 0, 0]}
           />
         </BarChart>
       </ResponsiveContainer>
+      </div>
+      <div className="mt-2 flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ background: colors.chart1 }}
+          />
+          {REPORTS.customers.chart.newLabel}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ background: colors.chart4 }}
+          />
+          {REPORTS.customers.chart.returningLabel}
+        </span>
+      </div>
     </div>
   )
 }
@@ -380,16 +426,20 @@ interface StatusBreakdownChartProps {
 
 export function StatusBreakdownChart({ data, height = 200 }: StatusBreakdownChartProps) {
   const colors = useChartTheme()
+  const narrow = useNarrowChart()
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div style={{ width: '100%', height }} className="min-w-0 overflow-hidden">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: narrow ? 8 : 0 }}>
           <CartesianGrid stroke={colors.border} vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            tick={{ fill: colors.mutedFg, fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: colors.border }}
             tickLine={false}
+            {...(narrow
+              ? { interval: 0, angle: -35, textAnchor: 'end' as const, height: 56 }
+              : {})}
           />
           <YAxis
             tick={{ fill: colors.mutedFg, fontSize: 11 }}
@@ -433,8 +483,66 @@ export function TopItemsBarChart({
   height = 260,
   valueAsMoney = true,
 }: TopItemsChartProps) {
+  const colors = useChartTheme()
+  const chartHeight = Math.max(height, data.length * 40)
+  const longestLabel = data.reduce((max, d) => Math.max(max, d.name.length), 8)
+  const yAxisWidth = Math.min(180, Math.max(104, longestLabel * 7))
+
   return (
-    <HorizontalStaffBarsChart data={data} height={height} valueAsMoney={valueAsMoney} />
+    <div
+      style={{ width: '100%', height: chartHeight }}
+      className="min-w-0 overflow-hidden pr-1"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 8, right: 20, left: 8, bottom: 8 }}
+        >
+          <CartesianGrid stroke={colors.border} horizontal={false} />
+          <XAxis
+            type="number"
+            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) =>
+              valueAsMoney
+                ? v >= 1000
+                  ? `${Math.round(v / 1000)}k`
+                  : String(v)
+                : formatNumber(v)
+            }
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={yAxisWidth}
+            tick={{ fill: colors.mutedFg, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip
+            cursor={{ fill: colors.cursor }}
+            contentStyle={chartTooltipContentStyle(colors)}
+            content={
+              <ChartTooltipContent
+                formatter={(value) => [
+                  valueAsMoney ? formatINR(Number(value)) : formatNumber(Number(value)),
+                  valueAsMoney ? REPORTS.sales.chart.services : REPORTS.services.chart.byCount,
+                ]}
+              />
+            }
+          />
+          <Bar
+            dataKey="value"
+            fill={colors.chart1}
+            radius={[0, 4, 4, 0]}
+            background={{ fill: colors.track, radius: 4 }}
+            barSize={20}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
@@ -463,7 +571,8 @@ export function WalkInVsAppointmentChart({
     },
   ]
   return (
-    <div style={{ width: '100%', height }} className="min-w-0">
+    <div className="min-w-0 max-w-full overflow-hidden">
+      <div style={{ width: '100%', height }} className="min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -491,9 +600,10 @@ export function WalkInVsAppointmentChart({
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex justify-center gap-4 text-xs text-muted-foreground">
+      </div>
+      <div className="mt-2 flex max-w-full flex-wrap justify-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
         {data.map((d) => (
-          <span key={d.name} className="inline-flex items-center gap-1.5">
+          <span key={d.name} className="inline-flex min-w-0 items-center gap-1.5">
             <span
               className="inline-block size-2.5 rounded-sm"
               style={{ background: d.color }}
@@ -520,7 +630,7 @@ export function BusyHoursGrid({
 }) {
   const max = Math.max(1, ...cells.flat())
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto">
       <div
         className="grid min-w-[480px] gap-1"
         style={{

@@ -16,6 +16,14 @@ export const ErrorCodes = {
   PASSWORD_SAME: "PASSWORD_SAME",
   MUST_CHANGE_PASSWORD: "MUST_CHANGE_PASSWORD",
   DESIGNATION_IN_USE: "DESIGNATION_IN_USE",
+  CATEGORY_IN_USE: "CATEGORY_IN_USE",
+  CATEGORY_DUPLICATE: "CATEGORY_DUPLICATE",
+  COMBO_TOO_FEW_SERVICES: "COMBO_TOO_FEW_SERVICES",
+  COMBO_DUPLICATE_SERVICE: "COMBO_DUPLICATE_SERVICE",
+  COMBO_PRICE_NOT_BELOW_LIST: "COMBO_PRICE_NOT_BELOW_LIST",
+  COMBO_INVALID_COMPONENTS: "COMBO_INVALID_COMPONENTS",
+  INSUFFICIENT_STOCK: "INSUFFICIENT_STOCK",
+  PRODUCT_NOT_BILLABLE: "PRODUCT_NOT_BILLABLE",
   USERNAME_TAKEN: "USERNAME_TAKEN",
   EMAIL_TAKEN: "EMAIL_TAKEN",
   DESIGNATION_REQUIRED: "DESIGNATION_REQUIRED",
@@ -42,6 +50,22 @@ export const ErrorMessages = {
     "You must set a new password before continuing",
   [ErrorCodes.DESIGNATION_IN_USE]:
     "Reassign staff before deactivating this designation",
+  [ErrorCodes.CATEGORY_IN_USE]:
+    "Reassign or remove active services before deactivating this category",
+  [ErrorCodes.CATEGORY_DUPLICATE]: "A category with this name already exists",
+  [ErrorCodes.COMBO_TOO_FEW_SERVICES]:
+    "A combo must include at least two services",
+  [ErrorCodes.COMBO_DUPLICATE_SERVICE]:
+    "A combo cannot include the same service twice",
+  [ErrorCodes.COMBO_PRICE_NOT_BELOW_LIST]:
+    "Combo price is not below the list total. Confirm to save anyway.",
+  [ErrorCodes.COMBO_INVALID_COMPONENTS]:
+    "Combo components and staff assignments are incomplete or invalid",
+  [ErrorCodes.INSUFFICIENT_STOCK]: "Insufficient stock for one or more products",
+  [ErrorCodes.PRODUCT_NOT_BILLABLE]:
+    "Consumable products cannot be added to a bill",
+  INSUFFICIENT_STOCK_FOR: (name: string, available: number) =>
+    `Insufficient stock for ${name} (available: ${available})`,
   [ErrorCodes.USERNAME_TAKEN]: "That username is already taken",
   [ErrorCodes.EMAIL_TAKEN]: "That email is already in use",
   [ErrorCodes.DESIGNATION_REQUIRED]:

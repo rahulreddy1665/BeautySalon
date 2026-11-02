@@ -12,19 +12,26 @@ function part(
   return parts.find((p) => p.type === type)?.value ?? ''
 }
 
+/**
+ * Built once and reused. Creating an Intl.DateTimeFormat is expensive, and the
+ * calendars call getSalonNow() for every time slot on every render; building a
+ * new one each call made the appointments screen lag on phones.
+ */
+const salonClockFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: SALON_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
 export function getSalonNow(now: Date = new Date()): {
   dateKey: string
   totalMinutes: number
 } {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: SALON_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(now)
+  const parts = salonClockFormat.formatToParts(now)
 
   const year = part(parts, 'year')
   const month = part(parts, 'month')
@@ -52,27 +59,27 @@ export function isFinalAppointmentStatus(status: string): boolean {
   return status === 'completed' || status === 'cancelled' || status === 'no_show'
 }
 
-export function isAppointmentEndPast(
+export function isAppointmentPast(
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   const salon = getSalonNow(now)
   if (date < salon.dateKey) return true
   if (date > salon.dateKey) return false
-  const endMin = parseHhMm(endTime)
-  if (endMin == null) return false
-  return endMin <= salon.totalMinutes
+  const startMin = parseHhMm(startTime)
+  if (startMin == null) return false
+  return startMin <= salon.totalMinutes
 }
 
 export function isAppointmentLocked(
   status: string,
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   if (isFinalAppointmentStatus(status)) return true
-  return isAppointmentEndPast(date, endTime, now)
+  return isAppointmentPast(date, startTime, now)
 }
 
 /** Slot start is in the past (cannot create). Today remaining times OK. */

@@ -60,30 +60,30 @@ export function isFinalAppointmentStatus(
   );
 }
 
-/** True when the appointment end is at or before salon now. */
-export function isAppointmentEndPast(
+/** True when the appointment start is at or before salon now. */
+export function isAppointmentPast(
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   const salon = getSalonNow(now);
   if (date < salon.dateKey) return true;
   if (date > salon.dateKey) return false;
-  const endMin = parseHhMm(endTime);
-  if (endMin == null) return false;
-  return endMin <= salon.totalMinutes;
+  const startMin = parseHhMm(startTime);
+  if (startMin == null) return false;
+  return startMin <= salon.totalMinutes;
 }
 
 /**
  * Locked for edit / reschedule / cancel.
- * Final statuses OR past end time. Booked + past still allows bill / no-show.
+ * Final statuses OR past start time. Booked + past still allows bill / no-show.
  */
 export function isAppointmentLocked(
   status: string,
   date: string,
-  endTime: string,
+  startTime: string,
   now: Date = new Date(),
 ): boolean {
   if (isFinalAppointmentStatus(status)) return true;
-  return isAppointmentEndPast(date, endTime, now);
+  return isAppointmentPast(date, startTime, now);
 }

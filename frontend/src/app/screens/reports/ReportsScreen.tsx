@@ -72,13 +72,6 @@ const REPORT_CARDS: ReportCard[] = [
   },
 ]
 
-const GROUP_ORDER: Array<keyof typeof REPORTS.hub.groups> = [
-  'sales',
-  'team',
-  'customers',
-  'operations',
-]
-
 function ReportLinkCard({ card }: { card: ReportCard }) {
   const Icon = card.icon
   return (
@@ -176,22 +169,48 @@ export function ReportsScreen() {
           description={COMMON.errors.noAccessHint}
         />
       ) : (
-        GROUP_ORDER.map((group) => {
-          const cards = visible.filter((c) => c.group === group)
-          if (cards.length === 0) return null
-          return (
-            <section key={group} className="space-y-2">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {REPORTS.hub.groups[group]}
-              </h3>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-                {cards.map((card) => (
-                  <ReportLinkCard key={card.to} card={card} />
-                ))}
-              </div>
-            </section>
-          )
-        })
+        <>
+          {/* Sales / Team / Customers share one row on md+ so the hub fits without scrolling. */}
+          {(['sales', 'team', 'customers'] as const).some((g) =>
+            visible.some((c) => c.group === g),
+          ) ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-2">
+              {(['sales', 'team', 'customers'] as const).map((group) => {
+                const cards = visible.filter((c) => c.group === group)
+                if (cards.length === 0) return null
+                return (
+                  <section key={group} className="min-w-0 space-y-2">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {REPORTS.hub.groups[group]}
+                    </h3>
+                    <div className="space-y-2">
+                      {cards.map((card) => (
+                        <ReportLinkCard key={card.to} card={card} />
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {(() => {
+            const cards = visible.filter((c) => c.group === 'operations')
+            if (cards.length === 0) return null
+            return (
+              <section className="space-y-2">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {REPORTS.hub.groups.operations}
+                </h3>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+                  {cards.map((card) => (
+                    <ReportLinkCard key={card.to} card={card} />
+                  ))}
+                </div>
+              </section>
+            )
+          })()}
+        </>
       )}
     </div>
   )

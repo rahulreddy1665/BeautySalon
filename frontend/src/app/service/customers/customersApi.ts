@@ -7,28 +7,75 @@ export interface Customer {
   lastName?: string
   email?: string
   phone: number
-  address?: string
-  address1?: string
-  pincode?: number
   isActive?: boolean
   createdAt?: string
   updatedAt?: string
 }
 
 export interface CustomerInput {
-  name: string
+  name?: string
+  /** Legacy split name; sent as '' to fold it into `name`. */
   lastName?: string
   email?: string
   phone: number
-  address?: string
-  address1?: string
-  pincode?: number
+}
+
+export interface CustomerImportRowResult {
+  row: number
+  status: 'created' | 'updated' | 'skipped' | 'error'
+  reason?: string
+  name?: string
+  phone?: string
+}
+
+export interface CustomerImportResult {
+  results: CustomerImportRowResult[]
+  summary: {
+    created: number
+    updated: number
+    skipped: number
+    error: number
+    total: number
+  }
+}
+
+export interface CustomerSummary {
+  visits: number
+  lifetimeSpend: number
+  lastVisitAt: string | null
+}
+
+export interface CustomerListParams {
+  page?: number
+  limit?: number
+  /** Name, email, or phone digits. */
+  q?: string
+}
+
+export interface PaginatedCustomers {
+  items: Customer[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
 }
 
 export const customersApi = {
-  getAll: async (): Promise<Customer[]> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<Customer[]>>('/customer')
-    return data.data ?? []
+  /** Server-paginated, searchable list. */
+  list: async (params: CustomerListParams = {}): Promise<PaginatedCustomers> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<PaginatedCustomers>>(
+      '/customer',
+      { params },
+    )
+    return data.data
+  },
+
+  /** Totals over ALL of the customer's invoices (not just one page). */
+  getSummary: async (id: string): Promise<CustomerSummary> => {
+    const { data } = await apiClient.get<ApiSuccessResponse<CustomerSummary>>(
+      `/customer/${id}/summary`,
+    )
+    return data.data
   },
 
   getById: async (id: string): Promise<Customer> => {
@@ -48,6 +95,19 @@ export const customersApi = {
     const { data } = await apiClient.patch<ApiSuccessResponse<Customer>>(
       `/customer/${id}`,
       payload,
+    )
+    return data.data
+  },
+
+  importFile: async (file: File): Promise<CustomerImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await apiClient.post<ApiSuccessResponse<CustomerImportResult>>(
+      '/customer/import',
+      form,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
     )
     return data.data
   },

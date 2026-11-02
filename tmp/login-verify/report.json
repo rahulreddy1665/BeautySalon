@@ -1,0 +1,57 @@
+[
+  {
+    "width": 360,
+    "file": "light-360.png",
+    "darkClass": false,
+    "themeModePersisted": "dark",
+    "themeColor": "#0b0b0b",
+    "hasThemeToggle": false,
+    "hasParticles": true,
+    "horizontalOverflow": false,
+    "bg": "rgb(246, 246, 247)"
+  },
+  {
+    "width": 390,
+    "file": "light-390.png",
+    "darkClass": false,
+    "themeModePersisted": "dark",
+    "themeColor": "#0b0b0b",
+    "hasThemeToggle": false,
+    "hasParticles": true,
+    "horizontalOverflow": false,
+    "bg": "rgb(246, 246, 247)"
+  },
+  {
+    "width": 768,
+    "file": "light-768.png",
+    "darkClass": false,
+    "themeModePersisted": "dark",
+    "themeColor": "#0b0b0b",
+    "hasThemeToggle": false,
+    "hasParticles": true,
+    "horizontalOverflow": false,
+    "bg": "rgb(246, 246, 247)"
+  },
+  {
+    "width": 1024,
+    "file": "light-1024.png",
+    "darkClass": false,
+    "themeModePersisted": "dark",
+    "themeColor": "#ffffff",
+    "hasThemeToggle": false,
+    "hasParticles": true,
+    "horizontalOverflow": false,
+    "bg": "rgb(246, 246, 247)"
+  },
+  {
+    "width": 1440,
+    "file": "light-1440.png",
+    "darkClass": false,
+    "themeModePersisted": "dark",
+    "themeColor": "#ffffff",
+    "hasThemeToggle": false,
+    "hasParticles": true,
+    "horizontalOverflow": false,
+    "bg": "rgb(246, 246, 247)"
+  }
+]

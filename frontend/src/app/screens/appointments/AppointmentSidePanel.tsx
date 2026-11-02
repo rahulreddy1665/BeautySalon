@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns'
 import { Link } from 'react-router-dom'
 
 import { Avatar, AvatarFallback } from '@/app/components/ui/avatar'
@@ -14,6 +15,7 @@ import {
   appointmentStaffName,
   type Appointment,
 } from '@/app/service/appointments/appointmentsApi'
+import { formatCompactTime } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusChipClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { formatINR } from '@/app/utils'
 import { isAppointmentLocked, isFinalAppointmentStatus } from '@/app/utils/salonTime'
@@ -72,7 +74,7 @@ export function AppointmentSidePanel({
   const locked = isAppointmentLocked(
     appointment.status,
     appointment.date,
-    appointment.endTime,
+    appointment.startTime,
   )
   const final = isFinalAppointmentStatus(appointment.status)
   const canBill = appointment.status === 'booked' && !appointment.invoice
@@ -133,8 +135,9 @@ export function AppointmentSidePanel({
           <dt className="text-xs text-muted-foreground">
             {APPOINTMENTS.detail.timeSlot}
           </dt>
-          <dd className="tabular-nums">
-            {appointment.date} · {appointment.startTime}–{appointment.endTime}
+          <dd className="min-w-0 break-words tabular-nums">
+            {format(parseISO(`${appointment.date}T12:00:00`), 'd MMM yyyy')}{' '}
+            {formatCompactTime(appointment.startTime)}
           </dd>
         </div>
         <div>
@@ -157,7 +160,8 @@ export function AppointmentSidePanel({
         ) : null}
       </dl>
 
-      <div className="mt-auto flex flex-col gap-2 pt-4">
+      {/* Directly under details — avoid mt-auto so actions aren’t pushed below the fold */}
+      <div className="mt-4 flex flex-col gap-2">
         {canEdit ? (
           <Button type="button" onClick={() => onEdit(appointment)}>
             {APPOINTMENTS.detail.edit}

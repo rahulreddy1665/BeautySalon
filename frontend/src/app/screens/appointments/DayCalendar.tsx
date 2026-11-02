@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 import type { StaffMember } from '@/app/service/staff/staffApi'
 import {
   appointmentCustomerLabel,
@@ -11,6 +13,7 @@ import {
   appointmentOverlapsHours,
   appointmentTopPx,
   buildTimeSlots,
+  formatCompactTime,
   formatHourLabel,
   isTimeWithinHours,
   minutesToTime,
@@ -18,7 +21,7 @@ import {
 } from '@/app/screens/appointments/calendarConfig'
 import { appointmentStatusClasses } from '@/app/screens/appointments/appointmentStatusStyles'
 import { cn } from '@/app/utils'
-import { isAppointmentEndPast, isSlotInPast } from '@/app/utils/salonTime'
+import { isAppointmentPast, isSlotInPast } from '@/app/utils/salonTime'
 
 interface DayCalendarProps {
   date: string
@@ -30,7 +33,8 @@ interface DayCalendarProps {
   onAppointmentClick: (appointment: Appointment) => void
 }
 
-export function DayCalendar({
+/** Memoised: re-renders only when its data changes, not on every parent update. */
+export const DayCalendar = memo(function DayCalendar({
   date,
   staff,
   appointments,
@@ -51,11 +55,14 @@ export function DayCalendar({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-border">
       <div
-        className="grid min-w-[640px] overflow-y-hidden"
+        className="grid overflow-y-hidden"
         style={{
           gridTemplateColumns: `56px repeat(${staff.length}, minmax(140px, 1fr))`,
+          // Only as wide as the columns shown: one staff fits a phone screen
+          // without sideways scrolling.
+          minWidth: 56 + staff.length * 140,
         }}
       >
         <div className="sticky left-0 z-20 border-b border-r border-border bg-card" />
@@ -72,7 +79,7 @@ export function DayCalendar({
           {slots.map((mins) => (
             <div
               key={mins}
-              className="border-b border-border px-1 text-[10px] text-muted-foreground tabular-nums"
+              className="border-b border-r border-border px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums"
               style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
             >
               {mins % 60 === 0 ? formatHourLabel(mins) : ''}
@@ -83,7 +90,8 @@ export function DayCalendar({
         {staff.map((member) => {
           const columnAppts = appointments.filter(
             (appt) =>
-              appointmentOverlapsHours(appt.startTime, appt.endTime, hours) &&
+              appt.date === date &&
+              appointmentOverlapsHours(appt.startTime, hours) &&
               appt.services.some((line) => appointmentStaffId(line) === member._id),
           )
           return (
@@ -122,12 +130,12 @@ export function DayCalendar({
 
               {columnAppts.map((appt) => {
                 const top = Math.max(0, appointmentTopPx(appt.startTime, hours))
-                const rawHeight = appointmentHeightPx(appt.startTime, appt.endTime, hours)
+                const rawHeight = appointmentHeightPx()
                 const height = Math.min(
                   Math.max(rawHeight - 2, 28),
                   Math.max(0, gridHeight - top),
                 )
-                const past = isAppointmentEndPast(appt.date, appt.endTime)
+                const past = isAppointmentPast(appt.date, appt.startTime)
                 return (
                   <button
                     key={`${appt._id}-${member._id}`}
@@ -138,21 +146,31 @@ export function DayCalendar({
                       past && 'opacity-60',
                       !past && 'hover:brightness-[0.98]',
                     )}
+                    title={`${appointmentCustomerLabel(appt)} ${formatCompactTime(appt.startTime)}`}
                     style={{ top, height }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onAppointmentClick(appt)
                     }}
                   >
-                    <p className="truncate text-[11px] font-semibold leading-tight">
-                      {appointmentCustomerLabel(appt)}
-                    </p>
-                    <p className="truncate text-[10px] tabular-nums opacity-80">
-                      {appt.startTime}–{appt.endTime}
-                    </p>
-                    <p className="truncate text-[10px] opacity-70">
-                      {appt.services.map((s) => s.name).join(', ')}
-                    </p>
+                    {height < 40 ? (
+                      <p className="truncate text-[11px] leading-tight">
+                        {appointmentCustomerLabel(appt)}{' '}
+                        {formatCompactTime(appt.startTime)}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="truncate text-[11px] font-semibold leading-tight">
+                          {appointmentCustomerLabel(appt)}
+                        </p>
+                        <p className="truncate text-[10px] tabular-nums opacity-80">
+                          {formatCompactTime(appt.startTime)}
+                        </p>
+                        <p className="truncate text-[10px] opacity-70">
+                          {appt.services.map((s) => s.name).join(', ')}
+                        </p>
+                      </>
+                    )}
                   </button>
                 )
               })}
@@ -162,4 +180,4 @@ export function DayCalendar({
       </div>
     </div>
   )
-}
+})

@@ -7,6 +7,7 @@ import {
   deleteInvoice,
   getInvoiceByIdController,
   getInvoicesController,
+  getPopularBillingItemsController,
   getStaffSalesController,
 } from "../controller/invoice.controller";
 import {
@@ -28,6 +29,13 @@ router.get(
   authenticate,
   requirePermission("invoice:read"),
   getInvoicesController,
+);
+
+router.get(
+  "/popular",
+  authenticate,
+  requirePermission("invoice:read"),
+  getPopularBillingItemsController,
 );
 
 router.post(

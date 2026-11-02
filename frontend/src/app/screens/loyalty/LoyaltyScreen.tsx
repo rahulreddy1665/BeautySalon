@@ -9,10 +9,11 @@ import { PageHeader } from '@/app/components/PageHeader'
 import { ResponsiveTable, type ColumnDef } from '@/app/components/ResponsiveTable'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/app/components/Pagination'
 import { LOYALTY } from '@/app/constants'
-import { useCustomersQuery } from '@/app/hooks/queries/useCustomersQuery'
-import { useLoyaltyBalancesQuery } from '@/app/hooks/queries/useLoyaltyQuery'
-import type { Customer } from '@/app/service/customers/customersApi'
+import { useLoyaltyMembersQuery } from '@/app/hooks/queries/useLoyaltyQuery'
+import { useDebouncedValue } from '@/app/hooks/useDebouncedValue'
+import type { LoyaltyMember } from '@/app/service/loyalty/loyaltyApi'
 import { AdjustPointsDialog } from '@/app/screens/loyalty/AdjustPointsDialog'
 
 type MemberRow = {
@@ -23,10 +24,9 @@ type MemberRow = {
   updatedLabel: string
 }
 
-const PAGE_SIZE = 20
 
-function displayName(customer: Customer): string {
-  return [customer.name, customer.lastName].filter(Boolean).join(' ')
+function displayName(member: Pick<LoyaltyMember, 'name' | 'lastName'>): string {
+  return [member.name, member.lastName].filter(Boolean).join(' ')
 }
 
 const memberColumns = (
@@ -75,56 +75,33 @@ const memberColumns = (
 ]
 
 export function LoyaltyScreen() {
-  const customersQuery = useCustomersQuery()
-  const balancesQuery = useLoyaltyBalancesQuery()
-
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [presetCustomerId, setPresetCustomerId] = useState<string | null>(null)
+  // Search, sort and paging run on the server; wait for a pause in typing.
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const membersQuery = useLoyaltyMembersQuery({
+    page,
+    limit: pageSize,
+    q: debouncedSearch || undefined,
+  })
 
-  const customers = customersQuery.data ?? []
+  const pageRows = useMemo(
+    (): MemberRow[] =>
+      (membersQuery.data?.items ?? []).map((m) => ({
+        id: m.customerId,
+        fullName: displayName(m),
+        phoneLabel: String(m.phone ?? ''),
+        points: m.points,
+        updatedLabel: m.updatedAt ? format(parseISO(m.updatedAt), 'dd MMM yyyy') : '—',
+      })),
+    [membersQuery.data],
+  )
 
-  const balanceByCustomer = useMemo(() => {
-    const map = new Map<string, { points: number; updatedAt?: string }>()
-    for (const b of balancesQuery.data ?? []) {
-      map.set(b.customerId, { points: b.points, updatedAt: b.updatedAt })
-    }
-    return map
-  }, [balancesQuery.data])
-
-  const members = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return customers
-      .filter((c) => c.isActive !== false)
-      .map((c) => {
-        const bal = balanceByCustomer.get(c._id)
-        return {
-          id: c._id,
-          fullName: displayName(c),
-          phoneLabel: String(c.phone ?? ''),
-          points: bal?.points ?? 0,
-          updatedLabel: bal?.updatedAt
-            ? format(parseISO(bal.updatedAt), 'dd MMM yyyy')
-            : '—',
-        }
-      })
-      .filter((row) => {
-        if (!q) return true
-        return `${row.fullName} ${row.phoneLabel}`.toLowerCase().includes(q)
-      })
-      .sort((a, b) => b.points - a.points)
-  }, [customers, balanceByCustomer, search])
-
-  const pageCount = Math.max(1, Math.ceil(members.length / PAGE_SIZE))
-  const safePage = Math.min(page, pageCount - 1)
-  const pageRows = members.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
-
-  const loading = customersQuery.isLoading || balancesQuery.isLoading
-  const error =
-    customersQuery.isError || balancesQuery.isError
-      ? (customersQuery.error ?? balancesQuery.error)
-      : null
+  const loading = membersQuery.isLoading
+  const error = membersQuery.isError ? membersQuery.error : null
 
   const openAdjust = (customerId?: string) => {
     setPresetCustomerId(customerId ?? null)
@@ -153,10 +130,7 @@ export function LoyaltyScreen() {
         <ErrorState
           error={error}
           title={LOYALTY.loadFailed}
-          onRetry={() => {
-            void customersQuery.refetch()
-            void balancesQuery.refetch()
-          }}
+          onRetry={() => void membersQuery.refetch()}
         />
       ) : null}
 
@@ -171,7 +145,7 @@ export function LoyaltyScreen() {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
-                setPage(0)
+                setPage(1)
               }}
               placeholder={LOYALTY.searchPlaceholder}
               className="pl-8"
@@ -186,41 +160,23 @@ export function LoyaltyScreen() {
             emptyDescription={LOYALTY.emptyMembersHint}
           />
 
-          {members.length > PAGE_SIZE ? (
-            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>
-                {members.length} {LOYALTY.members.toLowerCase()} · page {safePage + 1} /{' '}
-                {pageCount}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={safePage <= 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={safePage >= pageCount - 1}
-                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <Pagination
+            page={membersQuery.data?.page ?? page}
+            totalPages={membersQuery.data?.totalPages ?? 1}
+            total={membersQuery.data?.total ?? 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
         </div>
       ) : null}
 
       <AdjustPointsDialog
         open={adjustOpen}
         onOpenChange={setAdjustOpen}
-        customers={customers}
         presetCustomerId={presetCustomerId}
       />
     </div>

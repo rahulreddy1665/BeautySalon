@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Download, MessageCircle, Printer, Link2Off } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -26,7 +26,12 @@ import {
 } from '@/app/service/billing/sendInvoiceToCustomer'
 import { invoicesApi } from '@/app/service/invoices/invoicesApi'
 import { formatINR } from '@/app/utils'
-import { downloadBlob, generateInvoicePdf, printInvoice } from '@/app/utils/invoicePdf'
+import {
+  downloadBlob,
+  generateInvoicePdf,
+  printInvoice,
+  releaseCaptureLock,
+} from '@/app/utils/invoicePdf'
 
 export function InvoiceScreen() {
   const { id } = useParams<{ id: string }>()
@@ -36,6 +41,19 @@ export function InvoiceScreen() {
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [phoneDraft, setPhoneDraft] = useState('')
   const [sharing, setSharing] = useState(false)
+
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState === 'hidden') return
+      releaseCaptureLock()
+    }
+    window.addEventListener('focus', onReturn)
+    document.addEventListener('visibilitychange', onReturn)
+    return () => {
+      window.removeEventListener('focus', onReturn)
+      document.removeEventListener('visibilitychange', onReturn)
+    }
+  }, [])
 
   if (invoiceQuery.isLoading) return <LoadingSkeleton rows={6} />
   if (invoiceQuery.isError || !invoiceQuery.data) {
@@ -71,8 +89,9 @@ export function InvoiceScreen() {
     printInvoice()
   }
 
-  const runShare = async (phoneRaw: string) => {
+  const runShare = async (phoneRaw: string, popup: Window | null) => {
     setSharing(true)
+    setPhoneOpen(false)
     try {
       const outcome = await sendInvoiceToCustomer({
         invoiceId: inv._id,
@@ -82,16 +101,16 @@ export function InvoiceScreen() {
         salonName: vm.salonName,
         amountLabel: formatINR(vm.total),
         whatsappTemplate: settingsQuery.data?.invoice?.whatsappMessage,
-        sheetElement: sheetEl(),
+        popup,
       })
       if (outcome.mode === 'error') {
+        popup?.close()
         toast.error(outcome.message)
         return
       }
       if (outcome.mode === 'wa-me') {
         toast.message(outcome.instruction)
       }
-      setPhoneOpen(false)
     } finally {
       setSharing(false)
     }
@@ -104,7 +123,8 @@ export function InvoiceScreen() {
       setPhoneOpen(true)
       return
     }
-    void runShare(phone)
+    const popup = window.open('', '_blank')
+    void runShare(phone, popup)
   }
 
   const onRevokeLink = async () => {
@@ -204,7 +224,10 @@ export function InvoiceScreen() {
             <Button
               type="button"
               disabled={sharing || !phoneDraft.trim()}
-              onClick={() => void runShare(phoneDraft)}
+              onClick={() => {
+                const popup = window.open('', '_blank')
+                void runShare(phoneDraft, popup)
+              }}
             >
               {BILLING.invoice.walkInPhoneContinue}
             </Button>

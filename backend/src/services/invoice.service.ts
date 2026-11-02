@@ -1,8 +1,11 @@
 import mongoose from "mongoose";
 
+import { ErrorCodes, ErrorMessages, fail } from "../constants/errors";
 import { Appointment, type IAppointment } from "../models/appointment.model";
+import { Combo } from "../models/combo.model";
 import {
   Invoice,
+  INVOICE_LIST_PROJECTION,
   type DiscountType,
   type PaymentMode,
 } from "../models/invoice.model";
@@ -11,13 +14,25 @@ import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
 import { Staff } from "../models/staff.model";
 import { Customer } from "../models/customer.model";
+
+import { allocateComboAmount } from "./combo.service";
 import { applyInvoiceLoyalty, reverseInvoiceLoyalty } from "./loyalty.service";
+import { ensureLogo, withInvoiceLogo } from "./logo.service";
+
 import {
   applyRounding,
   computeSectionTax,
   formatInvoiceNumber,
   getOrCreateSettings,
 } from "./settings.service";
+import { applySaleDeduction } from "./stock.service";
+import {
+  daysBetweenInclusive,
+  isValidDateKey,
+  salonDateKeyFromUtc,
+  salonDayStartUtc,
+} from "../utils/reportRange";
+import { getSalonNow } from "../utils/salonTime";
 
 export interface LineDiscountInput {
   type?: DiscountType;
@@ -38,6 +53,19 @@ export interface ProductLineInput {
   discount?: LineDiscountInput;
 }
 
+export interface ComboComponentInput {
+  serviceId: string;
+  staffId: string;
+}
+
+export interface ComboLineInput {
+  comboId: string;
+  qty: number;
+  discount?: LineDiscountInput;
+  /** One staff assignment per combo component service. */
+  components: ComboComponentInput[];
+}
+
 export interface CreateInvoiceDto {
   customerId?: string | null;
   walkIn?: boolean;
@@ -46,6 +74,7 @@ export interface CreateInvoiceDto {
   appointmentId?: string | null;
   serviceItems?: ServiceLineInput[];
   productItems?: ProductLineInput[];
+  comboItems?: ComboLineInput[];
   /** Section-level discount applied after per-line discounts (lines usually 0). */
   serviceDiscount?: LineDiscountInput;
   productDiscount?: LineDiscountInput;
@@ -53,6 +82,11 @@ export interface CreateInvoiceDto {
   tip?: number;
   loyaltyRedeemPoints?: number;
   createdBy?: string | null;
+  /**
+   * Salon date (YYYY-MM-DD) the bill belongs to, for bills entered late.
+   * Omitted or today → now. Past dates only, at most BACKDATE_MAX_DAYS back.
+   */
+  billDate?: string;
 }
 
 export interface InvoiceListQuery {
@@ -60,8 +94,13 @@ export interface InvoiceListQuery {
   to?: string;
   paymentMode?: string;
   search?: string;
+  customerId?: string;
   page?: number;
   limit?: number;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function round2(n: number): number {
@@ -83,8 +122,50 @@ function applyDiscount(
   return { discountAmount, lineTotal: round2(base - discountAmount) };
 }
 
+type SalonSettings = Awaited<ReturnType<typeof getOrCreateSettings>>;
+
+/** How far back a forgotten bill may be entered. Guards against wrong-year typos. */
+export const BACKDATE_MAX_DAYS = 90;
+
+/**
+ * Resolves the bill's timestamp. A past salon date keeps the current time of
+ * day (salon time), so it lands on that day in reports, dashboard and history.
+ */
+function resolveBillTimestamp(
+  billDate: unknown,
+): { ok: true; createdAt?: Date } | { ok: false; message: string } {
+  if (billDate === undefined || billDate === null || billDate === "")
+    return { ok: true };
+  // Shape check + round trip (rejects impossible dates like 2026-02-31).
+  if (
+    !isValidDateKey(billDate) ||
+    salonDateKeyFromUtc(salonDayStartUtc(billDate)) !== billDate
+  ) {
+    return { ok: false, message: "billDate must be a valid YYYY-MM-DD date" };
+  }
+  const now = new Date();
+  const todayKey = getSalonNow(now).dateKey;
+  if (billDate === todayKey) return { ok: true };
+  if (billDate > todayKey) {
+    return { ok: false, message: "Bill date can't be in the future" };
+  }
+  const daysBack = daysBetweenInclusive(billDate, todayKey) - 1;
+  if (daysBack > BACKDATE_MAX_DAYS) {
+    return {
+      ok: false,
+      message: `Bills can be backdated by at most ${BACKDATE_MAX_DAYS} days`,
+    };
+  }
+  const timeOfDayMs = now.getTime() - salonDayStartUtc(todayKey).getTime();
+  return {
+    ok: true,
+    createdAt: new Date(salonDayStartUtc(billDate).getTime() + timeOfDayMs),
+  };
+}
+
 async function highestExistingInvoiceSeq(
-  invoice: Awaited<ReturnType<typeof getOrCreateSettings>>["invoice"],
+  invoice: SalonSettings["invoice"],
+  session?: mongoose.ClientSession,
 ): Promise<number> {
   const prefix = String(invoice.prefix || "INV")
     .trim()
@@ -97,6 +178,7 @@ async function highestExistingInvoiceSeq(
     .sort({ invoiceNumber: -1 })
     .limit(50)
     .select("invoiceNumber")
+    .session(session ?? null)
     .lean();
   let max = 0;
   for (const row of latest) {
@@ -106,46 +188,138 @@ async function highestExistingInvoiceSeq(
   return max;
 }
 
-async function nextInvoiceNumberFromSettings(): Promise<{
-  invoiceNumber: string;
-  seq: number;
-}> {
-  const settings = await getOrCreateSettings();
-  const floor = await highestExistingInvoiceSeq(settings.invoice);
-  const existing = await InvoiceSequence.findOne({ key: "main" });
-  const base = Math.max(existing?.seq ?? 0, floor);
-  if (!existing || existing.seq < floor) {
-    await InvoiceSequence.findOneAndUpdate(
-      { key: "main" },
-      { $set: { seq: base } },
-      { upsert: true },
-    );
-  }
+/**
+ * Next invoice number. The counter never goes below the highest number already
+ * issued (guards against imports / prefix changes). "Raise to floor, then +1" is
+ * a single atomic pipeline update instead of read → set → increment.
+ * Inside a transaction, an aborted bill also rolls the counter back (no gaps).
+ */
+async function nextInvoiceNumber(
+  invoiceSettings: SalonSettings["invoice"],
+  session?: mongoose.ClientSession,
+): Promise<{ invoiceNumber: string; seq: number }> {
+  const floor = await highestExistingInvoiceSeq(invoiceSettings, session);
   const counter = await InvoiceSequence.findOneAndUpdate(
     { key: "main" },
-    { $inc: { seq: 1 } },
-    { upsert: true, new: true },
+    [
+      {
+        $set: {
+          seq: { $add: [{ $max: [{ $ifNull: ["$seq", 0] }, floor] }, 1] },
+        },
+      },
+    ],
+    { upsert: true, new: true, session },
   );
   return {
-    invoiceNumber: formatInvoiceNumber(settings.invoice, counter.seq),
+    invoiceNumber: formatInvoiceNumber(invoiceSettings, counter.seq),
     seq: counter.seq,
   };
 }
 
+type ObjectId = mongoose.Types.ObjectId;
+type LineDiscountSnapshot = { type: "percent" | "amount"; value: number };
+
+interface ServiceItemRow {
+  service: ObjectId;
+  name: string;
+  price: number;
+  qty: number;
+  staff: ObjectId;
+  discount: LineDiscountSnapshot;
+  lineTotal: number;
+}
+
+interface ProductItemRow {
+  product: ObjectId;
+  name: string;
+  price: number;
+  qty: number;
+  staff: ObjectId;
+  discount: LineDiscountSnapshot;
+  lineTotal: number;
+}
+
+interface ComboItemRow {
+  combo: ObjectId;
+  name: string;
+  price: number;
+  qty: number;
+  discount: LineDiscountSnapshot;
+  lineTotal: number;
+  listTotal: number;
+  components: Array<{
+    service: ObjectId;
+    name: string;
+    listPrice: number;
+    allocatedAmount: number;
+    staff: ObjectId;
+  }>;
+}
+
+/** Thrown inside the transaction to abort it and return this response. */
+class BillingAbort extends Error {
+  constructor(
+    public readonly result: {
+      statusCode: number;
+      data: null;
+      message?: string;
+      errors?: unknown;
+    },
+  ) {
+    super(result.message ?? "Billing aborted");
+  }
+}
+
+const isObjectId = (id: unknown): id is string =>
+  typeof id === "string" && mongoose.Types.ObjectId.isValid(id);
+
+/** `$in` lookup keyed by string id. Invalid ids are dropped (they become "not found"). */
+async function findByIds<T extends { _id: unknown }>(
+  ids: Iterable<unknown>,
+  query: (validIds: string[]) => Promise<T[]>,
+): Promise<Map<string, T>> {
+  const valid = [...new Set([...ids].filter(isObjectId))];
+  if (valid.length === 0) return new Map();
+  const docs = await query(valid);
+  return new Map(docs.map((d) => [String(d._id), d]));
+}
+
+/**
+ * Creates a bill.
+ *
+ * Phase 1 (validate, no writes): every lookup is batched. Settings, appointment,
+ * customer, combos, products and staff load in parallel; then all services
+ * (direct + combo components) in one `$in`. Previously each line did its own
+ * findById, so query count grew with the bill size.
+ *
+ * Phase 2 (write, one transaction): claim appointment, invoice number, loyalty,
+ * invoice, stock. Any failure rolls back everything, including loyalty points,
+ * which the old manual cleanup did not undo.
+ */
 export const createInvoice = async (data: CreateInvoiceDto) => {
   try {
     const serviceInputs = data.serviceItems ?? [];
     const productInputs = data.productItems ?? [];
-    if (serviceInputs.length === 0 && productInputs.length === 0) {
+    const comboInputs = data.comboItems ?? [];
+    if (
+      serviceInputs.length === 0 &&
+      productInputs.length === 0 &&
+      comboInputs.length === 0
+    ) {
       return {
         statusCode: 400,
         data: null,
-        message: "At least one service or product line is required",
+        message: "At least one service, product, or combo line is required",
       };
     }
 
     if (!["upi", "cash", "card"].includes(data.paymentMode)) {
       return { statusCode: 400, data: null, message: "Invalid paymentMode" };
+    }
+
+    const billTime = resolveBillTimestamp(data.billDate);
+    if (!billTime.ok) {
+      return { statusCode: 400, data: null, message: billTime.message };
     }
 
     const tip = Math.max(0, round2(Number(data.tip) || 0));
@@ -154,9 +328,69 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       Math.floor(Number(data.loyaltyRedeemPoints) || 0),
     );
 
-    let appointment: IAppointment | null = null;
+    // ---- Phase 1a: everything that doesn't depend on another lookup, in parallel.
+    const staffIds = new Set<unknown>([
+      ...serviceInputs.map((l) => l.staffId),
+      ...productInputs.map((l) => l.staffId),
+      ...comboInputs.flatMap((l) =>
+        Array.isArray(l.components) ? l.components.map((c) => c.staffId) : [],
+      ),
+    ]);
+    const [
+      settings,
+      appointment,
+      customerDoc,
+      comboById,
+      productById,
+      staffById,
+    ] = await Promise.all([
+      getOrCreateSettings(),
+      data.appointmentId
+        ? isObjectId(data.appointmentId)
+          ? Appointment.findById(data.appointmentId)
+          : null
+        : null,
+      data.customerId
+        ? isObjectId(data.customerId)
+          ? Customer.findById(data.customerId).select("_id").lean()
+          : null
+        : null,
+      findByIds(
+        comboInputs.map((l) => l.comboId),
+        (ids) =>
+          Combo.find({
+            _id: { $in: ids },
+            isDeleted: false,
+            isActive: true,
+          }).lean(),
+      ),
+      findByIds(
+        productInputs.map((l) => l.productId),
+        (ids) => Product.find({ _id: { $in: ids } }).lean(),
+      ),
+      findByIds(staffIds, (ids) =>
+        Staff.find({ _id: { $in: ids } })
+          .select("_id")
+          .lean(),
+      ),
+    ]);
+
+    // ---- Phase 1b: all services (direct lines + combo components) in one query.
+    const serviceById = await findByIds(
+      [
+        ...serviceInputs.map((l) => l.serviceId),
+        ...[...comboById.values()].flatMap((c) =>
+          c.services.map((s) => String(s.service)),
+        ),
+      ],
+      (ids) =>
+        Service.find({ _id: { $in: ids } })
+          .select("name price")
+          .lean(),
+    );
+
+    // ---- Validation, in the same order and with the same messages as before.
     if (data.appointmentId) {
-      appointment = await Appointment.findById(data.appointmentId);
       if (!appointment) {
         return {
           statusCode: 404,
@@ -180,7 +414,7 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       }
     }
 
-    const serviceItems = [];
+    const serviceItems: ServiceItemRow[] = [];
     let serviceSubtotal = 0;
     let serviceDiscountTotal = 0;
 
@@ -193,7 +427,7 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           message: "Service qty must be >= 1",
         };
       }
-      const service = await Service.findById(line.serviceId);
+      const service = serviceById.get(String(line.serviceId));
       if (!service) {
         return {
           statusCode: 400,
@@ -201,7 +435,7 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           message: `Service not found: ${line.serviceId}`,
         };
       }
-      const staff = await Staff.findById(line.staffId);
+      const staff = staffById.get(String(line.staffId));
       if (!staff) {
         return {
           statusCode: 400,
@@ -214,11 +448,11 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       serviceSubtotal = round2(serviceSubtotal + base);
       serviceDiscountTotal = round2(serviceDiscountTotal + discountAmount);
       serviceItems.push({
-        service: service._id,
+        service: service._id as ObjectId,
         name: service.name,
         price: service.price,
         qty,
-        staff: staff._id,
+        staff: staff._id as ObjectId,
         discount: {
           type: line.discount?.type === "percent" ? "percent" : "amount",
           value: Math.max(0, Number(line.discount?.value) || 0),
@@ -227,7 +461,114 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       });
     }
 
-    const productItems = [];
+    const comboItems: ComboItemRow[] = [];
+    for (const line of comboInputs) {
+      const qty = Math.floor(Number(line.qty));
+      if (!Number.isFinite(qty) || qty < 1) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: "Combo qty must be >= 1",
+        };
+      }
+      const combo = comboById.get(String(line.comboId));
+      if (!combo) {
+        return {
+          statusCode: 400,
+          data: null,
+          message: `Combo not found: ${line.comboId}`,
+        };
+      }
+      const expectedIds = combo.services.map((s) => String(s.service));
+      const provided = Array.isArray(line.components) ? line.components : [];
+      if (provided.length !== expectedIds.length) {
+        return fail(
+          400,
+          ErrorMessages.COMBO_INVALID_COMPONENTS,
+          ErrorCodes.COMBO_INVALID_COMPONENTS,
+        );
+      }
+      const providedMap = new Map(
+        provided.map((c) => [String(c.serviceId), String(c.staffId)]),
+      );
+      for (const sid of expectedIds) {
+        if (!providedMap.has(sid)) {
+          return fail(
+            400,
+            ErrorMessages.COMBO_INVALID_COMPONENTS,
+            ErrorCodes.COMBO_INVALID_COMPONENTS,
+          );
+        }
+      }
+
+      const componentRows: Array<{
+        service: mongoose.Types.ObjectId;
+        name: string;
+        listPrice: number;
+        staff: mongoose.Types.ObjectId;
+      }> = [];
+      let listTotal = 0;
+      for (const row of combo.services) {
+        const service = serviceById.get(String(row.service));
+        if (!service) {
+          return {
+            statusCode: 400,
+            data: null,
+            message: `Service not found in combo: ${String(row.service)}`,
+          };
+        }
+        const staffId = providedMap.get(String(row.service))!;
+        const staff = staffById.get(staffId);
+        if (!staff) {
+          return {
+            statusCode: 400,
+            data: null,
+            message: `Staff not found: ${staffId}`,
+          };
+        }
+        const componentQty = Math.max(1, Math.floor(Number(row.qty) || 1));
+        const listPrice = round2(service.price * componentQty * qty);
+        listTotal = round2(listTotal + listPrice);
+        componentRows.push({
+          service: service._id as mongoose.Types.ObjectId,
+          name: service.name,
+          listPrice,
+          staff: staff._id as mongoose.Types.ObjectId,
+        });
+      }
+
+      const base = round2(combo.comboPrice * qty);
+      const { discountAmount, lineTotal } = applyDiscount(base, line.discount);
+      serviceSubtotal = round2(serviceSubtotal + base);
+      serviceDiscountTotal = round2(serviceDiscountTotal + discountAmount);
+
+      const allocations = allocateComboAmount(
+        lineTotal,
+        componentRows.map((c) => ({ listPrice: c.listPrice })),
+      );
+      comboItems.push({
+        combo: combo._id as ObjectId,
+        name: combo.name,
+        price: combo.comboPrice,
+        qty,
+        discount: {
+          type: line.discount?.type === "percent" ? "percent" : "amount",
+          value: Math.max(0, Number(line.discount?.value) || 0),
+        },
+        lineTotal,
+        listTotal,
+        components: componentRows.map((c, i) => ({
+          service: c.service,
+          name: c.name,
+          listPrice: c.listPrice,
+          allocatedAmount: allocations[i] ?? 0,
+          staff: c.staff,
+        })),
+      });
+    }
+
+    const productItems: ProductItemRow[] = [];
+    const trackStockById = new Map<string, boolean>();
     let productSubtotal = 0;
     let productDiscountTotal = 0;
 
@@ -240,7 +581,7 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           message: "Product qty must be >= 1",
         };
       }
-      const product = await Product.findById(line.productId);
+      const product = productById.get(String(line.productId));
       if (!product) {
         return {
           statusCode: 400,
@@ -248,7 +589,19 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           message: `Product not found: ${line.productId}`,
         };
       }
-      const staff = await Staff.findById(line.staffId);
+      if (product.type === "consumable") {
+        return fail(
+          400,
+          ErrorMessages.PRODUCT_NOT_BILLABLE,
+          ErrorCodes.PRODUCT_NOT_BILLABLE,
+          {
+            code: ErrorCodes.PRODUCT_NOT_BILLABLE,
+            productId: String(product._id),
+            productName: product.name,
+          },
+        );
+      }
+      const staff = staffById.get(String(line.staffId));
       if (!staff) {
         return {
           statusCode: 400,
@@ -256,16 +609,17 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
           message: `Staff not found: ${line.staffId}`,
         };
       }
+      trackStockById.set(String(product._id), Boolean(product.trackStock));
       const base = round2(product.price * qty);
       const { discountAmount, lineTotal } = applyDiscount(base, line.discount);
       productSubtotal = round2(productSubtotal + base);
       productDiscountTotal = round2(productDiscountTotal + discountAmount);
       productItems.push({
-        product: product._id,
+        product: product._id as ObjectId,
         name: product.name,
         price: product.price,
         qty,
-        staff: staff._id,
+        staff: staff._id as ObjectId,
         discount: {
           type: line.discount?.type === "percent" ? "percent" : "amount",
           value: Math.max(0, Number(line.discount?.value) || 0),
@@ -296,7 +650,6 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
     const productNet = round2(productSubtotal - productDiscountTotal);
     const netAfterDiscounts = round2(serviceNet + productNet);
 
-    const settings = await getOrCreateSettings();
     const taxCfg = settings.tax;
 
     const serviceTax = computeSectionTax({
@@ -345,11 +698,10 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
     let walkInPhone = data.walkInPhone?.trim();
 
     if (data.customerId) {
-      const c = await Customer.findById(data.customerId);
-      if (!c) {
+      if (!customerDoc) {
         return { statusCode: 400, data: null, message: "Customer not found" };
       }
-      customer = c._id as mongoose.Types.ObjectId;
+      customer = customerDoc._id as mongoose.Types.ObjectId;
       walkIn = false;
     } else if (appointment?.customer) {
       customer = appointment.customer as mongoose.Types.ObjectId;
@@ -365,7 +717,6 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
     // Loyalty redeem value computed against net after discounts (pre-tax)
     let loyaltyRedeemPoints = 0;
     let loyaltyRedeemValue = 0;
-    let loyaltyEarnedPoints = 0;
 
     if (customer && settings.loyalty.enabled && requestedRedeem > 0) {
       const maxValue = round2(
@@ -390,131 +741,176 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       );
     }
 
-    const afterLoyalty = round2(Math.max(0, afterTax - loyaltyRedeemValue));
-    const { rounded, roundOff } = applyRounding(
-      afterLoyalty,
-      settings.invoice.rounding,
-    );
-    const amountPayable = round2(rounded + tip);
-    const grandTotal = amountPayable;
-
-    if (appointment) {
-      const claimed = await Appointment.findOneAndUpdate(
-        {
-          _id: appointment._id,
-          status: "booked",
-          $or: [{ invoice: null }, { invoice: { $exists: false } }],
-        },
-        { $set: { status: "completed" } },
-        { new: true },
-      );
-      if (!claimed) {
-        return {
-          statusCode: 409,
-          data: null,
-          message: "This appointment has already been billed",
-        };
-      }
-    }
-
-    const { invoiceNumber } = await nextInvoiceNumberFromSettings();
     const b = settings.business;
+    const templateId =
+      settings.invoice.templateId === "classic"
+        ? "creamGold"
+        : settings.invoice.templateId;
+    const allowNegativeStock = Boolean(settings.business?.allowNegativeStock);
+    // The invoice stores a reference; the logo itself is stored once.
+    const logoId = await ensureLogo(b.logoBase64, b.logoMimeType);
+    // Known up front so loyalty, stock ledger and the appointment can reference it
+    // before the invoice document is written (lets us write the invoice once).
+    const invoiceId = new mongoose.Types.ObjectId();
 
-    const invoice = await Invoice.create({
-      invoiceNumber,
-      customer,
-      walkIn,
-      walkInName,
-      walkInPhone,
-      source: appointment ? "appointment" : "walk-in",
-      appointment: appointment?._id ?? null,
-      serviceItems,
-      productItems,
-      serviceSubtotal,
-      productSubtotal,
-      serviceDiscountTotal,
-      productDiscountTotal,
-      tax,
-      loyaltyRedeemPoints,
-      loyaltyRedeemValue,
-      loyaltyEarnedPoints: 0,
-      roundOff,
-      roundingRule: settings.invoice.rounding,
-      tip,
-      amountPayable,
-      grandTotal,
-      templateId:
-        settings.invoice.templateId === "classic"
-          ? "creamGold"
-          : settings.invoice.templateId,
-      templateSnapshot: {
-        templateId:
-          settings.invoice.templateId === "classic"
-            ? "creamGold"
-            : settings.invoice.templateId,
-        accentPreset: settings.invoice.accentPreset ?? "gold",
-        accentColor: settings.invoice.accentColor ?? "#FFD700",
-        showStaffNames: settings.invoice.showStaffNames !== false,
-        showLogo: settings.invoice.showLogo !== false,
-        termsText: settings.invoice.termsText ?? "",
-        thankYouText: settings.invoice.thankYouText ?? "",
-      },
-      businessSnapshot: {
-        salonName: b.salonName,
-        gstin: b.gstin,
-        address: [b.address, b.city, b.state, b.pincode]
-          .filter(Boolean)
-          .join(", "),
-        phone: b.phone,
-        email: b.email,
-        invoiceFooterNote: b.invoiceFooterNote,
-        logoBase64: b.logoBase64,
-        logoMimeType: b.logoMimeType,
-      },
-      paymentMode: data.paymentMode,
-      status: "paid",
-      createdBy: data.createdBy || null,
-    });
+    // ---- Phase 2: all writes succeed together or not at all.
+    const session = await mongoose.startSession();
+    try {
+      // withTransaction retries the callback on transient errors (e.g. two bills
+      // racing for the invoice counter), so everything inside is recomputed per attempt.
+      await session.withTransaction(async () => {
+        if (appointment) {
+          // Claim and link in one write; the filter makes double-billing impossible.
+          const claimed = await Appointment.findOneAndUpdate(
+            {
+              _id: appointment._id,
+              status: "booked",
+              $or: [{ invoice: null }, { invoice: { $exists: false } }],
+            },
+            { $set: { status: "completed", invoice: invoiceId } },
+            { new: true, session },
+          );
+          if (!claimed) {
+            throw new BillingAbort({
+              statusCode: 409,
+              data: null,
+              message: "This appointment has already been billed",
+            });
+          }
+        }
 
-    if (customer && settings.loyalty.enabled) {
-      const loyaltyResult = await applyInvoiceLoyalty({
-        customerId: String(customer),
-        redeemPoints: loyaltyRedeemPoints,
-        earnBaseAmount: netAfterDiscounts,
-        invoiceId: String(invoice._id),
-        createdBy: data.createdBy,
-      });
-      // Sync actual redeem if balance was lower
-      invoice.loyaltyRedeemPoints = loyaltyResult.redeemedPoints;
-      invoice.loyaltyRedeemValue = loyaltyResult.redeemedValue;
-      invoice.loyaltyEarnedPoints = loyaltyResult.earnedPoints;
-      // If redeem value changed due to balance, recalculate payable is too late;
-      // applyInvoiceLoyalty already capped. Recompute only if redeem dropped.
-      if (loyaltyResult.redeemedValue !== loyaltyRedeemValue) {
-        const afterLoyalty2 = round2(
-          Math.max(0, afterTax - loyaltyResult.redeemedValue),
+        const { invoiceNumber } = await nextInvoiceNumber(
+          settings.invoice,
+          session,
         );
-        const r2 = applyRounding(afterLoyalty2, settings.invoice.rounding);
-        invoice.roundOff = r2.roundOff;
-        invoice.amountPayable = round2(r2.rounded + tip);
-        invoice.grandTotal = invoice.amountPayable;
-      }
-      await invoice.save();
-    }
 
-    if (appointment) {
-      await Appointment.findByIdAndUpdate(appointment._id, {
-        invoice: invoice._id,
-        status: "completed",
+        let redeemPoints = loyaltyRedeemPoints;
+        let redeemValue = loyaltyRedeemValue;
+        let earnedPoints = 0;
+        if (customer && settings.loyalty.enabled) {
+          const loyaltyResult = await applyInvoiceLoyalty({
+            customerId: String(customer),
+            redeemPoints: loyaltyRedeemPoints,
+            earnBaseAmount: netAfterDiscounts,
+            invoiceId: String(invoiceId),
+            createdBy: data.createdBy,
+            rules: settings.loyalty,
+            session,
+          });
+          // Actual redeem may be lower if the balance was lower.
+          redeemPoints = loyaltyResult.redeemedPoints;
+          redeemValue = loyaltyResult.redeemedValue;
+          earnedPoints = loyaltyResult.earnedPoints;
+        }
+
+        const afterLoyalty = round2(Math.max(0, afterTax - redeemValue));
+        const { rounded, roundOff } = applyRounding(
+          afterLoyalty,
+          settings.invoice.rounding,
+        );
+        const amountPayable = round2(rounded + tip);
+
+        await Invoice.create(
+          [
+            {
+              _id: invoiceId,
+              invoiceNumber,
+              customer,
+              walkIn,
+              walkInName,
+              walkInPhone,
+              source: appointment ? "appointment" : "walk-in",
+              appointment: appointment?._id ?? null,
+              serviceItems,
+              productItems,
+              comboItems,
+              serviceSubtotal,
+              productSubtotal,
+              serviceDiscountTotal,
+              productDiscountTotal,
+              tax,
+              loyaltyRedeemPoints: redeemPoints,
+              loyaltyRedeemValue: redeemValue,
+              loyaltyEarnedPoints: earnedPoints,
+              roundOff,
+              roundingRule: settings.invoice.rounding,
+              tip,
+              amountPayable,
+              grandTotal: amountPayable,
+              templateId,
+              templateSnapshot: {
+                templateId,
+                accentPreset: settings.invoice.accentPreset ?? "gold",
+                accentColor: settings.invoice.accentColor ?? "#FFD700",
+                showStaffNames: settings.invoice.showStaffNames !== false,
+                showLogo: settings.invoice.showLogo !== false,
+                termsText: settings.invoice.termsText ?? "",
+                thankYouText: settings.invoice.thankYouText ?? "",
+              },
+              businessSnapshot: {
+                salonName: b.salonName,
+                gstin: b.gstin,
+                address: [b.address, b.city, b.state, b.pincode]
+                  .filter(Boolean)
+                  .join(", "),
+                phone: b.phone,
+                email: b.email,
+                invoiceFooterNote: b.invoiceFooterNote,
+                logoId,
+              },
+              paymentMode: data.paymentMode,
+              status: "paid",
+              createdBy: data.createdBy || null,
+              // Backdated bill: recorded on the chosen salon day.
+              ...(billTime.createdAt ? { createdAt: billTime.createdAt } : {}),
+            },
+          ],
+          { session },
+        );
+
+        for (const line of productItems) {
+          const deduct = await applySaleDeduction({
+            productId: String(line.product),
+            quantity: line.qty,
+            invoiceId: String(invoiceId),
+            createdBy: data.createdBy,
+            trackStock: trackStockById.get(String(line.product)),
+            allowNegative: allowNegativeStock,
+            session,
+          });
+          if (deduct.statusCode !== 200) {
+            throw new BillingAbort({
+              statusCode: deduct.statusCode,
+              data: null,
+              message:
+                (deduct as { message?: string }).message ??
+                ErrorMessages.INSUFFICIENT_STOCK,
+              errors: (deduct as { errors?: unknown }).errors ?? {
+                code: ErrorCodes.INSUFFICIENT_STOCK,
+              },
+            });
+          }
+        }
       });
+    } catch (error) {
+      if (error instanceof BillingAbort) return error.result;
+      throw error;
+    } finally {
+      await session.endSession();
     }
 
-    const populated = await Invoice.findById(invoice._id)
+    // ---- Phase 3: committed; return it with names filled in.
+    const populated = await Invoice.findById(invoiceId)
       .populate("customer", "name lastName phone")
       .populate("serviceItems.staff", "name")
-      .populate("productItems.staff", "name");
+      .populate("productItems.staff", "name")
+      .populate("comboItems.components.staff", "name");
 
-    return { statusCode: 200, data: populated ?? invoice };
+    return {
+      statusCode: 200,
+      data: await withInvoiceLogo(populated),
+      message: undefined,
+    };
   } catch (error) {
     return {
       statusCode: 500,
@@ -532,6 +928,9 @@ export const getInvoices = async (query: InvoiceListQuery = {}) => {
     const filter: Record<string, unknown> = {};
 
     if (query.paymentMode) filter.paymentMode = query.paymentMode;
+    if (query.customerId && mongoose.Types.ObjectId.isValid(query.customerId)) {
+      filter.customer = new mongoose.Types.ObjectId(query.customerId);
+    }
     if (query.from || query.to) {
       filter.createdAt = {};
       if (query.from) {
@@ -544,32 +943,67 @@ export const getInvoices = async (query: InvoiceListQuery = {}) => {
       }
     }
 
-    let items = await Invoice.find(filter)
-      .populate("customer", "name lastName phone")
-      .populate("serviceItems.staff", "name")
-      .populate("productItems.staff", "name")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-
-    if (query.search?.trim()) {
-      const q = query.search.trim().toLowerCase();
-      items = items.filter((inv) => {
-        const cust = inv.customer as {
-          name?: string;
-          lastName?: string;
-        } | null;
-        const name = cust
-          ? `${cust.name ?? ""} ${cust.lastName ?? ""}`
-          : (inv.walkInName ?? "");
-        return (
-          inv.invoiceNumber.toLowerCase().includes(q) ||
-          name.toLowerCase().includes(q)
+    // Search is part of the query (not a filter on the fetched page), so it
+    // finds matches anywhere in the history and `total` / paging stay correct.
+    const search = query.search?.trim();
+    if (search) {
+      const pattern = escapeRegex(search);
+      const digits = search.replace(/\D/g, "");
+      const customerMatch: Record<string, unknown>[] = [
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $concat: [
+                  { $ifNull: ["$name", ""] },
+                  " ",
+                  { $ifNull: ["$lastName", ""] },
+                ],
+              },
+              regex: pattern,
+              options: "i",
+            },
+          },
+        },
+      ];
+      if (digits.length >= 3) {
+        customerMatch.push(
+          digits.length === 10
+            ? { phone: Number(digits) }
+            : {
+                $expr: {
+                  $regexMatch: {
+                    input: { $toString: "$phone" },
+                    regex: digits,
+                  },
+                },
+              },
         );
-      });
+      }
+      const matchingCustomers = await Customer.find({ $or: customerMatch })
+        .select("_id")
+        .limit(1000)
+        .lean();
+      filter.$or = [
+        { invoiceNumber: { $regex: pattern, $options: "i" } },
+        { walkInName: { $regex: pattern, $options: "i" } },
+        ...(matchingCustomers.length
+          ? [{ customer: { $in: matchingCustomers.map((c) => c._id) } }]
+          : []),
+      ];
     }
 
-    const total = await Invoice.countDocuments(filter);
+    const [items, total] = await Promise.all([
+      Invoice.find(filter)
+        .select(INVOICE_LIST_PROJECTION)
+        .populate("customer", "name lastName phone")
+        .populate("serviceItems.staff", "name")
+        .populate("productItems.staff", "name")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
 
     return {
       statusCode: 200,
@@ -592,11 +1026,12 @@ export const getInvoiceById = async (id: string) => {
       .populate("customer", "name lastName phone email")
       .populate("serviceItems.staff", "name")
       .populate("productItems.staff", "name")
+      .populate("comboItems.components.staff", "name")
       .populate("appointment");
     if (!invoice) {
       return { statusCode: 404, data: null, message: "Invoice not found" };
     }
-    return { statusCode: 200, data: invoice };
+    return { statusCode: 200, data: await withInvoiceLogo(invoice) };
   } catch (error) {
     return { statusCode: 500, data: error };
   }
@@ -615,7 +1050,11 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
       }
     }
 
-    const invoices = await Invoice.find(match).lean();
+    const invoices = await Invoice.find(match)
+      .select(
+        "serviceItems productItems comboItems serviceSubtotal serviceDiscountTotal productSubtotal productDiscountTotal",
+      )
+      .lean();
     const byStaff = new Map<
       string,
       { staffId: string; serviceSales: number; productSales: number }
@@ -640,6 +1079,15 @@ export const getStaffSalesSummary = async (from?: string, to?: string) => {
     for (const inv of invoices) {
       for (const line of inv.serviceItems ?? []) {
         bump(String(line.staff), "service", line.lineTotal);
+      }
+      for (const combo of inv.comboItems ?? []) {
+        for (const comp of combo.components ?? []) {
+          bump(
+            String(comp.staff),
+            "service",
+            Number(comp.allocatedAmount) || 0,
+          );
+        }
       }
       for (const line of inv.productItems ?? []) {
         bump(String(line.staff), "product", line.lineTotal);
@@ -761,6 +1209,95 @@ export const deleteInvoices = async (invoiceNumbers: string[]) => {
       statusCode: 500,
       message: "Invoice delete failed",
       data: null,
+      errors: error,
+    };
+  }
+};
+const POPULAR_WINDOW_DAYS = 90;
+
+export const getPopularBillingItems = async (limitRaw?: unknown) => {
+  try {
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(limitRaw) || 12)));
+
+    // Count in the database: returns at most `limit` rows per type instead of
+    // shipping every paid invoice's lines to Node. Ties keep first-sold order
+    // (earliest invoice _id), matching the previous in-memory behaviour.
+    // "Popular" = sold most in the last 90 days. Bounded by the createdAt index,
+    // so cost doesn't grow with years of history.
+    const since = new Date(Date.now() - POPULAR_WINDOW_DAYS * 86_400_000);
+    const topSold = (
+      itemsField: "serviceItems" | "productItems",
+      idField: string,
+    ) =>
+      Invoice.aggregate<{ _id: mongoose.Types.ObjectId; qty: number }>([
+        { $match: { createdAt: { $gte: since }, status: "paid" } },
+        { $project: { [itemsField]: 1 } },
+        { $unwind: { path: `$${itemsField}`, includeArrayIndex: "lineIndex" } },
+        { $match: { [`${itemsField}.${idField}`]: { $ne: null } } },
+        {
+          $group: {
+            _id: `$${itemsField}.${idField}`,
+            qty: { $sum: { $ifNull: [`$${itemsField}.qty`, 1] } },
+            firstSeen: { $min: { invoice: "$_id", line: "$lineIndex" } },
+          },
+        },
+        { $sort: { qty: -1, firstSeen: 1 } },
+        { $limit: limit },
+      ]);
+
+    const [topServices, topProducts] = await Promise.all([
+      topSold("serviceItems", "service"),
+      topSold("productItems", "product"),
+    ]);
+    const serviceQty = new Map(topServices.map((r) => [String(r._id), r.qty]));
+    const productQty = new Map(topProducts.map((r) => [String(r._id), r.qty]));
+    const topServiceIds = topServices.map((r) => String(r._id));
+    const topProductIds = topProducts.map((r) => String(r._id));
+
+    const [serviceDocs, productDocs] = await Promise.all([
+      Service.find({ _id: { $in: topServiceIds } })
+        .select("name price")
+        .lean(),
+      Product.find({ _id: { $in: topProductIds } })
+        .select("name price")
+        .lean(),
+    ]);
+
+    const serviceById = new Map(serviceDocs.map((s) => [String(s._id), s]));
+    const productById = new Map(productDocs.map((p) => [String(p._id), p]));
+
+    const services = topServiceIds
+      .map((id) => {
+        const doc = serviceById.get(id);
+        if (!doc) return null;
+        return {
+          id,
+          name: doc.name,
+          price: Number(doc.price ?? 0),
+          timesSold: serviceQty.get(id) ?? 0,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null);
+
+    const products = topProductIds
+      .map((id) => {
+        const doc = productById.get(id);
+        if (!doc) return null;
+        return {
+          id,
+          name: doc.name,
+          price: Number(doc.price ?? 0),
+          timesSold: productQty.get(id) ?? 0,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null);
+
+    return { statusCode: 200, data: { services, products } };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      data: null,
+      message: "Popular items failed",
       errors: error,
     };
   }

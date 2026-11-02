@@ -1,4 +1,4 @@
-import { apiClient } from '@/app/service/apiClient'
+import { apiClient, publicGet } from '@/app/service/apiClient'
 import type { ApiSuccessResponse } from '@/app/types/api'
 
 export type PaymentMode = 'upi' | 'cash' | 'card'
@@ -22,6 +22,13 @@ export interface CreateInvoiceProductLine {
   discount?: InvoiceLineDiscount
 }
 
+export interface CreateInvoiceComboLine {
+  comboId: string
+  qty: number
+  discount?: InvoiceLineDiscount
+  components: Array<{ serviceId: string; staffId: string }>
+}
+
 export interface CreateInvoiceInput {
   customerId?: string | null
   walkIn?: boolean
@@ -30,11 +37,14 @@ export interface CreateInvoiceInput {
   appointmentId?: string | null
   serviceItems?: CreateInvoiceServiceLine[]
   productItems?: CreateInvoiceProductLine[]
+  comboItems?: CreateInvoiceComboLine[]
   serviceDiscount?: InvoiceLineDiscount
   productDiscount?: InvoiceLineDiscount
   paymentMode: PaymentMode
   tip?: number
   loyaltyRedeemPoints?: number
+  /** Salon date (YYYY-MM-DD) for a bill entered late; omit for today. */
+  billDate?: string
 }
 
 export interface InvoiceTaxSnapshot {
@@ -81,6 +91,22 @@ export interface InvoiceRecord {
     staff: string | { _id: string; name?: string }
     discount: InvoiceLineDiscount
     lineTotal: number
+  }>
+  comboItems?: Array<{
+    combo: string
+    name: string
+    price: number
+    qty: number
+    discount: InvoiceLineDiscount
+    lineTotal: number
+    listTotal: number
+    components: Array<{
+      service: string
+      name: string
+      listPrice: number
+      allocatedAmount: number
+      staff: string | { _id: string; name?: string }
+    }>
   }>
   serviceSubtotal: number
   productSubtotal: number
@@ -183,7 +209,10 @@ export const invoicesApi = {
         expiresAt: string
         hasActiveLink: boolean
       }>
-    >(`/invoice/${id}/share-link`, opts)
+    >(`/invoice/${id}/share-link`, {
+      ...opts,
+      origin: window.location.origin,
+    })
     return data.data
   },
 
@@ -191,6 +220,21 @@ export const invoicesApi = {
     const { data } = await apiClient.post<ApiSuccessResponse<{ revoked: boolean }>>(
       `/invoice/${id}/revoke-share-link`,
     )
+    return data.data
+  },
+
+  popular: async (
+    limit = 12,
+  ): Promise<{
+    services: Array<{ id: string; name: string; price: number; timesSold: number }>
+    products: Array<{ id: string; name: string; price: number; timesSold: number }>
+  }> => {
+    const { data } = await apiClient.get<
+      ApiSuccessResponse<{
+        services: Array<{ id: string; name: string; price: number; timesSold: number }>
+        products: Array<{ id: string; name: string; price: number; timesSold: number }>
+      }>
+    >('/invoice/popular', { params: { limit } })
     return data.data
   },
 }
@@ -239,8 +283,8 @@ export interface PublicInvoicePayload {
 
 export const publicInvoiceApi = {
   getByToken: async (token: string): Promise<PublicInvoicePayload> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<PublicInvoicePayload>>(
-      `/public/invoice/${token}`,
+    const { data } = await publicGet<ApiSuccessResponse<PublicInvoicePayload>>(
+      `/public/invoice/${encodeURIComponent(token)}`,
     )
     return data.data
   },

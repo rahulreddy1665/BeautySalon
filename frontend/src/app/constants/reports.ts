@@ -55,8 +55,6 @@ export const REPORTS = {
     },
     export: 'Export CSV',
     searchPlaceholder: 'Search…',
-    pageOf: '{page} / {total}',
-    rowsTotal: '{total} rows',
   },
   presets: {
     today: 'Today',
@@ -103,6 +101,9 @@ export const REPORTS = {
       status: 'Status',
     },
     searchPlaceholder: 'Search invoice or customer',
+    filters: {
+      paymentAll: 'All payments',
+    },
   },
   staff: {
     title: 'Staff performance',

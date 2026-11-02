@@ -106,3 +106,81 @@ export function useInventoryQuery() {
 export function useInventoryProductQuery(id: string | undefined) {
   return useProductQuery(id)
 }
+
+export function useAddStockMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      quantity,
+      note,
+    }: {
+      id: string
+      quantity: number
+      note?: string
+    }) => productsApi.addStock(id, { quantity, note }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.billing.products() })
+      toast.success('Stock updated')
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Could not update stock'))
+    },
+  })
+}
+
+export function useUseStockMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      quantity,
+      reason,
+      staffId,
+    }: {
+      id: string
+      quantity: number
+      reason: string
+      staffId?: string
+    }) => productsApi.useStock(id, { quantity, reason, staffId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all })
+      toast.success('Stock updated')
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Could not update stock'))
+    },
+  })
+}
+
+export function useAdjustStockMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      countedQty,
+      reason,
+    }: {
+      id: string
+      countedQty: number
+      reason: string
+    }) => productsApi.adjustStock(id, { countedQty, reason }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.billing.products() })
+      toast.success('Stock updated')
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error, 'Could not update stock'))
+    },
+  })
+}
+
+export function useStockLedgerQuery(id: string | undefined, open: boolean) {
+  return useQuery({
+    queryKey: queryKeys.inventory.history(id ?? ''),
+    queryFn: () => productsApi.ledger(id!),
+    enabled: Boolean(id) && open,
+  })
+}

@@ -1,11 +1,13 @@
 import mongoose, { Document, Schema } from "mongoose";
+import "./category.model";
 
 export interface IService extends Document {
   name: string;
+  /** Denormalized category name (kept for migration / legacy filters). */
   category: string;
+  /** Managed category master reference. */
+  categoryId?: mongoose.Types.ObjectId | null;
   price: number;
-  /** Duration in minutes; default 30, min 5, step 5. */
-  durationMinutes: number;
 }
 
 const serviceSchema = new Schema<IService>(
@@ -20,16 +22,16 @@ const serviceSchema = new Schema<IService>(
       required: true,
       trim: true,
     },
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+      index: true,
+    },
     price: {
       type: Number,
       required: true,
       min: 0,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-      default: 30,
-      min: 5,
     },
   },
   {

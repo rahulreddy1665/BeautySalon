@@ -5,9 +5,8 @@ export type AppointmentStatus = 'booked' | 'completed' | 'cancelled' | 'no_show'
 
 export interface AppointmentServiceLine {
   service:
-    string | { _id: string; name?: string; price?: number; durationMinutes?: number }
+    string | { _id: string; name?: string; price?: number }
   name: string
-  durationMinutes: number
   staff: string | { _id: string; name?: string; isActive?: boolean }
 }
 
@@ -20,7 +19,6 @@ export interface Appointment {
   services: AppointmentServiceLine[]
   date: string
   startTime: string
-  endTime: string
   status: AppointmentStatus
   notes?: string
   invoice?: string | { _id: string } | null
@@ -29,7 +27,9 @@ export interface Appointment {
 }
 
 export interface AppointmentServiceInput {
-  serviceId: string
+  serviceId?: string
+  /** Expands to component services on the server. */
+  comboId?: string
   staffId: string
 }
 
@@ -82,6 +82,9 @@ export function appointmentServiceId(line: AppointmentServiceLine): string {
   return typeof line.service === 'string' ? line.service : line.service._id
 }
 
+/** Server caps a page at 1000; 500 keeps each response small. */
+const WINDOW_PAGE_SIZE = 500
+
 export const appointmentsApi = {
   list: async (params: AppointmentListParams = {}): Promise<PaginatedAppointments> => {
     const { data } = await apiClient.get<ApiSuccessResponse<PaginatedAppointments>>(
@@ -89,6 +92,25 @@ export const appointmentsApi = {
       { params },
     )
     return data.data
+  },
+
+  /**
+   * Every appointment in a date window (calendar / list views). Fetches page 1,
+   * then any remaining pages in parallel, so busy windows are never truncated.
+   */
+  listWindow: async (
+    params: Omit<AppointmentListParams, 'page' | 'limit'>,
+  ): Promise<PaginatedAppointments> => {
+    const limit = WINDOW_PAGE_SIZE
+    const first = await appointmentsApi.list({ ...params, page: 1, limit })
+    if (first.totalPages <= 1) return first
+    const rest = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, i) =>
+        appointmentsApi.list({ ...params, page: i + 2, limit }),
+      ),
+    )
+    const items = [first, ...rest].flatMap((p) => p.items)
+    return { items, total: first.total, page: 1, limit: items.length, totalPages: 1 }
   },
 
   getById: async (id: string): Promise<Appointment> => {

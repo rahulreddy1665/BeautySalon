@@ -25,6 +25,7 @@ export interface BusinessSettings {
   openingTime?: string
   closingTime?: string
   workingDays?: Weekday[]
+  allowNegativeStock?: boolean
 }
 
 export interface TaxRatePair {
@@ -89,7 +90,9 @@ export function logoDataUrl(business?: BusinessSettings | null): string | null {
 
 export const settingsApi = {
   get: async (): Promise<SalonSettings> => {
-    const { data } = await apiClient.get<ApiSuccessResponse<SalonSettings>>('/settings')
+    const { data } = await apiClient.get<ApiSuccessResponse<SalonSettings>>('/settings', {
+      timeout: 60_000,
+    })
     return data.data
   },
 

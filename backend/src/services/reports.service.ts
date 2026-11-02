@@ -1,16 +1,20 @@
 /**
  * Reports service — invoice/appointment analytics.
  *
- * Indexes: relies on existing Invoice.createdAt and Appointment.date+status
- * (plus Appointment services.staff+date+startTime). No new indexes added —
- * range queries filter on those fields.
+ * Indexes: Invoice.createdAt (range filters), Invoice.customer+createdAt
+ * (customer history), Appointment.date+status and services.staff+date+startTime.
+ *
+ * Data volume: invoices snapshot the salon logo (~300 KB each). Every list read
+ * here uses REPORT_INVOICE_FIELDS (or a narrower field list) so reports move
+ * kilobytes, not hundreds of MB. Money totals are still summed in JS with the
+ * same round2 semantics as billing, so report figures match invoices exactly.
  */
 
 import mongoose from "mongoose";
 
 import { Appointment } from "../models/appointment.model";
 import { Customer } from "../models/customer.model";
-import { Invoice } from "../models/invoice.model";
+import { Invoice, INVOICE_TOTALS_PROJECTION } from "../models/invoice.model";
 import { LoyaltyBalance } from "../models/loyalty.model";
 import { Product } from "../models/product.model";
 import { Service } from "../models/service.model";
@@ -52,6 +56,21 @@ type LeanInvoice = {
     staff: mongoose.Types.ObjectId;
     lineTotal: number;
   }>;
+  comboItems?: Array<{
+    combo: mongoose.Types.ObjectId;
+    name: string;
+    price: number;
+    qty: number;
+    lineTotal: number;
+    listTotal?: number;
+    components?: Array<{
+      service: mongoose.Types.ObjectId;
+      name: string;
+      listPrice: number;
+      allocatedAmount: number;
+      staff: mongoose.Types.ObjectId;
+    }>;
+  }>;
   serviceSubtotal?: number;
   productSubtotal?: number;
   serviceDiscountTotal?: number;
@@ -64,7 +83,14 @@ type LeanInvoice = {
   createdAt?: Date;
 };
 
-type ReportOpts = { canViewRevenue: boolean };
+type ReportOpts = {
+  canViewRevenue: boolean;
+  /** Internal: exports lift the 100-row page cap to get every row. */
+  maxLimit?: number;
+};
+
+/** Exports need the whole report, not one page. */
+const UNCAPPED = Number.MAX_SAFE_INTEGER;
 
 const APPT_STATUSES = new Set(["booked", "completed", "cancelled", "no_show"]);
 
@@ -130,12 +156,12 @@ function allBucketKeys(
   return keys;
 }
 
-function parsePageLimit(pageRaw: unknown, limitRaw: unknown) {
+function parsePageLimit(pageRaw: unknown, limitRaw: unknown, maxLimit = 100) {
   let page = Math.floor(Number(pageRaw));
   if (!Number.isFinite(page) || page < 1) page = 1;
   let limit = Math.floor(Number(limitRaw));
   if (!Number.isFinite(limit) || limit < 1) limit = 25;
-  if (limit > 100) limit = 100;
+  if (limit > maxLimit) limit = maxLimit;
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -158,10 +184,25 @@ function requireRange(fromRaw: unknown, toRaw: unknown) {
   return parseReportRange(fromRaw, toRaw);
 }
 
+/** Exactly the fields in LeanInvoice: everything report code reads, nothing more. */
+const REPORT_INVOICE_FIELDS =
+  "invoiceNumber customer walkIn walkInName source appointment serviceItems productItems comboItems serviceSubtotal productSubtotal serviceDiscountTotal productDiscountTotal tip amountPayable grandTotal paymentMode status createdAt";
+
 async function loadInvoices(fromDate: Date, toDate: Date): Promise<LeanInvoice[]> {
   return Invoice.find({
     createdAt: { $gte: fromDate, $lte: toDate },
-  }).lean() as Promise<LeanInvoice[]>;
+  })
+    .select(REPORT_INVOICE_FIELDS)
+    .lean() as Promise<LeanInvoice[]>;
+}
+
+/** Revenue / tip / count only, for "previous period" comparisons. */
+async function loadInvoiceTotals(fromDate: Date, toDate: Date): Promise<LeanInvoice[]> {
+  return Invoice.find({
+    createdAt: { $gte: fromDate, $lte: toDate },
+  })
+    .select(INVOICE_TOTALS_PROJECTION)
+    .lean() as Promise<LeanInvoice[]>;
 }
 
 function serviceNet(inv: LeanInvoice): number {
@@ -178,10 +219,30 @@ function productNet(inv: LeanInvoice): number {
 
 /**
  * Allocate section discount proportionally across lines:
- * attributed = lineTotal * (sectionNet / sumLines) when sumLines > 0
+ * attributed = lineTotal * (sectionNet / sumLines) when sumLines > 0.
+ * Combo components participate via allocatedAmount (already after line discount).
  */
 function attributedServiceLines(inv: LeanInvoice) {
-  const lines = inv.serviceItems ?? [];
+  const lines = [
+    ...(inv.serviceItems ?? []).map((l) => ({
+      service: l.service,
+      name: l.name,
+      price: l.price,
+      qty: l.qty,
+      staff: l.staff,
+      lineTotal: Number(l.lineTotal ?? 0),
+    })),
+    ...(inv.comboItems ?? []).flatMap((combo) =>
+      (combo.components ?? []).map((c) => ({
+        service: c.service,
+        name: c.name,
+        price: c.listPrice,
+        qty: 1,
+        staff: c.staff,
+        lineTotal: Number(c.allocatedAmount ?? 0),
+      })),
+    ),
+  ];
   const sumLines = round2(lines.reduce((s, l) => s + Number(l.lineTotal ?? 0), 0));
   const net = serviceNet(inv);
   const factor = sumLines > 0 ? net / sumLines : 0;
@@ -189,6 +250,10 @@ function attributedServiceLines(inv: LeanInvoice) {
     ...l,
     attributed: round2(Number(l.lineTotal ?? 0) * factor),
   }));
+}
+
+function combosSoldCount(inv: LeanInvoice): number {
+  return (inv.comboItems ?? []).reduce((s, l) => s + Number(l.qty ?? 1), 0);
 }
 
 function attributedProductLines(inv: LeanInvoice) {
@@ -277,8 +342,8 @@ export const getReportsOverview = async (opts: ReportOpts) => {
     const range = thisMonthToDateRange();
     const [currInvoices, prevInvoices, currAppts, prevAppts, newCurr, newPrev] =
       await Promise.all([
-        loadInvoices(range.fromDate, range.toDate),
-        loadInvoices(range.previousFromDate, range.previousToDate),
+        loadInvoiceTotals(range.fromDate, range.toDate),
+        loadInvoiceTotals(range.previousFromDate, range.previousToDate),
         Appointment.find({
           date: { $gte: range.from, $lte: range.to },
         })
@@ -413,6 +478,10 @@ function salesTableRows(invoices: LeanInvoice[]) {
       (s, l) => s + Number(l.qty ?? 1),
       0,
     );
+    const comboComponentQty = (inv.comboItems ?? []).reduce(
+      (s, combo) => s + (combo.components?.length ?? 0) * Number(combo.qty ?? 1),
+      0,
+    );
     const productQty = (inv.productItems ?? []).reduce(
       (s, l) => s + Number(l.qty ?? 1),
       0,
@@ -424,7 +493,7 @@ function salesTableRows(invoices: LeanInvoice[]) {
       createdAt: created ? created.toISOString() : "",
       customerName: customerDisplayName(cust, inv.walkInName),
       walkIn: Boolean(inv.walkIn),
-      itemsCount: serviceQty + productQty,
+      itemsCount: serviceQty + comboComponentQty + productQty,
       revenue: invoiceRevenue(inv),
       tip: round2(Number(inv.tip ?? 0)),
       amountPayable: round2(Number(inv.amountPayable ?? inv.grandTotal ?? 0)),
@@ -460,6 +529,7 @@ export const getReportsSales = async (
     order?: unknown;
     q?: unknown;
     chartSeries?: unknown;
+    allBills?: unknown;
   },
   opts: ReportOpts,
 ) => {
@@ -469,7 +539,7 @@ export const getReportsSales = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -500,9 +570,11 @@ export const getReportsSales = async (
       Invoice.find({
         createdAt: { $gte: range.fromDate, $lte: range.toDate },
       })
+        .select(REPORT_INVOICE_FIELDS)
         .populate("customer", "name lastName phone")
         .lean() as Promise<LeanInvoice[]>,
-      loadInvoices(range.previousFromDate, range.previousToDate),
+      // Previous period only feeds the KPI deltas (revenue, tips, bill count).
+      loadInvoiceTotals(range.previousFromDate, range.previousToDate),
     ]);
 
     const kpisRaw = salesKpis(curr, prev);
@@ -532,7 +604,18 @@ export const getReportsSales = async (
 
     let rows = filterSalesByQ(salesTableRows(curr), q);
     rows = sortByKey(rows as unknown as Record<string, unknown>[], sort, order) as typeof rows;
-    const table = paginate(rows, page, limit);
+    const allBills =
+      query.allBills === true ||
+      query.allBills === "true" ||
+      query.allBills === "1";
+    const table = allBills
+      ? {
+          items: rows,
+          total: rows.length,
+          page: 1,
+          limit: rows.length || 1,
+        }
+      : paginate(rows, page, limit);
 
     const kpis = opts.canViewRevenue
       ? kpisRaw
@@ -629,6 +712,7 @@ export const exportReportsSales = async (
     const curr = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
+      .select(REPORT_INVOICE_FIELDS)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -802,7 +886,7 @@ export const getReportsStaff = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1075,7 +1159,7 @@ export const getReportsCustomers = async (
     const inactiveDays = [30, 60, 90].includes(inactiveDaysRaw)
       ? inactiveDaysRaw
       : 30;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1091,6 +1175,7 @@ export const getReportsCustomers = async (
     const invoices = (await Invoice.find({
       createdAt: { $gte: range.fromDate, $lte: range.toDate },
     })
+      .select(REPORT_INVOICE_FIELDS)
       .populate("customer", "name lastName phone")
       .lean()) as LeanInvoice[];
 
@@ -1255,6 +1340,16 @@ export const getReportsCustomers = async (
             customer: { $ne: null },
           },
         },
+        // Keep the sort small: only the fields the $group below reads.
+        {
+          $project: {
+            customer: 1,
+            createdAt: 1,
+            amountPayable: 1,
+            grandTotal: 1,
+            tip: 1,
+          },
+        },
         { $sort: { createdAt: -1 } },
         {
           $group: {
@@ -1276,7 +1371,10 @@ export const getReportsCustomers = async (
             lastVisitAt: { $lte: cutoffEnd },
           },
         },
-      ]);
+        // $group output order is unspecified; the table sorts by day, so ties
+        // need a fixed order or pagination can repeat / skip customers.
+        { $sort: { lastVisitAt: -1, _id: 1 } },
+      ]).allowDiskUse(true);
 
       const ids = lastInvoices.map((r) => r._id);
       const customers = await Customer.find({ _id: { $in: ids } })
@@ -1348,8 +1446,8 @@ export const exportReportsCustomers = async (
 ) => {
   try {
     const result = await getReportsCustomers(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) {
       return result;
@@ -1439,7 +1537,7 @@ export const getReportsAppointments = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, _opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1462,7 +1560,8 @@ export const getReportsAppointments = async (
     if (statusFilter) match.status = statusFilter;
     if (staffId) match["services.staff"] = new mongoose.Types.ObjectId(staffId);
 
-    const [appointments, invoices, settings] = await Promise.all([
+    const filtered = Boolean(statusFilter || staffId);
+    const [appointments, invoices, settings, unfilteredInRange] = await Promise.all([
       Appointment.find(match)
         .populate("customer", "name lastName phone")
         .populate("services.staff", "name")
@@ -1473,14 +1572,17 @@ export const getReportsAppointments = async (
         .select("walkIn source appointment")
         .lean(),
       getOrCreateSettings(),
+      // KPIs ignore the status/staff filters. Without filters that's the same set
+      // as `appointments`, so only query again when a filter is applied.
+      filtered
+        ? Appointment.find({
+            date: { $gte: range.from, $lte: range.to },
+          })
+            .select("status invoice date startTime")
+            .lean()
+        : null,
     ]);
-
-    // KPIs from unfiltered range status counts (re-query without status/staff for KPIs)
-    const allInRange = await Appointment.find({
-      date: { $gte: range.from, $lte: range.to },
-    })
-      .select("status invoice date startTime")
-      .lean();
+    const allInRange = unfilteredInRange ?? appointments;
 
     const total = allInRange.length;
     const completed = allInRange.filter((a) => a.status === "completed").length;
@@ -1560,7 +1662,6 @@ export const getReportsAppointments = async (
         id: String(a._id),
         date: a.date,
         startTime: a.startTime,
-        endTime: a.endTime,
         status: a.status,
         customerName,
         staffNames,
@@ -1611,8 +1712,8 @@ export const exportReportsAppointments = async (
 ) => {
   try {
     const result = await getReportsAppointments(
-      { ...query, page: 1, limit: 100000 },
-      _opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ..._opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {
@@ -1621,7 +1722,6 @@ export const exportReportsAppointments = async (
         items: Array<{
           date: string;
           startTime: string;
-          endTime: string;
           status: string;
           customerName: string;
           staffNames: string[];
@@ -1632,8 +1732,7 @@ export const exportReportsAppointments = async (
     };
     const headers = [
       "Date",
-      "Start",
-      "End",
+      "Time",
       "Status",
       "Customer",
       "Staff",
@@ -1643,7 +1742,6 @@ export const exportReportsAppointments = async (
     const rows = data.table.items.map((r) => [
       r.date,
       r.startTime,
-      r.endTime,
       r.status,
       r.customerName,
       r.staffNames.join("; "),
@@ -1690,7 +1788,7 @@ export const getReportsServices = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1819,6 +1917,7 @@ export const getReportsServices = async (
 
     const soldCount = [...agg.values()].reduce((s, r) => s + r.qty, 0);
     const distinctCount = agg.size;
+    const combosSold = invoices.reduce((s, inv) => s + combosSoldCount(inv), 0);
     const avgDiscountPct =
       totalServiceSubtotal > 0
         ? round2((totalServiceDiscount / totalServiceSubtotal) * 100)
@@ -1829,6 +1928,7 @@ export const getReportsServices = async (
       revenue: opts.canViewRevenue ? totalRevenue : null,
       distinctCount,
       avgDiscountPct: opts.canViewRevenue ? avgDiscountPct : null,
+      combosSold,
     };
 
     const byRevenue = [...rows]
@@ -1903,8 +2003,8 @@ export const exportReportsServices = async (
 ) => {
   try {
     const result = await getReportsServices(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {
@@ -1980,7 +2080,7 @@ export const getReportsProducts = async (
       return fail(400, parsed.message, ErrorCodes.VALIDATION_ERROR);
     }
     const range = parsed.range;
-    const { page, limit } = parsePageLimit(query.page, query.limit);
+    const { page, limit } = parsePageLimit(query.page, query.limit, opts.maxLimit);
     const { sort, order } = parseSortOrder(
       query.sort,
       query.order,
@@ -1992,6 +2092,7 @@ export const getReportsProducts = async (
         "avgPriceCharged",
         "discountPctEffect",
         "revenueShare",
+        "stockQty",
       ],
       "revenue",
     );
@@ -2036,7 +2137,7 @@ export const getReportsProducts = async (
     }
 
     const productIds = [...agg.keys()];
-    const catalog = await Product.find({ _id: { $in: productIds } }).lean();
+    const catalog = await Product.find().lean();
     const catalogById = new Map(catalog.map((p) => [String(p._id), p]));
 
     const allStaffIds = [
@@ -2076,6 +2177,7 @@ export const getReportsProducts = async (
         productId: id,
         name: current?.name ?? r.snapshotName,
         timesSold: r.qty,
+        unitsSold: r.qty,
         revenue: r.revenue,
         listPrice,
         avgPriceCharged,
@@ -2085,6 +2187,10 @@ export const getReportsProducts = async (
         topSellerStaffId,
         topSellerStaffName,
         topSellerSales,
+        stockQty: current?.trackStock ? Number(current.stockQty ?? 0) : null,
+        unit: current?.unit ?? "",
+        trackStock: Boolean(current?.trackStock),
+        type: current?.type ?? "retail",
       };
     });
 
@@ -2194,8 +2300,8 @@ export const exportReportsProducts = async (
 ) => {
   try {
     const result = await getReportsProducts(
-      { ...query, page: 1, limit: 100000 },
-      opts,
+      { ...query, page: 1, limit: UNCAPPED },
+      { ...opts, maxLimit: UNCAPPED },
     );
     if (result.statusCode !== 200 || !result.data) return result;
     const data = result.data as {
