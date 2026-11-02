@@ -241,6 +241,16 @@ export function NewBillScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per appointment id
   }, [appointmentQuery.data, servicesQuery.data])
 
+  // The cart lives in Redux, so it outlives this screen; start fresh on every visit.
+  // Clearing the ref lets StrictMode's dev remount reload the appointment it just wiped.
+  useEffect(
+    () => () => {
+      loadedAppointmentIdRef.current = null
+      dispatch(resetCart())
+    },
+    [dispatch],
+  )
+
   useEffect(() => {
     const onFocusIn = (event: FocusEvent) => {
       if (!window.matchMedia('(max-width: 1023px)').matches) return

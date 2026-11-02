@@ -229,6 +229,43 @@ export function BillingScreen() {
     },
   ]
 
+  const hasRows = rows.length > 0 && !isLoading && !isError
+  const hasSelection = selectedIds.length > 0
+  const selectedLabel = BILLING.list.selectedCount.replace(
+    '{count}',
+    plural(selectedIds.length),
+  )
+  const selectionActions = (
+    <div
+      className={cn(
+        'flex shrink-0 items-center gap-2 transition-opacity',
+        hasSelection ? 'opacity-100' : 'pointer-events-none opacity-0',
+      )}
+      aria-hidden={!hasSelection}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        tabIndex={hasSelection ? 0 : -1}
+        onClick={() => setSelectedIds([])}
+      >
+        {BILLING.list.clearSelection}
+      </Button>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        tabIndex={hasSelection ? 0 : -1}
+        disabled={deleteMutation.isPending}
+        onClick={() => setDeleteTargets(selectedIds)}
+      >
+        <Trash2 className="size-4" strokeWidth={1.75} />
+        {BILLING.list.deleteSelected}
+      </Button>
+    </div>
+  )
+
   return (
     <div className="min-w-0 space-y-3">
       <PageHeader description={BILLING.list.description} />
@@ -278,58 +315,35 @@ export function BillingScreen() {
             <SelectItem value="card">Card</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Desktop: selection actions sit at the end of the filter row, so nothing shifts. */}
+        {hasRows ? (
+          <div className="hidden items-center gap-3 md:ml-auto md:flex">
+            {hasSelection ? (
+              <span className="text-sm font-medium text-gold-deep">{selectedLabel}</span>
+            ) : null}
+            {selectionActions}
+          </div>
+        ) : null}
       </div>
 
-      {/* Fixed-height row: selection actions fade in without pushing the table down. */}
-      {rows.length > 0 && !isLoading && !isError ? (
-        <div className="flex h-9 items-center justify-between gap-2 px-1">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <label className="flex items-center gap-2 text-muted-foreground md:hidden">
-              <SelectBox
-                checked={allPageSelected}
-                indeterminate={selectedOnPage > 0 && !allPageSelected}
-                onChange={toggleAllOnPage}
-                label={BILLING.list.selectAllAria}
-              />
-              {selectedIds.length === 0 ? BILLING.list.selectAllOnPage : null}
-            </label>
-            {selectedIds.length > 0 ? (
-              <span className="truncate font-medium text-gold-deep">
-                {BILLING.list.selectedCount.replace(
-                  '{count}',
-                  plural(selectedIds.length),
-                )}
-              </span>
-            ) : null}
-          </div>
-          <div
-            className={cn(
-              'flex shrink-0 items-center gap-2 transition-opacity',
-              selectedIds.length > 0 ? 'opacity-100' : 'pointer-events-none opacity-0',
+      {/* Phones: the table is cards with no header, so select-all lives in its own row. */}
+      {hasRows ? (
+        <div className="flex min-h-9 items-center justify-between gap-2 px-1 md:hidden">
+          <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+            <SelectBox
+              checked={allPageSelected}
+              indeterminate={selectedOnPage > 0 && !allPageSelected}
+              onChange={toggleAllOnPage}
+              label={BILLING.list.selectAllAria}
+            />
+            {hasSelection ? (
+              <span className="truncate font-medium text-gold-deep">{selectedLabel}</span>
+            ) : (
+              BILLING.list.selectAllOnPage
             )}
-            aria-hidden={selectedIds.length === 0}
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              tabIndex={selectedIds.length > 0 ? 0 : -1}
-              onClick={() => setSelectedIds([])}
-            >
-              {BILLING.list.clearSelection}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              tabIndex={selectedIds.length > 0 ? 0 : -1}
-              disabled={deleteMutation.isPending}
-              onClick={() => setDeleteTargets(selectedIds)}
-            >
-              <Trash2 className="size-4" strokeWidth={1.75} />
-              {BILLING.list.deleteSelected}
-            </Button>
-          </div>
+          </label>
+          {selectionActions}
         </div>
       ) : null}
 
@@ -384,7 +398,7 @@ export function BillingScreen() {
             </span>
             <DialogTitle className="text-base">
               {deleteTargets?.length === 1
-                ? BILLING.list.deleteOneTitle.replace('{invoice}', deleteTargets[0])
+                ? BILLING.list.deleteOneTitle.replace('{invoice}', deleteTargets[0] ?? '')
                 : BILLING.list.deleteManyTitle.replace(
                     '{count}',
                     plural(deleteTargets?.length ?? 0),
