@@ -79,9 +79,9 @@ export function BillingScreen() {
     [data],
   )
 
-  const pageIds = rows.map((bill) => bill.id)
-  const allPageSelected =
-    pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
+  // const pageIds = rows.map((bill) => bill.id)
+  // const allPageSelected =
+  //   pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
 
   const toggleInvoice = (id: string) => {
     setSelectedIds((previous) =>
@@ -91,29 +91,23 @@ export function BillingScreen() {
     )
   }
 
-  const toggleAllOnPage = () => {
-    setSelectedIds((previous) =>
-      allPageSelected
-        ? previous.filter((id) => !pageIds.includes(id))
-        : [...new Set([...previous, ...pageIds])],
-    )
-  }
+  // const toggleAllOnPage = () => {
+  //   setSelectedIds((previous) =>
+  //     allPageSelected
+  //       ? previous.filter((id) => !pageIds.includes(id))
+  //       : [...new Set([...previous, ...pageIds])],
+  //   )
+  // }
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0 || deleting) return
-
     setDeleting(true)
-
     try {
       await invoicesApi.deleteInvoices(selectedIds)
-
       const deletedCount = selectedIds.length
-
       setSelectedIds([])
       setDeleteOpen(false)
-
       toast.success(`${deletedCount} invoice(s) deleted successfully`)
-
       await refetch()
     } catch (err) {
       toast.error(
@@ -127,15 +121,7 @@ export function BillingScreen() {
   const columns: ColumnDef<BillRow>[] = [
     {
       id: 'select',
-      header: (
-        <input
-    type="checkbox"
-    checked={allPageSelected}
-    onChange={toggleAllOnPage}
-    aria-label="Select all invoices"
-    className="h-4 w-4 cursor-pointer"
-  />
-      ),
+      header: "",
       cell: ({ row }) => (
         <input
     type="checkbox"
