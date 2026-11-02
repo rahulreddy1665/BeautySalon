@@ -177,7 +177,18 @@ export const invoicesApi = {
     )
     return data.data
   },
+  deleteInvoices: async (ids: string[]): Promise<{ deletedCount: number }> => {
+    console.log('delete-invoice')
 
+    const { data } = await apiClient.post<ApiSuccessResponse<{ deletedCount: number }>>(
+      '/invoice/bulk-delete',
+      {
+        data: { invoiceNumbers: ids },
+      },
+    )
+
+    return data.data
+  },
   staffSales: async (from?: string, to?: string) => {
     const { data } = await apiClient.get<
       ApiSuccessResponse<

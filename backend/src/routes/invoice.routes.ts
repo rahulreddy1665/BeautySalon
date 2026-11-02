@@ -67,7 +67,7 @@ router.post(
 );
 
 router.post(
-  "/deleteInvoice",
+  "/bulk-delete",
   authenticate,
   // requirePermission("invoice:delete"),
   deleteInvoice,

@@ -912,6 +912,8 @@ export const createInvoice = async (data: CreateInvoiceDto) => {
       message: undefined,
     };
   } catch (error) {
+    console.log(error);
+
     return {
       statusCode: 500,
       data: null,

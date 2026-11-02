@@ -12,6 +12,8 @@ import { sendResponse } from "../middlewares/response.middleware";
 
 export const createInvoiceController = async (req: Request, res: Response) => {
   try {
+    console.log(req.body);
+
     const userId = (req as Request & { user?: { id?: string } }).user?.id;
     const data = await createInvoice({
       ...req.body,
@@ -99,7 +101,9 @@ export const getPopularBillingItemsController = async (
     return sendResponse(res, {
       statusCode: data.statusCode,
       message:
-        data.statusCode === 200 ? "Popular billing items" : "Popular items failed",
+        data.statusCode === 200
+          ? "Popular billing items"
+          : "Popular items failed",
       data: data.data,
       errors: (data as { errors?: unknown }).errors ?? null,
     });
@@ -137,8 +141,8 @@ export const getStaffSalesController = async (req: Request, res: Response) => {
 
 export const deleteInvoice = async (req: Request, res: Response) => {
   try {
-    if (req.body.invoiceNumbers) {
-      const result = await deleteInvoices(req.body.invoiceNumbers);
+    if (req.body.data.invoiceNumbers) {
+      const result = await deleteInvoices(req.body.data.invoiceNumbers);
       return sendResponse(res, {
         statusCode: result.statusCode,
         message: result.message,
